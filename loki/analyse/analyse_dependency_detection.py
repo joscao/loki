@@ -15,7 +15,7 @@ from loki import (
     FindNodes,
 )
 
-___all___ = ["normalize_bounds"]
+___all___ = ["normalize_bounds", "get_nested_loops"]
 
 
 def _implementation_get_nested_loops(loop):
@@ -31,7 +31,7 @@ def _implementation_get_nested_loops(loop):
         yield from _implementation_get_nested_loops(node)
 
 
-def _get_nested_loops(loop):
+def get_nested_loops(loop):
     """
     Helper routine to yield all loops in a loop nest.
     """
@@ -44,7 +44,7 @@ def normalize_bounds(start_node):
 
     transformer_map = {}
     for loop_start in loops_greedy:
-        nested_loops = list(_get_nested_loops(loop_start))
+        nested_loops = list(get_nested_loops(loop_start))
 
         mapped_bounds, new_body, new_node = None, None, {}
         for loop_node in reversed(nested_loops):
@@ -81,3 +81,5 @@ def normalize_bounds(start_node):
                 bounds=mapped_bounds, body=new_body
             )
     return Transformer(transformer_map).visit(start_node)
+
+
