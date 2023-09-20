@@ -154,7 +154,8 @@ def test_simplify_flattened(source, ref):
     ('10*a/5', '2*a'),
     ('2*(-2)/(-4)', '1'),
     ('(-8)/4', '-2'),
-    ('(5 + 3) * a - 8 * a / 2 + a * ((7 - 1) / 3)', '8*a - 4*a + 2*a')
+    ('(5 + 3) * a - 8 * a / 2 + a * ((7 - 1) / 3)', '8*a - 4*a + 2*a'),
+    ('9/5','1')
 ])
 def test_simplify_integer_arithmetic(source, ref):
     scope = Scope()

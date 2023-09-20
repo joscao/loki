@@ -383,9 +383,9 @@ def div_int_literals(expr):
         return expr
 
     if isinstance(expr.numerator, sym.IntLiteral):
-        div = gcd(expr.numerator.value, expr.denominator.value)
-        numerator = sym.IntLiteral(expr.numerator.value / div)
-        denominator = sym.IntLiteral(expr.denominator.value / div)
+        result = expr.numerator.value // expr.denominator.value
+        numerator = sym.IntLiteral(result)
+        denominator = sym.IntLiteral(1)
 
     elif isinstance(expr.numerator, sym.Product):
         value, remaining_components = separate_coefficients(expr.numerator)
