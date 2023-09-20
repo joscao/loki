@@ -13,7 +13,6 @@ from loki import (
     IntLiteral,
     Transformer,
     FindNodes,
-    Cast,
 )
 
 ___all___ = ["normalize_bounds"]
@@ -55,23 +54,25 @@ def normalize_bounds(start_node):
 
             if c is None:
                 c = IntLiteral(1)
-            if a == c == 1:
-                continue  # do nothing if already normalized
 
-            loop_variable_map = {loop_variable: (loop_variable - 1) * c + a}
-            loop_bounds_map = {
-                bounds: LoopRange(
-                    (IntLiteral(1), Cast("INT", (b - a) / c + 1), IntLiteral(1))
-                )
-            }
+            loop_variable_map = {}
+            loop_bounds_map = {}
 
-            if loop_node in new_node:
-                loop_node = new_node[loop_node]
+            if not a == c == 1:
+                loop_variable_map = {loop_variable: (loop_variable - 1) * c + a}
+                loop_bounds_map = {
+                    bounds: LoopRange((IntLiteral(1), (b - a) / c + 1, IntLiteral(1)))
+                }
 
             mapped_bounds = SubstituteExpressionsMapper(loop_bounds_map)(
                 loop_node.bounds
             )
-            new_body = SubstituteExpressions(loop_variable_map).visit(loop_node.body)
+
+            copy_body = tuple(
+                new_node.get(element, element) for element in loop_node.body
+            )
+
+            new_body = SubstituteExpressions(loop_variable_map).visit(copy_body)
 
             new_node[loop_node] = loop_node.clone(bounds=mapped_bounds, body=new_body)
 
