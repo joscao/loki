@@ -13,6 +13,8 @@ from loki import (
     IntLiteral,
     Transformer,
     FindNodes,
+    simplify,
+    Simplification,
 )
 
 ___all___ = ["normalize_bounds", "get_nested_loops"]
@@ -39,6 +41,15 @@ def get_nested_loops(loop):
     yield from _implementation_get_nested_loops(loop)
 
 
+def _simplify(expression):
+    return simplify(
+        expression,
+        enabled_simplifications=Simplification.IntegerArithmetic
+        | Simplification.CollectCoefficients
+        #until flatting is fixed for proper integer divison (issue #155)
+    )
+
+
 def normalize_bounds(start_node):
     loops_greedy = [node for node in FindNodes(Loop, greedy=True).visit(start_node)]
 
@@ -59,9 +70,17 @@ def normalize_bounds(start_node):
             loop_bounds_map = {}
 
             if not a == c == 1:
-                loop_variable_map = {loop_variable: (loop_variable - 1) * c + a}
+                loop_variable_map = {
+                    loop_variable: _simplify((loop_variable - 1) * c + a)
+                }
+
+                try:
+                    upper_bound = (b.value - a.value) // c.value + 1
+                except AttributeError:
+                    upper_bound = _simplify((b - a) / c + 1)
+
                 loop_bounds_map = {
-                    bounds: LoopRange((IntLiteral(1), (b - a) / c + 1, IntLiteral(1)))
+                    bounds: LoopRange((IntLiteral(1), upper_bound, IntLiteral(1)))
                 }
 
             mapped_bounds = SubstituteExpressionsMapper(loop_bounds_map)(
@@ -81,5 +100,3 @@ def normalize_bounds(start_node):
                 bounds=mapped_bounds, body=new_body
             )
     return Transformer(transformer_map).visit(start_node)
-
-
