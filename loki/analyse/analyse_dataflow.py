@@ -16,6 +16,9 @@ from loki.types import BasicType
 from loki.visitors import Visitor, Transformer
 from loki.subroutine import Subroutine
 from loki.tools.util import CaseInsensitiveDict
+from loki.expression import SubstituteExpressions
+from loki import RangeIndex, IntLiteral
+
 
 __all__ = [
     "dataflow_analysis_attached",
@@ -62,12 +65,8 @@ class DataflowAnalysisAttacher(Transformer):
         Return set of symbols found in an expression.
         """
         if condition is not None:
-            return {
-                v.clone(dimensions=None)
-                for v in FindVariables().visit(expr)
-                if condition(v)
-            }
-        return {v.clone(dimensions=None) for v in FindVariables().visit(expr)}
+            return {v.clone() for v in FindVariables().visit(expr) if condition(v)}
+        return {v.clone() for v in FindVariables().visit(expr)}
 
     @classmethod
     def _symbols_from_lhs_expr(cls, expr):
@@ -84,12 +83,12 @@ class DataflowAnalysisAttacher(Transformer):
         (defines, uses) : (set, set)
             The sets of defined and used symbols (in that order).
         """
-        defines = {expr.clone(dimensions=None)}
+
+        defines = {expr.clone()}
         uses = cls._symbols_from_expr(getattr(expr, "dimensions", ()))
         return defines, uses
 
     # Abstract node (also called from every node type for integration)
-
     def visit_Node(self, o, **kwargs):
         # Live symbols are determined on InternalNode handler levels and
         # get passed down to all child nodes
@@ -99,6 +98,7 @@ class DataflowAnalysisAttacher(Transformer):
         # handler routines and passed on to visitNode from there
         o._update(_defines_symbols=kwargs.get("defines_symbols", set()))
         o._update(_uses_symbols=kwargs.get("uses_symbols", set()))
+
         return o
 
     # Internal nodes
@@ -144,17 +144,50 @@ class DataflowAnalysisAttacher(Transformer):
             **kwargs,
         )
 
+    @staticmethod
+    def _manipulate_array_dimensions(expressions: set(), start, stop, step, variables):
+        def manipulate_if_array(value, variable_map):
+            if not isinstance(value, Array):
+                return value
+            return value.clone(
+                dimensions=SubstituteExpressions(variable_map).visit(value.dimensions)
+            )
+
+        variable_map = {
+            v: RangeIndex((start, stop, step)) for v in flatten(as_tuple(variables))
+        }
+
+        return {manipulate_if_array(x, variable_map) for x in expressions}
+
     def visit_Loop(self, o, **kwargs):
         # A loop defines the induction variable for its body before entering it
         live = kwargs.pop("live_symbols", set())
         uses = self._symbols_from_expr(o.bounds)
+
         body, defines, uses = self._visit_body(
             o.body, live=live | {o.variable.clone()}, uses=uses, **kwargs
         )
         o._update(body=body)
+
         # Make sure the induction variable is not considered outside the loop
         uses.discard(o.variable)
         defines.discard(o.variable)
+
+        uses = self._manipulate_array_dimensions(
+            uses,
+            o.bounds.start,
+            o.bounds.stop,
+            o.bounds.step or IntLiteral(1),
+            o.variable,
+        )
+        defines = self._manipulate_array_dimensions(
+            defines,
+            o.bounds.start,
+            o.bounds.stop,
+            o.bounds.step or IntLiteral(1),
+            o.variable,
+        )
+
         return self.visit_Node(
             o, live_symbols=live, defines_symbols=defines, uses_symbols=uses, **kwargs
         )
@@ -165,6 +198,28 @@ class DataflowAnalysisAttacher(Transformer):
         uses = self._symbols_from_expr(o.condition)
         body, defines, uses = self._visit_body(o.body, live=live, uses=uses, **kwargs)
         o._update(body=body)
+
+        # REMARK: Currently we do not try to determine bounds for while loop,
+        # simply assuming that every array occuring is fully used
+        dimension_exprs = set(
+            flatten(
+                as_tuple(
+                    v.dimensions
+                    for v in FindVariables().visit(o.body)
+                    if isinstance(v, Array)
+                )
+            )
+        )
+        live = self._manipulate_array_dimensions(
+            live, None, None, None, dimension_exprs
+        )
+        defines = self._manipulate_array_dimensions(
+            defines, None, None, None, dimension_exprs
+        )
+        uses = self._manipulate_array_dimensions(
+            uses, None, None, None, dimension_exprs
+        )
+
         return self.visit_Node(
             o, live_symbols=live, defines_symbols=defines, uses_symbols=uses, **kwargs
         )
