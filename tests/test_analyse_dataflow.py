@@ -411,8 +411,8 @@ end subroutine test
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
     with dataflow_analysis_attached(routine):
-        assert not 'a' in routine.body.uses_symbols
-        assert 'a' in routine.body.defines_symbols
+        assert not 'a(:,:)' in routine.body.uses_symbols
+        assert 'a(:,:)' in routine.body.defines_symbols
         assert not 'b' in routine.body.uses_symbols
 
 
@@ -510,8 +510,8 @@ end subroutine masked_statements
     with dataflow_analysis_attached(routine):
         assert len(mask.uses_symbols) == 1
         assert len(mask.defines_symbols) == 1
-        assert 'mask' in mask.uses_symbols
-        assert 'vec1' in mask.defines_symbols
+        assert 'mask(:)' in mask.uses_symbols
+        assert 'vec1(:)' in mask.defines_symbols
 
 
 @pytest.mark.parametrize('frontend', available_frontends())
