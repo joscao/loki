@@ -550,7 +550,7 @@ end subroutine while_loop
         assert len(loop.uses_symbols) == 1
         assert len(loop.defines_symbols) == 2
         assert 'ij' in loop.uses_symbols
-        assert all(v in loop.defines_symbols for v in ('ij', 'a'))
+        assert all(v in loop.defines_symbols for v in ('ij', 'a(:)'))
 
 
 @pytest.mark.parametrize('frontend', available_frontends())
