@@ -199,8 +199,9 @@ class DataflowAnalysisAttacher(Transformer):
         body, defines, uses = self._visit_body(o.body, live=live, uses=uses, **kwargs)
         o._update(body=body)
 
-        # REMARK: Currently we do not try to determine bounds for while loop,
-        # simply assuming that every array occuring is fully used
+        # REMARK: Currently we do not try to determine bounds for while loops,
+        # instead we simply assume that every array occuring in is body is
+        # fully used
         dimension_exprs = set(
             flatten(
                 as_tuple(
