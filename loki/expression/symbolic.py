@@ -12,14 +12,16 @@ from math import gcd
 import operator as _op
 import numpy as np
 import pymbolic.primitives as pmbl
-
+from pymbolic.primitives import Call
 from loki.expression.mappers import LokiIdentityMapper
 import loki.expression.symbols as sym
 from loki.tools import as_tuple
 
+import loki.expression.interval_arithmetics as ia
+
 __all__ = [
     'is_constant', 'symbolic_op', 'simplify', 'accumulate_polynomial_terms',
-    'Simplification', 'SimplifyMapper', 'is_dimension_constant'
+    'Simplification', 'SimplifyMapper', 'is_dimension_constant', 'perform_interval_arithmetics'
 ]
 
 
@@ -572,3 +574,70 @@ def simplify(expr, enabled_simplifications=Simplification.ALL):
     Simplify the given expression by applying selected simplifications.
     """
     return SimplifyMapper(enabled_simplifications=enabled_simplifications)(expr)
+
+
+class IntervalArithmeticsMapper(LokiIdentityMapper):
+    """
+    A mapper that attempts to symbolically simplify a combination of interval/RangeIndex expressions.
+    """
+    def map_sum(self, expr, *args, **kwargs):
+        zero_range = sym.RangeIndex((0,0,0))
+        iteratable = (self.rec(child, *args, **kwargs) for child in expr.children)
+        new_expr = reduce(ia.add, iteratable, zero_range)
+
+        if new_expr != expr:
+            return self.rec(new_expr, *args, **kwargs)
+        return expr
+
+    def map_product(self, expr, *args, **kwargs):
+        one_range = sym.RangeIndex((1,1,1))
+        iteratable = (self.rec(child, *args, **kwargs) for child in expr.children)
+        new_expr = reduce(ia.mul, iteratable, one_range)
+
+        if new_expr != expr:
+            return self.rec(new_expr, *args, **kwargs)
+        return expr
+
+    def map_quotient(self, expr, *args, **kwargs):
+        numerator = self.rec(expr.numerator, *args, **kwargs)
+        denominator = self.rec(expr.denominator, *args, **kwargs)
+        new_expr = ia.binary_operation(lambda x,y : x/y, numerator, denominator)
+        if new_expr != expr:
+            return self.rec(new_expr, *args, **kwargs)
+        return expr
+
+    def map_floor_div(self, expr, *args, **kwargs):
+        numerator = self.rec(expr.numerator, *args, **kwargs)
+        denominator = self.rec(expr.denominator, *args, **kwargs)
+        new_expr = ia.binary_operation(lambda x,y : x//y, numerator, denominator)
+        if new_expr != expr:
+            return self.rec(new_expr, *args, **kwargs)
+        return expr
+
+    def map_call(self, expr, *args, **kwargs):
+        return #This function mapping implementation is currently faulty at best!!
+        
+        if not any(parameter == sym.RangeIndex for parameter in expr.parameters):
+            return expr
+
+        if len(expr.parameters) == 1:
+            print("expr:", expr)
+            new_expr = ia.unary_operation(lambda x:Call(expr.function,x), expr.parameters[0])
+            print("new_expr:", new_expr)
+        if len(expr.parameters) == 2:
+            new_expr = ia.binary_operation(expr.function, expr.parameters[0], expr.parameters[1])
+
+        if new_expr != expr:
+            return self.rec(new_expr, *args, **kwargs)
+        return expr
+
+    map_parenthesised_add = map_sum
+    map_parenthesised_mul = map_product
+    map_parenthesised_div = map_quotient
+
+def perform_interval_arithmetics(expr):
+    """
+    Simplify the given expression by performing interval arithmetics calculating upper and lower bounds.
+    """
+
+    return IntervalArithmeticsMapper()(expr)
