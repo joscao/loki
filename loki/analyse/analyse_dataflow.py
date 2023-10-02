@@ -19,7 +19,6 @@ from loki.tools.util import CaseInsensitiveDict
 from loki.expression import SubstituteExpressions
 from loki import RangeIndex, IntLiteral
 
-
 __all__ = [
     "dataflow_analysis_attached",
     "read_after_write_vars",
@@ -188,6 +187,7 @@ class DataflowAnalysisAttacher(Transformer):
             o.bounds.step or IntLiteral(1),
             o.variable,
         )
+
         defines = self._manipulate_array_dimensions(
             defines,
             o.bounds.start,
@@ -206,6 +206,8 @@ class DataflowAnalysisAttacher(Transformer):
         uses = self._symbols_from_expr(o.condition)
         body, defines, uses = self._visit_body(o.body, live=live, uses=uses, **kwargs)
         o._update(body=body)
+
+        # Warning this may not be usable for multiple arrays, since no differenciation of dimensions is made
 
         # REMARK: Currently we do not try to determine bounds for while loops,
         # instead we simply assume that every array occuring in is body is
