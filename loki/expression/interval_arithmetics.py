@@ -12,9 +12,9 @@ WARNING: Step size for ranges is disregarded in all operations, only valid upper
 https://en.wikipedia.org/wiki/Interval_arithmetic
 """
 
-from loki import RangeIndex
+from loki.expression.symbols import RangeIndex
 
-__all___ = ["add", "sub", "mul", "binary_operation"]
+__all___ = ["add", "sub", "mul", "binary_operation", "unary_operation"]
 
 
 def _get_bounds(x, y):
@@ -56,6 +56,14 @@ def binary_operation(op, x, y):
 
     if y.__class__ is not RangeIndex:
         return _binary_operation_on_range_index_and_scalar(op, x, y)
+
+
+def unary_operation(op, x : RangeIndex):
+    """
+    Apply unary operation `op` to interval `x`. Assuming
+    that the unary operation is well defined.
+    """
+    return RangeIndex((op(x.start), op(x.stop)))
 
 
 def _add_on_range_index(x: RangeIndex, y: RangeIndex):
