@@ -8,7 +8,7 @@
 import pytest
 
 from loki import RangeIndex
-from loki.analyse.interval_arithmetics import add, mul, sub, binary_operation
+from loki.expression.interval_arithmetics import add, mul, sub, binary_operation
 
 
 @pytest.mark.parametrize(
