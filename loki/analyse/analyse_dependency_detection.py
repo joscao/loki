@@ -5,6 +5,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import numpy as np
 from loki import (
     Loop,
     SubstituteExpressions,
@@ -14,10 +15,69 @@ from loki import (
     Transformer,
     FindNodes,
     simplify,
+    FindVariables,
     Simplification,
+    is_constant,
+    accumulate_polynomial_terms,
 )
+from loki.expression import symbols as sym
 
-___all___ = ["normalize_bounds", "get_nested_loops"]
+___all___ = [
+    "normalize_bounds",
+    "get_nested_loops",
+    "construct_affine_array_access_function_representation",
+]
+
+
+def construct_affine_array_access_function_representation(
+    array_dimensions_expr: tuple(), additional_variables: set() = None
+):
+    """
+    Construct a matrix, vector representation of the access function of an array.
+    E.g. z[i], where the expression ("i", ) should be passed to this function,
+         y[1+3,4-j], where ("1+3", "4-j") should be passed to this function,
+         if var=Array(...), then var.dimensions should be passed to this function.
+    Returns: matrix, vector: F,f mapping a vecector i within the bounds Bi+b>=0 to the
+    array location Fi+f
+    """
+    def generate_row(expr, variables):
+        supported_types = (sym.TypedSymbol, sym.MetaSymbol, sym.Sum, sym.Product)
+        if not (is_constant(expr) or isinstance(expr, supported_types)):
+            raise ValueError(f"Cannot derive inequality from expr {str(expr)}")
+        simplified_expr = simplify(expr)
+        terms = accumulate_polynomial_terms(simplified_expr)
+        const_term = terms.pop(1, 0)  # Constant term or 0
+        row = np.zeros(len(variables), dtype=np.dtype(int))
+
+        for base, coef in terms.items():
+            if not len(base) == 1:
+                raise ValueError(f"Non-affine bound {str(simplified_expr)}")
+            row[variables.index(base[0].name.lower())] = coef
+
+        return row, const_term
+
+    if additional_variables is None:
+        additional_variables = set()
+
+    variables = {v.name.lower() for v in additional_variables}
+    variables = sorted(
+        list(
+            variables
+            | {v.name.lower() for v in FindVariables().visit(array_dimensions_expr)}
+        )
+    )
+
+    n = len(array_dimensions_expr)
+    d = len(variables)
+
+    F = np.zeros([n, d], dtype=np.dtype(int))
+    f = np.zeros([n, 1], dtype=np.dtype(int))
+
+    for dimension_index, sub_expr in enumerate(array_dimensions_expr):
+        row, constant = generate_row(sub_expr, variables)
+        F[dimension_index] = row
+        f[dimension_index, 0] = constant
+    return F, f, variables
 
 
 def _implementation_get_nested_loops(loop):
@@ -37,7 +97,8 @@ def get_nested_loops(loop):
     """
     Helper routine to yield all loops in a loop nest.
     """
-    yield loop
+    if isinstance(loop, Loop):
+        yield loop
     yield from _implementation_get_nested_loops(loop)
 
 
@@ -46,7 +107,7 @@ def _simplify(expression):
         expression,
         enabled_simplifications=Simplification.IntegerArithmetic
         | Simplification.CollectCoefficients
-        #until flatting is fixed for proper integer divison (issue #155)
+        # until flatting is fixed for proper integer divison (issue #155)
     )
 
 
