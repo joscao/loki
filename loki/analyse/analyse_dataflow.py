@@ -173,6 +173,14 @@ class DataflowAnalysisAttacher(Transformer):
         uses.discard(o.variable)
         defines.discard(o.variable)
 
+        live = self._manipulate_array_dimensions(
+            live,
+            o.bounds.start,
+            o.bounds.stop,
+            o.bounds.step or IntLiteral(1),
+            o.variable,
+        )
+
         uses = self._manipulate_array_dimensions(
             uses,
             o.bounds.start,
