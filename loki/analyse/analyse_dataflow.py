@@ -23,6 +23,8 @@ __all__ = [
     "dataflow_analysis_attached",
     "read_after_write_vars",
     "loop_carried_dependencies",
+    "FindWrites",
+    "FindReads"
 ]
 
 

@@ -126,17 +126,15 @@ def test_nested_loops_calculation(
     assert expected == actual
 
 
-# test the detection of the affine array access function
-
-
 @pytest.mark.parametrize(
-        "array_dimensions_expr, expected", [
-            ("i-1", ([[1,0]],[[-1]])),
-            ("i,j", ([[1,0],[0,1]],[[0],[0]])),
-            ("j,j+1",([[0,1],[0,1]],[[0],[1]])),
-            ("1,2",([[0,0],[0,0]],[[1],[2]])),
-            ("1,i,2*i+j",([[0,0],[1,0],[2,1]],[[1],[0],[0]])),
-        ]
+    "array_dimensions_expr, expected",
+    [
+        ("i-1", ([[1, 0]], [[-1]])),
+        ("i,j", ([[1, 0], [0, 1]], [[0], [0]])),
+        ("j,j+1", ([[0, 1], [0, 1]], [[0], [1]])),
+        ("1,2", ([[0, 0], [0, 0]], [[1], [2]])),
+        ("1,i,2*i+j", ([[0, 0], [1, 0], [2, 1]], [[1], [0], [0]])),
+    ],
 )
 def test_access_function_creation(array_dimensions_expr, expected):
     scope = Scope()
@@ -146,6 +144,16 @@ def test_access_function_creation(array_dimensions_expr, expected):
     variables = FindVariables().visit(
         (*first.dimensions, *make_all_variables_available.dimensions)
     )
+    variables = {str(var).lower() for var in variables}
+
+    F, f, variables = construct_affine_array_access_function_representation(
+        first.dimensions, variables
+    )
+
+    assert np.array_equal(F, np.array(expected[0], dtype=np.dtype(int)))
+    assert np.array_equal(f, np.array(expected[1], dtype=np.dtype(int)))
+    assert np.array_equal(variables, np.array(["i", "j"], dtype=np.dtype(object)))
+
 
     F, f, variables = construct_affine_array_access_function_representation(first.dimensions, variables)
 

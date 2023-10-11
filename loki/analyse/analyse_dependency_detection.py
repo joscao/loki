@@ -30,7 +30,7 @@ ___all___ = [
 
 
 def construct_affine_array_access_function_representation(
-    array_dimensions_expr: tuple(), additional_variables: set() = None
+    array_dimensions_expr: tuple(), additional_variables: set[str] = None
 ):
     """
     Construct a matrix, vector representation of the access function of an array.
@@ -59,7 +59,7 @@ def construct_affine_array_access_function_representation(
     if additional_variables is None:
         additional_variables = set()
 
-    variables = {v.name.lower() for v in additional_variables}
+    variables = {v.lower() for v in additional_variables}
     variables = sorted(
         list(
             variables
