@@ -5,11 +5,13 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import warnings
 from pathlib import Path
 from shutil import rmtree
 import numpy as np
 import pytest
 from conftest import jit_compile
+from sympy import Matrix as sympy_matrix, sympify, Implies, And
 from loki import (
     Sourcefile,
     Loop,
@@ -22,7 +24,11 @@ from loki import (
 from loki.analyse.analyse_dependency_detection import (
     normalize_bounds,
     construct_affine_array_access_function_representation,
+    NoIntegerSolution,
+    row_echelon_form_under_gcd_condition,
 )
+from loki.analyse.analyse_dependency_detection import get_nested_loops
+from loki.analyse.util_polyhedron import Polyhedron
 
 
 @pytest.fixture(scope="module", name="here")
@@ -155,8 +161,103 @@ def test_access_function_creation(array_dimensions_expr, expected):
     assert np.array_equal(variables, np.array(["i", "j"], dtype=np.dtype(object)))
 
 
-    F, f, variables = construct_affine_array_access_function_representation(first.dimensions, variables)
+src_path = "sources/data_dependency_detection/"
 
-    assert np.array_equal(F, np.array(expected[0],dtype=np.dtype(int)))
-    assert np.array_equal(f, np.array(expected[1],dtype=np.dtype(int)))
-    assert np.array_equal(variables, np.array(["i","j"],dtype=np.dtype(object)))
+
+@pytest.mark.parametrize(
+    "filename, subroutine_names",
+    [
+        (
+            "loop_carried_dependencies.f90",
+            [
+                "SimpleDependency",
+                "NestedDependency",
+                "ConditionalDependency",
+                "NoDependency",
+            ],
+        ),
+        (
+            "various_loops.f90",
+            [
+                "single_loop",
+                "single_loop_split_access",
+                "single_loop_arithmetic_operations_for_access",
+                "nested_loop_single_dimensions_access",
+                "nested_loop_partially_used",
+                "partially_used_array",
+            ],
+        ),
+        (
+            "bounds_normalization.f90",
+            ["boundsnormalizationtests", "nested_loops_calculation"],
+        ),
+    ],
+)
+def test_correct_iteration_space_extraction(here, filename, subroutine_names):
+    """
+    Test if the iteration space is correctly extracted from the loop bounds, by comparing the inequalities gained
+    with the loop bounds by symbolic evaluation, performed by sympy. An additional assumption is made, that inside
+    the loop body the loop bounds are not violated, this should almost always hold, but is not checked.
+    """
+
+    def yield_routine(filename, subroutine_names):
+        source = Sourcefile.from_file(here / src_path / filename)
+
+        for name in subroutine_names:
+            yield source[name]
+
+    for routine in yield_routine(filename, subroutine_names):
+        nested_loops = list(get_nested_loops(routine.body))
+        loop_variables = [loop.variable for loop in nested_loops]
+        loop_ranges = [loop.bounds for loop in nested_loops]
+
+        try:
+            poly = Polyhedron.from_nested_loops(nested_loops)
+        except (ValueError, AssertionError) as e:
+            warnings.warn(str(e), UserWarning)
+            continue  # skip if the polyhedron cannot be constructed
+
+        B, b = poly.get_B_b_representation()
+        iteration_space_required_variables = list(str(v) for v in poly.variables)
+
+        B = sympy_matrix(B)
+        b = sympy_matrix(b)
+        v = sympy_matrix(iteration_space_required_variables)
+
+        inequality_rhs = B * v + b
+
+        # if the loop body is entered the start of the loop range must be smaller equal than the stop of the loop range
+        implied_loop_conditions = [
+            sympify(str(range.stop) + ">=" + str(range.start)) for range in loop_ranges
+        ]
+
+        expr_with_lower_bound = inequality_rhs.subs(
+            {str(v): str(range.start) for v, range in zip(loop_variables, loop_ranges)}
+        )
+        expr_with_upper_bound = inequality_rhs.subs(
+            {str(v): str(range.stop) for v, range in zip(loop_variables, loop_ranges)}
+        )
+
+        for expr in expr_with_lower_bound:
+            assert Implies(And(*implied_loop_conditions), expr >= 0)
+
+        for expr in expr_with_upper_bound:
+            assert Implies(And(*implied_loop_conditions), expr >= 0)
+
+
+@pytest.mark.parametrize(
+    "matrix, should_fail, result",
+    [
+        ([[2, 0, 1], [0, 2, 0]], True, None),
+        ([[1, -2, 1, 0], [3, 2, 1, 5]], True, None),
+        ([[1, -1, -10]], False, [[1, -1, -10]]),
+    ],
+)
+def test_row_echelon_form_under_gcd_condition(matrix, should_fail, result):
+    matrix = np.array(matrix, dtype=np.dtype(int))
+    if should_fail:
+        with pytest.raises(NoIntegerSolution):
+            _ = row_echelon_form_under_gcd_condition(matrix)
+    else:
+        result = np.array(result, dtype=np.dtype(int))
+        assert np.array_equal(row_echelon_form_under_gcd_condition(matrix), result)
