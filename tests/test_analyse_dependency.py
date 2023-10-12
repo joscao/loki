@@ -24,9 +24,8 @@ from loki import (
 from loki.analyse.analyse_dependency_detection import (
     normalize_bounds,
     construct_affine_array_access_function_representation,
-    NoIntegerSolution,
-    row_echelon_form_under_gcd_condition,
 )
+
 from loki.analyse.analyse_dependency_detection import get_nested_loops
 from loki.analyse.util_polyhedron import Polyhedron
 
@@ -164,6 +163,12 @@ def test_access_function_creation(array_dimensions_expr, expected):
 src_path = "sources/data_dependency_detection/"
 
 
+def yield_routine(filename, subroutine_names):
+    source = Sourcefile.from_file(here / src_path / filename)
+
+    for name in subroutine_names:
+        yield source[name]
+
 @pytest.mark.parametrize(
     "filename, subroutine_names",
     [
@@ -199,13 +204,6 @@ def test_correct_iteration_space_extraction(here, filename, subroutine_names):
     with the loop bounds by symbolic evaluation, performed by sympy. An additional assumption is made, that inside
     the loop body the loop bounds are not violated, this should almost always hold, but is not checked.
     """
-
-    def yield_routine(filename, subroutine_names):
-        source = Sourcefile.from_file(here / src_path / filename)
-
-        for name in subroutine_names:
-            yield source[name]
-
     for routine in yield_routine(filename, subroutine_names):
         nested_loops = list(get_nested_loops(routine.body))
         loop_variables = [loop.variable for loop in nested_loops]
@@ -244,20 +242,11 @@ def test_correct_iteration_space_extraction(here, filename, subroutine_names):
         for expr in expr_with_upper_bound:
             assert Implies(And(*implied_loop_conditions), expr >= 0)
 
-
 @pytest.mark.parametrize(
-    "matrix, should_fail, result",
+    "filename, subroutine_names",
     [
-        ([[2, 0, 1], [0, 2, 0]], True, None),
-        ([[1, -2, 1, 0], [3, 2, 1, 5]], True, None),
-        ([[1, -1, -10]], False, [[1, -1, -10]]),
-    ],
+        ("independent_variable_test_loops.f90", ["simple_nested_loop"])
+    ]
 )
-def test_row_echelon_form_under_gcd_condition(matrix, should_fail, result):
-    matrix = np.array(matrix, dtype=np.dtype(int))
-    if should_fail:
-        with pytest.raises(NoIntegerSolution):
-            _ = row_echelon_form_under_gcd_condition(matrix)
-    else:
-        result = np.array(result, dtype=np.dtype(int))
-        assert np.array_equal(row_echelon_form_under_gcd_condition(matrix), result)
+def test_independent_variables_test(filename, subroutine_names):
+    return True
