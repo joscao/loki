@@ -28,6 +28,7 @@ ___all___ = [
     "construct_affine_array_access_function_representation",
 ]
 
+
 def construct_affine_array_access_function_representation(
     array_dimensions_expr: tuple(), additional_variables: set[str] = None
 ):
@@ -39,6 +40,7 @@ def construct_affine_array_access_function_representation(
     Returns: matrix, vector: F,f mapping a vecector i within the bounds Bi+b>=0 to the
     array location Fi+f
     """
+
     def generate_row(expr, variables):
         supported_types = (sym.TypedSymbol, sym.MetaSymbol, sym.Sum, sym.Product)
         if not (is_constant(expr) or isinstance(expr, supported_types)):

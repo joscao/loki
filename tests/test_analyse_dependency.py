@@ -169,6 +169,7 @@ def yield_routine(filename, subroutine_names):
     for name in subroutine_names:
         yield source[name]
 
+
 @pytest.mark.parametrize(
     "filename, subroutine_names",
     [
@@ -242,11 +243,10 @@ def test_correct_iteration_space_extraction(here, filename, subroutine_names):
         for expr in expr_with_upper_bound:
             assert Implies(And(*implied_loop_conditions), expr >= 0)
 
+
 @pytest.mark.parametrize(
     "filename, subroutine_names",
-    [
-        ("independent_variable_test_loops.f90", ["simple_nested_loop"])
-    ]
+    [("independent_variable_test_loops.f90", ["simple_nested_loop"])],
 )
 def test_independent_variables_test(filename, subroutine_names):
     return True
