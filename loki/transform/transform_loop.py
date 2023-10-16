@@ -32,7 +32,7 @@ from loki.analyse import (
     dataflow_analysis_attached, read_after_write_vars, loop_carried_dependencies
 )
 
-__all__ = ['loop_interchange', 'loop_fusion', 'loop_fission']
+__all__ = ['loop_interchange', 'loop_fusion', 'loop_fission','eliminate_variable']
 
 
 from loki.analyse.util_polyhedron import Polyhedron
