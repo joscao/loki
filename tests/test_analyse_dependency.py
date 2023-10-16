@@ -163,7 +163,7 @@ def test_access_function_creation(array_dimensions_expr, expected):
 src_path = "sources/data_dependency_detection/"
 
 
-def yield_routine(filename, subroutine_names):
+def yield_routine(here, filename, subroutine_names):
     source = Sourcefile.from_file(here / src_path / filename)
 
     for name in subroutine_names:
@@ -205,7 +205,7 @@ def test_correct_iteration_space_extraction(here, filename, subroutine_names):
     with the loop bounds by symbolic evaluation, performed by sympy. An additional assumption is made, that inside
     the loop body the loop bounds are not violated, this should almost always hold, but is not checked.
     """
-    for routine in yield_routine(filename, subroutine_names):
+    for routine in yield_routine(here, filename, subroutine_names):
         nested_loops = list(get_nested_loops(routine.body))
         loop_variables = [loop.variable for loop in nested_loops]
         loop_ranges = [loop.bounds for loop in nested_loops]
