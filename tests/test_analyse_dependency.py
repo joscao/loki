@@ -149,7 +149,7 @@ def test_access_function_creation(array_dimensions_expr, expected):
     variables = FindVariables().visit(
         (*first.dimensions, *make_all_variables_available.dimensions)
     )
-    variables = {str(var).lower() for var in variables}
+    variables = list({str(var).lower() for var in variables})
 
     F, f, variables = construct_affine_array_access_function_representation(
         first.dimensions, variables
