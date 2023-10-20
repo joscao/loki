@@ -49,7 +49,11 @@ build_path = "build/data_dependency_detection/"
 
 
 def test_bounds_normalization(here, test_file="bounds_normalization.f90"):
-    rmtree(Path(here / build_path))
+    try:
+        rmtree(Path(here / build_path))
+    except FileNotFoundError:
+        pass
+    
     Path(here / build_path).mkdir(parents=True, exist_ok=True)
 
     original_filepath = here / base_path / test_file
