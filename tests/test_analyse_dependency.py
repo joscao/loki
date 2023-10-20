@@ -142,14 +142,18 @@ def test_nested_loops_calculation(
     ],
 )
 def test_access_function_creation(array_dimensions_expr, expected):
+    def unique_order_preserving(sequence):
+        seen = set()
+        return [x for x in sequence if not (x in seen or seen.add(x))]
+
     scope = Scope()
     first = parse_fparser_expression(f"z({array_dimensions_expr})", scope)
     make_all_variables_available = parse_fparser_expression("z(i,j)", scope)
 
     variables = FindVariables().visit(
-        (*first.dimensions, *make_all_variables_available.dimensions)
+        (*make_all_variables_available.dimensions, *first.dimensions)
     )
-    variables = list({str(var).lower() for var in variables})
+    variables = unique_order_preserving([str(var).lower() for var in variables])
 
     F, f, variables = construct_affine_array_access_function_representation(
         first.dimensions, variables
