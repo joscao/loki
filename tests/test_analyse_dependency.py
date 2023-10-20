@@ -144,8 +144,8 @@ def test_nested_loops_calculation(
 def test_access_function_creation(array_dimensions_expr, expected):
     scope = Scope()
     first = parse_fparser_expression(f"z({array_dimensions_expr})", scope)
-    
-    use_these_variables = ["i","j"]
+
+    use_these_variables = ["i", "j"]
 
     F, f, variables = construct_affine_array_access_function_representation(
         first.dimensions, use_these_variables
