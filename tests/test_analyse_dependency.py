@@ -49,7 +49,7 @@ base_path = "sources/data_dependency_detection/"
 build_path = "build/data_dependency_detection/"
 
 
-def test_boundsnormalization(here, test_file="bounds_normalization.f90"):
+def test_bounds_normalization(here, test_file="bounds_normalization.f90"):
     rmtree(Path(here / build_path))
     Path(here / build_path).mkdir(parents=True, exist_ok=True)
 
@@ -246,11 +246,3 @@ def test_correct_iteration_space_extraction(here, filename, subroutine_names):
 
         for expr in expr_with_upper_bound:
             assert Implies(And(*implied_loop_conditions), expr >= 0)
-
-
-@pytest.mark.parametrize(
-    "filename, subroutine_names",
-    [("independent_variable_test_loops.f90", ["simple_nested_loop"])],
-)
-def test_independent_variables_test(filename, subroutine_names):
-    return True
