@@ -67,7 +67,7 @@ def construct_affine_array_access_function_representation(
     for variable in additional_variables:
         assert variable.lower() == variable
 
-    variables = additional_variables
+    variables = additional_variables.copy()
     variables += list({v.name.lower() for v in FindVariables().visit(array_dimensions_expr)})
     variables = unique_order_preserving(variables)
 
