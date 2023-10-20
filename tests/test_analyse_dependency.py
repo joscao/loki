@@ -18,7 +18,6 @@ from loki import (
     FindNodes,
     IntLiteral,
     parse_fparser_expression,
-    FindVariables,
     Scope,
 )
 from loki.analyse.analyse_dependency_detection import (
