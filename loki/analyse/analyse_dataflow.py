@@ -35,7 +35,7 @@ class DataflowAnalysisAttacher(Transformer):
     """
 
     # group of functions that only query memory properties and don't read/write variable value
-    _mem_property_queries = ("size", "lbound", "ubound", "present")
+    _mem_property_queries = ('size', 'lbound', 'ubound', 'present')
 
     def __init__(self, **kwargs):
         super().__init__(inplace=True, invalidate_source=False, **kwargs)
@@ -55,7 +55,7 @@ class DataflowAnalysisAttacher(Transformer):
             uses = set()
         visited = []
         for i in flatten(body):
-            visited += [self.visit(i, live_symbols=live | defines, **kwargs)]
+            visited += [self.visit(i, live_symbols=live|defines, **kwargs)]
             uses |= visited[-1].uses_symbols.copy() - defines
             defines |= visited[-1].defines_symbols.copy()
         return as_tuple(visited), defines, uses
@@ -93,7 +93,7 @@ class DataflowAnalysisAttacher(Transformer):
     def visit_Node(self, o, **kwargs):
         # Live symbols are determined on InternalNode handler levels and
         # get passed down to all child nodes
-        o._update(_live_symbols=kwargs.get("live_symbols", set()))
+        o._update(_live_symbols=kwargs.get('live_symbols', set()))
 
         # Symbols defined or used by this node are determined by their individual
         # handler routines and passed on to visitNode from there
@@ -115,35 +115,25 @@ class DataflowAnalysisAttacher(Transformer):
     def visit_InternalNode(self, o, **kwargs):
         # An internal node defines all symbols defined by its body and uses all
         # symbols used by its body before they are defined in the body
-        live = kwargs.pop("live_symbols", set())
+        live = kwargs.pop('live_symbols', set())
         body, defines, uses = self._visit_body(o.body, live=live, **kwargs)
         o._update(body=body)
-        return self.visit_Node(
-            o, live_symbols=live, defines_symbols=defines, uses_symbols=uses, **kwargs
-        )
+        return self.visit_Node(o, live_symbols=live, defines_symbols=defines, uses_symbols=uses, **kwargs)
 
     def visit_Associate(self, o, **kwargs):
         # An associate block defines all symbols defined by its body and uses all
         # symbols used by its body before they are defined in the body
-        live = kwargs.pop("live_symbols", set())
+        live = kwargs.pop('live_symbols', set())
         body, defines, uses = self._visit_body(o.body, live=live, **kwargs)
         o._update(body=body)
 
         # reverse the mapping of names before assinging lives, defines, uses sets for Associate node itself
         invert_assoc = CaseInsensitiveDict({v.name: k for k, v in o.associations})
         _live = set(invert_assoc[v.name] if v.name in invert_assoc else v for v in live)
-        _defines = set(
-            invert_assoc[v.name] if v.name in invert_assoc else v for v in defines
-        )
+        _defines = set(invert_assoc[v.name] if v.name in invert_assoc else v for v in defines)
         _uses = set(invert_assoc[v.name] if v.name in invert_assoc else v for v in uses)
 
-        return self.visit_Node(
-            o,
-            live_symbols=_live,
-            defines_symbols=_defines,
-            uses_symbols=_uses,
-            **kwargs,
-        )
+        return self.visit_Node(o, live_symbols=_live, defines_symbols=_defines, uses_symbols=_uses, **kwargs)
 
     @staticmethod
     def _manipulate_array_dimensions(expressions: set(), start, stop, step, variables):
@@ -162,7 +152,7 @@ class DataflowAnalysisAttacher(Transformer):
 
     def visit_Loop(self, o, **kwargs):
         # A loop defines the induction variable for its body before entering it
-        live = kwargs.pop("live_symbols", set())
+        live = kwargs.pop('live_symbols', set())
         uses = self._symbols_from_expr(o.bounds)
 
         body, defines, uses = self._visit_body(
@@ -204,7 +194,7 @@ class DataflowAnalysisAttacher(Transformer):
 
     def visit_WhileLoop(self, o, **kwargs):
         # A while loop uses variables in its condition
-        live = kwargs.pop("live_symbols", set())
+        live = kwargs.pop('live_symbols', set())
         uses = self._symbols_from_expr(o.condition)
         body, defines, uses = self._visit_body(o.body, live=live, uses=uses, **kwargs)
         o._update(body=body)
@@ -238,113 +228,58 @@ class DataflowAnalysisAttacher(Transformer):
         )
 
     def visit_Conditional(self, o, **kwargs):
-        live = kwargs.pop("live_symbols", set())
+        live = kwargs.pop('live_symbols', set())
 
         # exclude arguments to functions that just check the memory attributes of a variable
-        mem_call = as_tuple(
-            i
-            for i in FindInlineCalls().visit(o.condition)
-            if i.function in self._mem_property_queries
-        )
-        query_args = as_tuple(
-            flatten(FindVariables().visit(i.parameters) for i in mem_call)
-        )
+        mem_call = as_tuple(i for i in FindInlineCalls().visit(o.condition) if i.function in self._mem_property_queries)
+        query_args = as_tuple(flatten(FindVariables().visit(i.parameters) for i in mem_call))
         cset = set(v for v in FindVariables().visit(o.condition) if not v in query_args)
 
         condition = self._symbols_from_expr(as_tuple(cset))
-        body, defines, uses = self._visit_body(
-            o.body, live=live, uses=condition, **kwargs
-        )
-        else_body, else_defines, uses = self._visit_body(
-            o.else_body, live=live, uses=uses, **kwargs
-        )
+        body, defines, uses = self._visit_body(o.body, live=live, uses=condition, **kwargs)
+        else_body, else_defines, uses = self._visit_body(o.else_body, live=live, uses=uses, **kwargs)
         o._update(body=body, else_body=else_body)
-        return self.visit_Node(
-            o,
-            live_symbols=live,
-            defines_symbols=defines | else_defines,
-            uses_symbols=uses,
-            **kwargs,
-        )
+        return self.visit_Node(o, live_symbols=live, defines_symbols=defines|else_defines, uses_symbols=uses, **kwargs)
 
     def visit_MultiConditional(self, o, **kwargs):
-        live = kwargs.pop("live_symbols", set())
+        live = kwargs.pop('live_symbols', set())
 
         # exclude arguments to functions that just check the memory attributes of a variable
-        mem_calls = as_tuple(
-            i
-            for i in FindInlineCalls().visit(o.expr)
-            if i.function in self._mem_property_queries
-        )
-        query_args = as_tuple(
-            flatten(FindVariables().visit(i.parameters) for i in mem_calls)
-        )
+        mem_calls = as_tuple(i for i in FindInlineCalls().visit(o.expr) if i.function in self._mem_property_queries)
+        query_args = as_tuple(flatten(FindVariables().visit(i.parameters) for i in mem_calls))
         eset = set(v for v in FindVariables().visit(o.expr) if not v in query_args)
 
-        mem_calls = as_tuple(
-            i
-            for i in FindInlineCalls().visit(o.values)
-            if i.function in self._mem_property_queries
-        )
-        query_args = as_tuple(
-            flatten(FindVariables().visit(i.parameters) for i in mem_calls)
-        )
+        mem_calls = as_tuple(i for i in FindInlineCalls().visit(o.values) if i.function in self._mem_property_queries)
+        query_args = as_tuple(flatten(FindVariables().visit(i.parameters) for i in mem_calls))
         vset = set(v for v in FindVariables().visit(o.values) if not v in query_args)
 
-        uses = self._symbols_from_expr(as_tuple(eset)) | self._symbols_from_expr(
-            as_tuple(vset)
-        )
+        uses = self._symbols_from_expr(as_tuple(eset)) | self._symbols_from_expr(as_tuple(vset))
         body = ()
         defines = set()
         for b in o.bodies:
             _b, _d, uses = self._visit_body(b, live=live, uses=uses, **kwargs)
             body += (as_tuple(_b),)
             defines |= _d
-        else_body, else_defines, uses = self._visit_body(
-            o.else_body, live=live, uses=uses, **kwargs
-        )
+        else_body, else_defines, uses = self._visit_body(o.else_body, live=live, uses=uses, **kwargs)
         o._update(bodies=body, else_body=else_body)
         defines = defines | else_defines
-        return self.visit_Node(
-            o, live_symbols=live, defines_symbols=defines, uses_symbols=uses, **kwargs
-        )
+        return self.visit_Node(o, live_symbols=live, defines_symbols=defines, uses_symbols=uses, **kwargs)
 
     def visit_MaskedStatement(self, o, **kwargs):
-        live = kwargs.pop("live_symbols", set())
+        live = kwargs.pop('live_symbols', set())
         conditions = self._symbols_from_expr(o.conditions)
-        body, defines, uses = self._visit_body(
-            o.bodies, live=live, uses=conditions, **kwargs
-        )
-        body = tuple(
-            as_tuple(
-                b,
-            )
-            for b in body
-        )
-        default, default_defs, uses = self._visit_body(
-            o.default, live=live, uses=uses, **kwargs
-        )
+        body, defines, uses = self._visit_body(o.bodies, live=live, uses=conditions, **kwargs)
+        body = tuple(as_tuple(b,) for b in body)
+        default, default_defs, uses = self._visit_body(o.default, live=live, uses=uses, **kwargs)
         o._update(bodies=body, default=default)
-        return self.visit_Node(
-            o,
-            live_symbols=live,
-            defines_symbols=defines | default_defs,
-            uses_symbols=uses,
-            **kwargs,
-        )
+        return self.visit_Node(o, live_symbols=live, defines_symbols=defines|default_defs, uses_symbols=uses, **kwargs)
 
     # Leaf nodes
 
     def visit_Assignment(self, o, **kwargs):
         # exclude arguments to functions that just check the memory attributes of a variable
-        mem_calls = as_tuple(
-            i
-            for i in FindInlineCalls().visit(o.rhs)
-            if i.function in self._mem_property_queries
-        )
-        query_args = as_tuple(
-            flatten(FindVariables().visit(i.parameters) for i in mem_calls)
-        )
+        mem_calls = as_tuple(i for i in FindInlineCalls().visit(o.rhs) if i.function in self._mem_property_queries)
+        query_args = as_tuple(flatten(FindVariables().visit(i.parameters) for i in mem_calls))
         rset = set(v for v in FindVariables().visit(o.rhs) if not v in query_args)
 
         # The left-hand side variable is defined by this statement
@@ -367,24 +302,12 @@ class DataflowAnalysisAttacher(Transformer):
             # are potentially defined and which are definitely only used by
             # this call
             defines, uses = set(), set()
-            outvals = [
-                val
-                for arg, val in o.arg_iter()
-                if str(arg.type.intent).lower() in ("inout", "out")
-            ]
-            invals = [
-                val
-                for arg, val in o.arg_iter()
-                if str(arg.type.intent).lower() in ("inout", "in")
-            ]
+            outvals = [val for arg, val in o.arg_iter() if str(arg.type.intent).lower() in ('inout', 'out')]
+            invals = [val for arg, val in o.arg_iter() if str(arg.type.intent).lower() in ('inout', 'in')]
 
             for val in outvals:
-                arrays = [
-                    v for v in FindVariables().visit(outvals) if isinstance(v, Array)
-                ]
-                dims = set(
-                    v for a in arrays for v in FindVariables().visit(a.dimensions)
-                )
+                arrays = [v for v in FindVariables().visit(outvals) if isinstance(v, Array)]
+                dims = set(v for a in arrays for v in FindVariables().visit(a.dimensions))
                 exprs = self._symbols_from_expr(val)
                 defines |= {e for e in exprs if not e in dims}
                 uses |= dims
@@ -394,24 +317,13 @@ class DataflowAnalysisAttacher(Transformer):
             # We don't know the intent of any of these arguments and thus have
             # to assume all of them are potentially used or defined by this
             # statement
-            arrays = [
-                v for v in FindVariables().visit(o.arguments) if isinstance(v, Array)
-            ]
-            arrays += [
-                v
-                for arg, val in o.kwarguments
-                for v in FindVariables().visit(val)
-                if isinstance(v, Array)
-            ]
+            arrays = [v for v in FindVariables().visit(o.arguments) if isinstance(v, Array)]
+            arrays += [v for arg, val in o.kwarguments for v in FindVariables().visit(val) if isinstance(v, Array)]
 
             dims = set(v for a in arrays for v in FindVariables().visit(a.dimensions))
-            defines = self._symbols_from_expr(
-                o.arguments, condition=lambda x: x not in dims
-            )
+            defines = self._symbols_from_expr(o.arguments, condition=lambda x: x not in dims)
             for arg, val in o.kwarguments:
-                defines |= self._symbols_from_expr(
-                    val, condition=lambda x: x not in dims
-                )
+                defines |= self._symbols_from_expr(val, condition=lambda x: x not in dims)
             uses = defines.copy() | dims
 
         return self.visit_Node(o, defines_symbols=defines, uses_symbols=uses, **kwargs)
@@ -419,9 +331,7 @@ class DataflowAnalysisAttacher(Transformer):
     def visit_Allocation(self, o, **kwargs):
         arrays = [v for v in FindVariables().visit(o.variables) if isinstance(v, Array)]
         dims = set(v for a in arrays for v in FindVariables().visit(a.dimensions))
-        defines = self._symbols_from_expr(
-            o.variables, condition=lambda x: x not in dims
-        )
+        defines = self._symbols_from_expr(o.variables, condition=lambda x: x not in dims)
         uses = self._symbols_from_expr(o.data_source or ()) | dims
         return self.visit_Node(o, defines_symbols=defines, uses_symbols=uses, **kwargs)
 
@@ -436,9 +346,7 @@ class DataflowAnalysisAttacher(Transformer):
         return self.visit_Node(o, defines_symbols=defines, **kwargs)
 
     def visit_VariableDeclaration(self, o, **kwargs):
-        defines = self._symbols_from_expr(
-            o.symbols, condition=lambda v: v.type.initial is not None
-        )
+        defines = self._symbols_from_expr(o.symbols, condition=lambda v: v.type.initial is not None)
         return self.visit_Node(o, defines_symbols=defines, **kwargs)
 
 
@@ -471,23 +379,18 @@ def attach_dataflow_analysis(module_or_routine):
     nodes remain valid.
     """
     live_symbols = set()
-    if hasattr(module_or_routine, "arguments"):
+    if hasattr(module_or_routine, 'arguments'):
         live_symbols = DataflowAnalysisAttacher._symbols_from_expr(
             module_or_routine.arguments,
-            condition=lambda a: a.type.intent
-            and a.type.intent.lower() in ("in", "inout"),
+            condition=lambda a: a.type.intent and a.type.intent.lower() in ('in', 'inout')
         )
 
-    if hasattr(module_or_routine, "spec"):
-        module_or_routine.spec = DataflowAnalysisAttacher().visit(
-            module_or_routine.spec, live_symbols=live_symbols
-        )
+    if hasattr(module_or_routine, 'spec'):
+        DataflowAnalysisAttacher().visit(module_or_routine.spec, live_symbols=live_symbols)
         live_symbols |= module_or_routine.spec.defines_symbols
 
-    if hasattr(module_or_routine, "body"):
-        module_or_routine.body = DataflowAnalysisAttacher().visit(
-            module_or_routine.body, live_symbols=live_symbols
-        )
+    if hasattr(module_or_routine, 'body'):
+        DataflowAnalysisAttacher().visit(module_or_routine.body, live_symbols=live_symbols)
 
 
 def detach_dataflow_analysis(module_or_routine):
@@ -496,14 +399,10 @@ def detach_dataflow_analysis(module_or_routine):
 
     Accessing the relevant attributes afterwards raises :py:class:`RuntimeError`.
     """
-    if hasattr(module_or_routine, "spec"):
-        module_or_routine.spec = DataflowAnalysisDetacher().visit(
-            module_or_routine.spec
-        )
-    if hasattr(module_or_routine, "body"):
-        module_or_routine.body = DataflowAnalysisDetacher().visit(
-            module_or_routine.body
-        )
+    if hasattr(module_or_routine, 'spec'):
+        DataflowAnalysisDetacher().visit(module_or_routine.spec)
+    if hasattr(module_or_routine, 'body'):
+        DataflowAnalysisDetacher().visit(module_or_routine.body)
 
 
 @contextmanager
@@ -589,15 +488,8 @@ class FindReads(Visitor):
         If enabled, writes of a symbol remove it from the :data:`candidate_set`.
     """
 
-    def __init__(
-        self,
-        start=None,
-        stop=None,
-        active=False,
-        candidate_set=None,
-        clear_candidates_on_write=False,
-        **kwargs,
-    ):
+    def __init__(self, start=None, stop=None, active=False,
+                 candidate_set=None, clear_candidates_on_write=False, **kwargs):
         super().__init__(**kwargs)
         self.start = set(as_tuple(start))
         self.stop = set(as_tuple(stop))
@@ -621,11 +513,7 @@ class FindReads(Visitor):
                 self.reads |= read_symbols & self.candidate_set
 
     def _register_writes(self, write_symbols):
-        if (
-            self.active
-            and self.clear_candidates_on_write
-            and self.candidate_set is not None
-        ):
+        if self.active and self.clear_candidates_on_write and self.candidate_set is not None:
             self.candidate_set -= write_symbols
 
     def visit(self, o, *args, **kwargs):
@@ -643,9 +531,7 @@ class FindReads(Visitor):
         self._register_reads(self._symbols_from_expr(o.condition))
         # Visit each branch with the original candidate set and then take the
         # union of both afterwards to include all potential read-after-writes
-        candidate_set = (
-            self.candidate_set.copy() if self.candidate_set is not None else None
-        )
+        candidate_set = self.candidate_set.copy() if self.candidate_set is not None else None
         self.visit(o.body, **kwargs)
         self.candidate_set, candidate_set = candidate_set, self.candidate_set
         self.visit(o.else_body, **kwargs)
@@ -685,9 +571,8 @@ class FindWrites(Visitor):
         If given, only writes for symbols in this set are considered.
     """
 
-    def __init__(
-        self, start=None, stop=None, active=False, candidate_set=None, **kwargs
-    ):
+    def __init__(self, start=None, stop=None, active=False,
+                 candidate_set=None, **kwargs):
         super().__init__(**kwargs)
         self.start = set(as_tuple(start))
         self.stop = set(as_tuple(stop))
@@ -757,11 +642,8 @@ def read_after_write_vars(ir, inspection_node):
     """
     write_visitor = FindWrites(stop=inspection_node, active=True)
     write_visitor.visit(ir)
-    read_visitor = FindReads(
-        start=inspection_node,
-        candidate_set=write_visitor.writes,
-        clear_candidates_on_write=True,
-    )
+    read_visitor = FindReads(start=inspection_node, candidate_set=write_visitor.writes,
+                             clear_candidates_on_write=True)
     read_visitor.visit(ir)
     return read_visitor.reads
 
