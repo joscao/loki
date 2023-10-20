@@ -43,18 +43,16 @@ subroutine ConditionalDependency(data, n)
 
 end subroutine ConditionalDependency
 
-subroutine NoDependency(data, n)
+subroutine NoDependency(data)
   implicit none
-  integer, intent(in) :: n
-  real(8), dimension(n) :: data
+  real(8), dimension(20) :: data
   integer :: i
 
-  do i = 1, n, 1
+  do i = 1, 10, 1
     data(2*i) = 10;
   end do
 
-  do i = 1, n, 1
+  do i = 1, 5, 1
     data(2*i + 1) = 20;
   end do
-
 end subroutine NoDependency
