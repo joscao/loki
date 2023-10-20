@@ -538,13 +538,14 @@ end subroutine while_loop
     routine = Subroutine.from_source(fcode, frontend=frontend)
     loop = FindNodes(WhileLoop).visit(routine.body)[0]
     cond = FindNodes(Conditional).visit(routine.body)[0]
+
     with dataflow_analysis_attached(routine):
         assert len(cond.uses_symbols) == 1
         assert 'flag' in cond.uses_symbols
         assert len(loop.uses_symbols) == 1
         assert len(loop.defines_symbols) == 2
         assert 'ij' in loop.uses_symbols
-        assert all(v in loop.defines_symbols for v in ('ij', 'a'))
+        assert all(v in loop.defines_symbols for v in ('ij', 'a(:)'))
 
     with dataflow_analysis_attached(cond):
         assert len(loop.uses_symbols) == 1
