@@ -22,36 +22,65 @@ from pymbolic.primitives import Expression
 from pydantic.dataclasses import dataclass as dataclass_validated
 
 from loki.scope import Scope
-from loki.tools import flatten, as_tuple, is_iterable, truncate_string, CaseInsensitiveDict
+from loki.tools import (
+    flatten,
+    as_tuple,
+    is_iterable,
+    truncate_string,
+    CaseInsensitiveDict,
+)
 from loki.types import DataType, BasicType, DerivedType, SymbolAttributes
 from loki.frontend.source import Source
 
 
 __all__ = [
     # Abstract base classes
-    'Node', 'InternalNode', 'LeafNode',
+    "Node",
+    "InternalNode",
+    "LeafNode",
     # Internal node classes
-    'Section', 'Associate', 'Loop', 'WhileLoop', 'Conditional',
-    'PragmaRegion', 'Interface',
+    "Section",
+    "Associate",
+    "Loop",
+    "WhileLoop",
+    "Conditional",
+    "PragmaRegion",
+    "Interface",
     # Leaf node classes
-    'Assignment', 'ConditionalAssignment', 'CallStatement',
-    'Allocation', 'Deallocation', 'Nullify',
-    'Comment', 'CommentBlock', 'Pragma', 'PreprocessorDirective',
-    'Import', 'VariableDeclaration', 'ProcedureDeclaration', 'DataDeclaration',
-    'StatementFunction', 'TypeDef', 'MultiConditional', 'MaskedStatement',
-    'Intrinsic', 'Enumeration', 'RawSource',
+    "Assignment",
+    "ConditionalAssignment",
+    "CallStatement",
+    "Allocation",
+    "Deallocation",
+    "Nullify",
+    "Comment",
+    "CommentBlock",
+    "Pragma",
+    "PreprocessorDirective",
+    "Import",
+    "VariableDeclaration",
+    "ProcedureDeclaration",
+    "DataDeclaration",
+    "StatementFunction",
+    "TypeDef",
+    "MultiConditional",
+    "MaskedStatement",
+    "Intrinsic",
+    "Enumeration",
+    "RawSource",
 ]
 
 # Configuration for validation mechanism via pydantic
-dataclass_validation_config  = {
-    'validate_assignment': True,
-    'arbitrary_types_allowed': True,
+dataclass_validation_config = {
+    "validate_assignment": True,
+    "arbitrary_types_allowed": True,
 }
 
 # Using this decorator, we can force strict validation
 dataclass_strict = partial(dataclass_validated, config=dataclass_validation_config)
 
 # Abstract base classes
+
 
 @dataclass_strict(frozen=True)
 class Node:
@@ -146,7 +175,11 @@ class Node:
         """
         Arguments used to construct the Node.
         """
-        return {k: v for k, v in self.__dict__.items() if k in self.__dataclass_fields__.keys()}  # pylint: disable=no-member
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k in self.__dataclass_fields__.keys()
+        }  # pylint: disable=no-member
 
     @property
     def args_frozen(self):
@@ -164,16 +197,19 @@ class Node:
         """
         # pylint: disable=import-outside-toplevel,cyclic-import
         from loki.visitors import pprint
+
         pprint(self)
 
-    def ir_graph(self, show_comments=False, show_expressions=False, linewidth=40, symgen=str):
+    def ir_graph(
+        self, show_comments=False, show_expressions=False, linewidth=40, symgen=str
+    ):
         """
         Get the IR graph to visualize the node hierachy under this node.
         """
         # pylint: disable=import-outside-toplevel,cyclic-import
         from loki.visitors.ir_graph import ir_graph
 
-        return ir_graph(self, show_comments, show_expressions,linewidth, symgen)
+        return ir_graph(self, show_comments, show_expressions, linewidth, symgen)
 
     @property
     def live_symbols(self):
@@ -188,9 +224,9 @@ class Node:
         :py:func:`loki.analyse.analyse_dataflow.dataflow_analysis_attached`
         context manager.
         """
-        if self.__dict__['_live_symbols'] is None:
-            raise RuntimeError('Need to run dataflow analysis on the IR first.')
-        return self.__dict__['_live_symbols']
+        if self.__dict__["_live_symbols"] is None:
+            raise RuntimeError("Need to run dataflow analysis on the IR first.")
+        return self.__dict__["_live_symbols"]
 
     @property
     def defines_symbols(self):
@@ -203,9 +239,9 @@ class Node:
         :py:func:`loki.analyse.analyse_dataflow.dataflow_analysis_attached`
         context manager.
         """
-        if self.__dict__['_defines_symbols'] is None:
-            raise RuntimeError('Need to run dataflow analysis on the IR first.')
-        return self.__dict__['_defines_symbols']
+        if self.__dict__["_defines_symbols"] is None:
+            raise RuntimeError("Need to run dataflow analysis on the IR first.")
+        return self.__dict__["_defines_symbols"]
 
     @property
     def uses_symbols(self):
@@ -219,9 +255,9 @@ class Node:
         :py:func:`loki.analyse.analyse_dataflow.dataflow_analysis_attached`
         context manager.
         """
-        if self.__dict__['_uses_symbols'] is None:
-            raise RuntimeError('Need to run dataflow analysis on the IR first.')
-        return self.__dict__['_uses_symbols']
+        if self.__dict__["_uses_symbols"] is None:
+            raise RuntimeError("Need to run dataflow analysis on the IR first.")
+        return self.__dict__["_uses_symbols"]
 
 
 @dataclass_strict(frozen=True)
@@ -239,7 +275,7 @@ class InternalNode(Node):
     # Certain Node types may contain Module / Subroutine objects
     body: Tuple[Any, ...] = None
 
-    _traversable = ['body']
+    _traversable = ["body"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -261,6 +297,7 @@ class LeafNode(Node):
 
 # Mix-ins
 
+
 class ScopedNode(Scope):
     """
     Mix-in to attache a scope to an IR :any:`Node`
@@ -276,22 +313,24 @@ class ScopedNode(Scope):
         Arguments used to construct the :any:`ScopedNode`, excluding
         the symbol table.
         """
-        keys = tuple(k for k in self.__dataclass_fields__.keys() if k not in ('symbol_attrs', ))  # pylint: disable=no-member
+        keys = tuple(
+            k for k in self.__dataclass_fields__.keys() if k not in ("symbol_attrs",)
+        )  # pylint: disable=no-member
         return {k: v for k, v in self.__dict__.items() if k in keys}
 
     def _update(self, *args, **kwargs):
-        if 'symbol_attrs' not in kwargs:
+        if "symbol_attrs" not in kwargs:
             # Retain the symbol table (unless given explicitly)
-            kwargs['symbol_attrs'] = self.symbol_attrs
+            kwargs["symbol_attrs"] = self.symbol_attrs
         super()._update(*args, **kwargs)  # pylint: disable=no-member
 
     def _rebuild(self, *args, **kwargs):
         # Retain the symbol table (unless given explicitly)
-        symbol_attrs = kwargs.pop('symbol_attrs', self.symbol_attrs)
-        rescope_symbols = kwargs.pop('rescope_symbols', False)
+        symbol_attrs = kwargs.pop("symbol_attrs", self.symbol_attrs)
+        rescope_symbols = kwargs.pop("rescope_symbols", False)
 
         # Ensure 'parent' is always explicitly set
-        kwargs['parent'] = kwargs.get('parent', None)
+        kwargs["parent"] = kwargs.get("parent", None)
 
         new_obj = super()._rebuild(*args, **kwargs)  # pylint: disable=no-member
         new_obj.symbol_attrs.update(symbol_attrs)
@@ -302,19 +341,20 @@ class ScopedNode(Scope):
 
     def __getstate__(self):
         s = self.args
-        s['symbol_attrs'] = self.symbol_attrs
+        s["symbol_attrs"] = self.symbol_attrs
         return s
 
     def __setstate__(self, s):
-        symbol_attrs = s.pop('symbol_attrs', None)
+        symbol_attrs = s.pop("symbol_attrs", None)
         self._update(**s, symbol_attrs=symbol_attrs, rescope_symbols=True)
+
 
 # Intermediate node types
 
 
 @dataclass_strict(frozen=True)
-class _SectionBase():
-    """ Type definitions for :any:`Section` node type. """
+class _SectionBase:
+    """Type definitions for :any:`Section` node type."""
 
     # Sections may contain Module / Subroutine objects
     body: Tuple[Any, ...] = ()
@@ -358,7 +398,9 @@ class Section(InternalNode, _SectionBase):
         node : :any:`Node` or tuple of :any:`Node`
             The node(s) to append to the section.
         """
-        self._update(body=self.body[:pos] + as_tuple(node) + self.body[pos:])  # pylint: disable=unsubscriptable-object
+        self._update(
+            body=self.body[:pos] + as_tuple(node) + self.body[pos:]
+        )  # pylint: disable=unsubscriptable-object
 
     def prepend(self, node):
         """
@@ -372,12 +414,12 @@ class Section(InternalNode, _SectionBase):
         self._update(body=as_tuple(node) + self.body)
 
     def __repr__(self):
-        return 'Section::'
+        return "Section::"
 
 
 @dataclass_strict(frozen=True)
-class _AssociateBase():
-    """ Type definitions for :any:`Associate` node type. """
+class _AssociateBase:
+    """Type definitions for :any:`Associate` node type."""
 
     associations: Tuple[Tuple[Expression, Expression], ...]
 
@@ -403,7 +445,7 @@ class Associate(ScopedNode, Section, _AssociateBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['body', 'associations']
+    _traversable = ["body", "associations"]
 
     def __post_init__(self, parent=None):
         super(ScopedNode, self).__post_init__(parent=parent)
@@ -424,15 +466,16 @@ class Associate(ScopedNode, Section, _AssociateBase):
 
     def __repr__(self):
         if self.associations:
-            associations = ', '.join(f'{str(var)}={str(expr)}'
-                                     for var, expr in self.associations)
-            return f'Associate:: {associations}'
-        return 'Associate::'
+            associations = ", ".join(
+                f"{str(var)}={str(expr)}" for var, expr in self.associations
+            )
+            return f"Associate:: {associations}"
+        return "Associate::"
 
 
 @dataclass_strict(frozen=True)
-class _LoopBase():
-    """ Type definitions for :any:`Loop` node type. """
+class _LoopBase:
+    """Type definitions for :any:`Loop` node type."""
 
     variable: Expression
     bounds: Expression
@@ -480,23 +523,23 @@ class Loop(InternalNode, _LoopBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['variable', 'bounds', 'body']
+    _traversable = ["variable", "bounds", "body"]
 
     def __post_init__(self):
         super().__post_init__()
         assert self.variable is not None
 
     def __repr__(self):
-        label = ', '.join(l for l in [self.name, self.loop_label] if l is not None)
+        label = ", ".join(l for l in [self.name, self.loop_label] if l is not None)
         if label:
-            label = ' ' + label
-        control = f'{str(self.variable)}={str(self.bounds)}'
-        return f'Loop::{label} {control}'
+            label = " " + label
+        control = f"{str(self.variable)}={str(self.bounds)}"
+        return f"Loop::{label} {control}"
 
 
 @dataclass_strict(frozen=True)
-class _WhileLoopBase():
-    """ Type definitions for :any:`WhileLoop` node type. """
+class _WhileLoopBase:
+    """Type definitions for :any:`WhileLoop` node type."""
 
     condition: Union[Expression, None]
     body: Tuple[Node, ...]
@@ -545,19 +588,19 @@ class WhileLoop(InternalNode, _WhileLoopBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['condition', 'body']
+    _traversable = ["condition", "body"]
 
     def __repr__(self):
-        label = ', '.join(l for l in [self.name, self.loop_label] if l is not None)
+        label = ", ".join(l for l in [self.name, self.loop_label] if l is not None)
         if label:
-            label = ' ' + label
-        control = str(self.condition) if self.condition else ''
-        return f'WhileLoop::{label} {control}'
+            label = " " + label
+        control = str(self.condition) if self.condition else ""
+        return f"WhileLoop::{label} {control}"
 
 
 @dataclass_strict(frozen=True)
-class _ConditionalBase():
-    """ Type definitions for :any:`Conditional` node type. """
+class _ConditionalBase:
+    """Type definitions for :any:`Conditional` node type."""
 
     condition: Expression
     body: Tuple[Node, ...]
@@ -595,7 +638,7 @@ class Conditional(InternalNode, _ConditionalBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['condition', 'body', 'else_body']
+    _traversable = ["condition", "body", "else_body"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -603,21 +646,25 @@ class Conditional(InternalNode, _ConditionalBase):
 
         if self.body is not None:
             assert isinstance(self.body, tuple)
-            assert all(isinstance(c, Node) for c in self.body)  # pylint: disable=not-an-iterable
+            assert all(
+                isinstance(c, Node) for c in self.body
+            )  # pylint: disable=not-an-iterable
 
         if self.has_elseif:
             assert len(self.else_body) == 1
-            assert isinstance(self.else_body[0], Conditional)  # pylint: disable=unsubscriptable-object
+            assert isinstance(
+                self.else_body[0], Conditional
+            )  # pylint: disable=unsubscriptable-object
 
     def __repr__(self):
         if self.name:
-            return f'Conditional:: {self.name}'
-        return 'Conditional::'
+            return f"Conditional:: {self.name}"
+        return "Conditional::"
 
 
 @dataclass_strict(frozen=True)
-class _PragmaRegionBase():
-    """ Type definitions for :any:`PragmaRegion` node type. """
+class _PragmaRegionBase:
+    """Type definitions for :any:`PragmaRegion` node type."""
 
     body: Tuple[Node, ...]
     pragma: Node = None
@@ -647,25 +694,27 @@ class PragmaRegion(InternalNode, _PragmaRegionBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['body']
+    _traversable = ["body"]
 
     def append(self, node):
         self._update(body=self.body + as_tuple(node))
 
     def insert(self, pos, node):
-        '''Insert at given position'''
-        self._update(body=self.body[:pos] + as_tuple(node) + self.body[pos:])  # pylint: disable=unsubscriptable-object
+        """Insert at given position"""
+        self._update(
+            body=self.body[:pos] + as_tuple(node) + self.body[pos:]
+        )  # pylint: disable=unsubscriptable-object
 
     def prepend(self, node):
         self._update(body=as_tuple(node) + self.body)
 
     def __repr__(self):
-        return 'PragmaRegion::'
+        return "PragmaRegion::"
 
 
 @dataclass_strict(frozen=True)
-class _InterfaceBase():
-    """ Type definitions for :any:`Interface` node type. """
+class _InterfaceBase:
+    """Type definitions for :any:`Interface` node type."""
 
     body: Tuple[Any, ...]
     abstract: bool = False
@@ -690,7 +739,7 @@ class Interface(InternalNode, _InterfaceBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['body']
+    _traversable = ["body"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -701,27 +750,31 @@ class Interface(InternalNode, _InterfaceBase):
         """
         The list of symbol names declared by this interface
         """
-        symbols = as_tuple(flatten(
-            getattr(node, 'procedure_symbol', getattr(node, 'symbols', ()))
-            for node in self.body  # pylint: disable=not-an-iterable
-        ))
+        symbols = as_tuple(
+            flatten(
+                getattr(node, "procedure_symbol", getattr(node, "symbols", ()))
+                for node in self.body  # pylint: disable=not-an-iterable
+            )
+        )
         if self.spec:
             return (self.spec,) + symbols
         return symbols
 
     def __repr__(self):
-        symbols = ', '.join(str(var) for var in self.symbols)
+        symbols = ", ".join(str(var) for var in self.symbols)
         if self.abstract:
-            return f'Abstract Interface:: {symbols}'
+            return f"Abstract Interface:: {symbols}"
         if self.spec:
-            return f'Interface {self.spec}:: {symbols}'
-        return f'Interface:: {symbols}'
+            return f"Interface {self.spec}:: {symbols}"
+        return f"Interface:: {symbols}"
+
 
 # Leaf node types
 
+
 @dataclass_strict(frozen=True)
-class _AssignmentBase():
-    """ Type definitions for :any:`Assignment` node type. """
+class _AssignmentBase:
+    """Type definitions for :any:`Assignment` node type."""
 
     lhs: Expression
     rhs: Expression
@@ -749,7 +802,7 @@ class Assignment(LeafNode, _AssignmentBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['lhs', 'rhs']
+    _traversable = ["lhs", "rhs"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -757,12 +810,12 @@ class Assignment(LeafNode, _AssignmentBase):
         assert self.rhs is not None
 
     def __repr__(self):
-        return f'Assignment:: {str(self.lhs)} = {str(self.rhs)}'
+        return f"Assignment:: {str(self.lhs)} = {str(self.rhs)}"
 
 
 @dataclass_strict(frozen=True)
-class _ConditionalAssignmentBase():
-    """ Type definitions for :any:`ConditionalAssignment` node type. """
+class _ConditionalAssignmentBase:
+    """Type definitions for :any:`ConditionalAssignment` node type."""
 
     lhs: Expression = None
     condition: Expression = None
@@ -798,15 +851,17 @@ class ConditionalAssignment(LeafNode, _ConditionalAssignmentBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['condition', 'lhs', 'rhs', 'else_rhs']
+    _traversable = ["condition", "lhs", "rhs", "else_rhs"]
 
     def __repr__(self):
-        return f'CondAssign:: {self.lhs} = {self.condition} ? {self.rhs} : {self.else_rhs}'
+        return (
+            f"CondAssign:: {self.lhs} = {self.condition} ? {self.rhs} : {self.else_rhs}"
+        )
 
 
 @dataclass_strict(frozen=True)
-class _CallStatementBase():
-    """ Type definitions for :any:`CallStatement` node type. """
+class _CallStatementBase:
+    """Type definitions for :any:`CallStatement` node type."""
 
     name: Expression
     arguments: Tuple[Expression, ...] = None
@@ -844,7 +899,7 @@ class CallStatement(LeafNode, _CallStatementBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['name', 'arguments', 'kwarguments']
+    _traversable = ["name", "arguments", "kwarguments"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -860,11 +915,13 @@ class CallStatement(LeafNode, _CallStatementBase):
 
         if self.chevron is not None:
             assert isinstance(self.chevron, tuple)
-            assert all(isinstance(a, Expression) for a in self.chevron)  # pylint: disable=not-an-iterable
+            assert all(
+                isinstance(a, Expression) for a in self.chevron
+            )  # pylint: disable=not-an-iterable
             assert 2 <= len(self.chevron) <= 4
 
     def __repr__(self):
-        return f'Call:: {self.name}'
+        return f"Call:: {self.name}"
 
     @property
     def procedure_type(self):
@@ -931,8 +988,8 @@ class CallStatement(LeafNode, _CallStatementBase):
 
 
 @dataclass_strict(frozen=True)
-class _AllocationBase():
-    """ Type definitions for :any:`Allocation` node type. """
+class _AllocationBase:
+    """Type definitions for :any:`Allocation` node type."""
 
     variables: Tuple[Expression, ...]
     data_source: Expression = None
@@ -956,7 +1013,7 @@ class Allocation(LeafNode, _AllocationBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['variables', 'data_source', 'status_var']
+    _traversable = ["variables", "data_source", "status_var"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -970,8 +1027,8 @@ class Allocation(LeafNode, _AllocationBase):
 
 
 @dataclass_strict(frozen=True)
-class _DeallocationBase():
-    """ Type definitions for :any:`Deallocation` node type. """
+class _DeallocationBase:
+    """Type definitions for :any:`Deallocation` node type."""
 
     variables: Tuple[Expression, ...]
     status_var: Expression = None
@@ -992,7 +1049,7 @@ class Deallocation(LeafNode, _DeallocationBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['variables', 'status_var']
+    _traversable = ["variables", "status_var"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -1005,8 +1062,8 @@ class Deallocation(LeafNode, _DeallocationBase):
 
 
 @dataclass_strict(frozen=True)
-class _NullifyBase():
-    """ Type definitions for :any:`Nullify` node type. """
+class _NullifyBase:
+    """Type definitions for :any:`Nullify` node type."""
 
     variables: Tuple[Expression, ...]
 
@@ -1024,7 +1081,7 @@ class Nullify(LeafNode, _NullifyBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['variables']
+    _traversable = ["variables"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -1036,8 +1093,8 @@ class Nullify(LeafNode, _NullifyBase):
 
 
 @dataclass_strict(frozen=True)
-class _CommentBase():
-    """ Type definitions for :any:`Comment` node type. """
+class _CommentBase:
+    """Type definitions for :any:`Comment` node type."""
 
     text: str
 
@@ -1060,12 +1117,12 @@ class Comment(LeafNode, _CommentBase):
         assert isinstance(self.text, str)
 
     def __repr__(self):
-        return f'Comment:: {truncate_string(self.text)}'
+        return f"Comment:: {truncate_string(self.text)}"
 
 
 @dataclass_strict(frozen=True)
-class _CommentBlockBase():
-    """ Type definitions for :any:`CommentBlock` node type. """
+class _CommentBlockBase:
+    """Type definitions for :any:`CommentBlock` node type."""
 
     comments: Tuple[Node, ...]
 
@@ -1092,15 +1149,15 @@ class CommentBlock(LeafNode, _CommentBlockBase):
     @property
     def text(self):
         """The combined string of all comments in this block"""
-        return ''.join(comment.text for comment in self.comments)
+        return "".join(comment.text for comment in self.comments)
 
     def __repr__(self):
-        return f'CommentBlock:: {truncate_string(self.text)}'
+        return f"CommentBlock:: {truncate_string(self.text)}"
 
 
 @dataclass_strict(frozen=True)
-class _PragmaBase():
-    """ Type definitions for :any:`Pragma` node type. """
+class _PragmaBase:
+    """Type definitions for :any:`Pragma` node type."""
 
     keyword: str
     content: str = None
@@ -1129,12 +1186,12 @@ class Pragma(LeafNode, _PragmaBase):
         assert self.keyword and isinstance(self.keyword, str)
 
     def __repr__(self):
-        return f'Pragma:: {self.keyword} {truncate_string(self.content)}'
+        return f"Pragma:: {self.keyword} {truncate_string(self.content)}"
 
 
 @dataclass_strict(frozen=True)
-class _PreprocessorDirectiveBase():
-    """ Type definitions for :any:`PreprocessorDirective` node type. """
+class _PreprocessorDirectiveBase:
+    """Type definitions for :any:`PreprocessorDirective` node type."""
 
     text: str = None
 
@@ -1156,12 +1213,12 @@ class PreprocessorDirective(LeafNode, _PreprocessorDirectiveBase):
     """
 
     def __repr__(self):
-        return f'PreprocessorDirective:: {truncate_string(self.text)}'
+        return f"PreprocessorDirective:: {truncate_string(self.text)}"
 
 
 @dataclass_strict(frozen=True)
-class _ImportBase():
-    """ Type definitions for :any:`Import` node type. """
+class _ImportBase:
+    """Type definitions for :any:`Import` node type."""
 
     module: Union[str, None]
     symbols: Tuple[Expression, ...] = ()
@@ -1198,7 +1255,7 @@ class Import(LeafNode, _ImportBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['symbols', 'rename_list']
+    _traversable = ["symbols", "rename_list"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -1206,25 +1263,31 @@ class Import(LeafNode, _ImportBase):
         assert isinstance(self.symbols, tuple)
         assert all(isinstance(s, (Expression, DataType)) for s in self.symbols)
         assert self.nature is None or (
-            isinstance(self.nature, str) and
-            self.nature.lower() in ('intrinsic', 'non_intrinsic') and
-            not (self.c_import or self.f_include or self.f_import)
+            isinstance(self.nature, str)
+            and self.nature.lower() in ("intrinsic", "non_intrinsic")
+            and not (self.c_import or self.f_include or self.f_import)
         )
         if self.c_import + self.f_include + self.f_import not in (0, 1):
-            raise ValueError('Import can only be either C include, F include or F import')
-        if self.rename_list and (self.symbols or self.c_import or self.f_include or self.f_import):
-            raise ValueError('Import cannot have rename and only lists or be an include')
+            raise ValueError(
+                "Import can only be either C include, F include or F import"
+            )
+        if self.rename_list and (
+            self.symbols or self.c_import or self.f_include or self.f_import
+        ):
+            raise ValueError(
+                "Import cannot have rename and only lists or be an include"
+            )
 
     def __repr__(self):
         if self.f_import:
-            return f'Import:: {self.symbols}'
-        _c = 'C-' if self.c_import else 'F-' if self.f_include else ''
-        return f'{_c}Import:: {self.module} => {self.symbols}'
+            return f"Import:: {self.symbols}"
+        _c = "C-" if self.c_import else "F-" if self.f_include else ""
+        return f"{_c}Import:: {self.module} => {self.symbols}"
 
 
 @dataclass_strict(frozen=True)
-class _VariableDeclarationBase():
-    """ Type definitions for :any:`VariableDeclaration` node type. """
+class _VariableDeclarationBase:
+    """Type definitions for :any:`VariableDeclaration` node type."""
 
     symbols: Tuple[Expression, ...]
     dimensions: Tuple[Expression, ...] = None
@@ -1256,7 +1319,7 @@ class VariableDeclaration(LeafNode, _VariableDeclarationBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['symbols', 'dimensions']
+    _traversable = ["symbols", "dimensions"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -1266,16 +1329,18 @@ class VariableDeclaration(LeafNode, _VariableDeclarationBase):
 
         if self.dimensions is not None:
             assert is_iterable(self.dimensions)
-            assert all(isinstance(d, Expression) for d in self.dimensions)  # pylint: disable=not-an-iterable
+            assert all(
+                isinstance(d, Expression) for d in self.dimensions
+            )  # pylint: disable=not-an-iterable
 
     def __repr__(self):
-        symbols = ', '.join(str(var) for var in self.symbols)
-        return f'VariableDeclaration:: {symbols}'
+        symbols = ", ".join(str(var) for var in self.symbols)
+        return f"VariableDeclaration:: {symbols}"
 
 
 @dataclass_strict(frozen=True)
-class _ProcedureDeclarationBase():
-    """ Type definitions for :any:`ProcedureDeclaration` node type. """
+class _ProcedureDeclarationBase:
+    """Type definitions for :any:`ProcedureDeclaration` node type."""
 
     symbols: Tuple[Expression, ...]
     interface: Union[Expression, DataType] = None
@@ -1320,24 +1385,26 @@ class ProcedureDeclaration(LeafNode, _ProcedureDeclarationBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['symbols', 'interface']
+    _traversable = ["symbols", "interface"]
 
     def __post_init__(self):
         super().__post_init__()
         assert is_iterable(self.symbols)
         assert all(isinstance(var, Expression) for var in self.symbols)
-        assert self.interface is None or isinstance(self.interface, (Expression, DataType))
+        assert self.interface is None or isinstance(
+            self.interface, (Expression, DataType)
+        )
 
         assert self.external + self.module + self.generic + self.final in (0, 1)
 
     def __repr__(self):
-        symbols = ', '.join(str(var) for var in self.symbols)
-        return f'ProcedureDeclaration:: {symbols}'
+        symbols = ", ".join(str(var) for var in self.symbols)
+        return f"ProcedureDeclaration:: {symbols}"
 
 
 @dataclass_strict(frozen=True)
-class _DataDeclarationBase():
-    """ Type definitions for :any:`DataDeclaration` node type. """
+class _DataDeclarationBase:
+    """Type definitions for :any:`DataDeclaration` node type."""
 
     # TODO: This should only allow Expression instances but needs frontend changes
     # TODO: Support complex statements (LOKI-23)
@@ -1361,7 +1428,7 @@ class DataDeclaration(LeafNode, _DataDeclarationBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['variable', 'values']
+    _traversable = ["variable", "values"]
 
     def __post_init__(self):
         super().__post_init__()
@@ -1370,12 +1437,12 @@ class DataDeclaration(LeafNode, _DataDeclarationBase):
         assert all(isinstance(val, Expression) for val in self.values)
 
     def __repr__(self):
-        return f'DataDeclaration:: {str(self.variable)}'
+        return f"DataDeclaration:: {str(self.variable)}"
 
 
 @dataclass_strict(frozen=True)
-class _StatementFunctionBase():
-    """ Type definitions for :any:`StatementFunction` node type. """
+class _StatementFunctionBase:
+    """Type definitions for :any:`StatementFunction` node type."""
 
     variable: Expression
     arguments: Tuple[Expression, ...]
@@ -1400,12 +1467,14 @@ class StatementFunction(LeafNode, _StatementFunctionBase):
         The return type of the statement function
     """
 
-    _traversable = ['variable', 'arguments', 'rhs']
+    _traversable = ["variable", "arguments", "rhs"]
 
     def __post_init__(self):
         super().__post_init__()
         assert isinstance(self.variable, Expression)
-        assert is_iterable(self.arguments) and all(isinstance(a, Expression) for a in self.arguments)
+        assert is_iterable(self.arguments) and all(
+            isinstance(a, Expression) for a in self.arguments
+        )
         assert isinstance(self.return_type, SymbolAttributes)
 
     @property
@@ -1421,8 +1490,8 @@ class StatementFunction(LeafNode, _StatementFunctionBase):
 
 
 @dataclass_strict(frozen=True)
-class _TypeDefBase():
-    """ Type definitions for :any:`TypeDef` node type. """
+class _TypeDefBase:
+    """Type definitions for :any:`TypeDef` node type."""
 
     name: str = None
     body: Tuple[Node, ...] = None
@@ -1468,7 +1537,7 @@ class TypeDef(ScopedNode, InternalNode, _TypeDefBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['body']
+    _traversable = ["body"]
 
     def __post_init__(self, parent=None):
         super(ScopedNode, self).__post_init__(parent=parent)
@@ -1485,7 +1554,8 @@ class TypeDef(ScopedNode, InternalNode, _TypeDefBase):
     @property
     def declarations(self):
         return tuple(
-            c for c in as_tuple(self.body)
+            c
+            for c in as_tuple(self.body)
             if isinstance(c, (VariableDeclaration, ProcedureDeclaration))
         )
 
@@ -1506,7 +1576,9 @@ class TypeDef(ScopedNode, InternalNode, _TypeDefBase):
         """
         Return the symbols imported in this typedef
         """
-        return tuple(flatten(c.symbols for c in as_tuple(self.body) if isinstance(c, Import)))
+        return tuple(
+            flatten(c.symbols for c in as_tuple(self.body) if isinstance(c, Import))
+        )
 
     @property
     def imported_symbol_map(self):
@@ -1523,18 +1595,21 @@ class TypeDef(ScopedNode, InternalNode, _TypeDefBase):
         return DerivedType(name=self.name, typedef=self)
 
     def __repr__(self):
-        return f'TypeDef:: {self.name}'
+        return f"TypeDef:: {self.name}"
 
     def clone(self, **kwargs):
-        from loki.visitors import Transformer  # pylint: disable=import-outside-toplevel,cyclic-import
-        if 'body' not in kwargs:
-            kwargs['body'] = Transformer().visit(self.body)
+        from loki.visitors import (
+            Transformer,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
+        if "body" not in kwargs:
+            kwargs["body"] = Transformer().visit(self.body)
         return super().clone(**kwargs)
 
 
 @dataclass_strict(frozen=True)
-class _MultiConditionalBase():
-    """ Type definitions for :any:`MultiConditional` node type. """
+class _MultiConditionalBase:
+    """Type definitions for :any:`MultiConditional` node type."""
 
     expr: Expression
     values: Tuple[Any, ...]
@@ -1564,25 +1639,27 @@ class MultiConditional(LeafNode, _MultiConditionalBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['expr', 'values', 'bodies', 'else_body']
+    _traversable = ["expr", "values", "bodies", "else_body"]
 
     def __post_init__(self):
         super().__post_init__()
         assert isinstance(self.expr, Expression)
         assert is_iterable(self.values)
-        assert all(isinstance(v, tuple) and all(isinstance(c, Expression) for c in v)
-                                           for v in self.values)
+        assert all(
+            isinstance(v, tuple) and all(isinstance(c, Expression) for c in v)
+            for v in self.values
+        )
         assert is_iterable(self.bodies) and all(is_iterable(b) for b in self.bodies)
         assert is_iterable(self.else_body)
 
     def __repr__(self):
-        label = f' {self.name}' if self.name else ''
-        return f'MultiConditional::{label} {str(self.expr)}'
+        label = f" {self.name}" if self.name else ""
+        return f"MultiConditional::{label} {str(self.expr)}"
 
 
 @dataclass_strict(frozen=True)
-class _MaskedStatementBase():
-    """ Type definitions for :any:`MaskedStatement` node type. """
+class _MaskedStatementBase:
+    """Type definitions for :any:`MaskedStatement` node type."""
 
     conditions: Tuple[Expression, ...]
     bodies: Tuple[Tuple[Node, ...], ...]
@@ -1610,25 +1687,31 @@ class MaskedStatement(LeafNode, _MaskedStatementBase):
         Other parameters that are passed on to the parent class constructor.
     """
 
-    _traversable = ['conditions', 'bodies', 'default']
+    _traversable = ["conditions", "bodies", "default"]
 
     def __post_init__(self):
         super().__post_init__()
-        assert is_iterable(self.conditions) and all(isinstance(c, Expression) for c in self.conditions)
-        assert is_iterable(self.bodies) and all(isinstance(c, tuple) for c in self.bodies)
+        assert is_iterable(self.conditions) and all(
+            isinstance(c, Expression) for c in self.conditions
+        )
+        assert is_iterable(self.bodies) and all(
+            isinstance(c, tuple) for c in self.bodies
+        )
         assert len(self.conditions) == len(self.bodies)
         assert is_iterable(self.default)
 
         if self.inline:
-            assert len(self.bodies) == 1 and len(self.bodies[0]) == 1 and not self.default
+            assert (
+                len(self.bodies) == 1 and len(self.bodies[0]) == 1 and not self.default
+            )
 
     def __repr__(self):
-        return f'MaskedStatement:: {str(self.conditions[0])}'
+        return f"MaskedStatement:: {str(self.conditions[0])}"
 
 
 @dataclass(frozen=True)
-class _IntrinsicBase():
-    """ Type definitions for :any:`Intrinsic` node type. """
+class _IntrinsicBase:
+    """Type definitions for :any:`Intrinsic` node type."""
 
     text: str
 
@@ -1657,12 +1740,12 @@ class Intrinsic(LeafNode, _IntrinsicBase):
         assert isinstance(self.text, str)
 
     def __repr__(self):
-        return f'Intrinsic:: {truncate_string(self.text)}'
+        return f"Intrinsic:: {truncate_string(self.text)}"
 
 
 @dataclass_strict(frozen=True)
-class _EnumerationBase():
-    """ Type definitions for :any:`Enumeration` node type. """
+class _EnumerationBase:
+    """Type definitions for :any:`Enumeration` node type."""
 
     symbols: Tuple[Expression, ...]
 
@@ -1687,16 +1770,18 @@ class Enumeration(LeafNode, _EnumerationBase):
     def __post_init__(self):
         super().__post_init__()
         if self.symbols is not None:
-            assert all(isinstance(s, Expression) for s in self.symbols)  # pylint: disable=not-an-iterable
+            assert all(
+                isinstance(s, Expression) for s in self.symbols
+            )  # pylint: disable=not-an-iterable
 
     def __repr__(self):
-        symbols = ', '.join(str(var) for var in as_tuple(self.symbols))
-        return f'Enumeration:: {symbols}'
+        symbols = ", ".join(str(var) for var in as_tuple(self.symbols))
+        return f"Enumeration:: {symbols}"
 
 
 @dataclass_strict(frozen=True)
-class _RawSourceBase():
-    """ Type definitions for :any:`RawSource` node type. """
+class _RawSourceBase:
+    """Type definitions for :any:`RawSource` node type."""
 
     text: str
 
@@ -1719,4 +1804,4 @@ class RawSource(LeafNode, _RawSourceBase):
     """
 
     def __repr__(self):
-        return f'RawSource:: {truncate_string(self.text.strip())}'
+        return f"RawSource:: {truncate_string(self.text.strip())}"

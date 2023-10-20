@@ -9,16 +9,31 @@ import re
 from loki.expression import symbols as sym
 from loki.transform import resolve_associates, inline_member_procedures
 from loki import (
-    Transformation, FindNodes, Transformer, info,
-    pragmas_attached, as_tuple, flatten, ir, FindExpressions,
-    SymbolAttributes, BasicType, SubstituteExpressions, DerivedType,
-    FindVariables, CaseInsensitiveDict, pragma_regions_attached,
-    PragmaRegion, is_loki_pragma, HoistVariablesTransformation
+    Transformation,
+    FindNodes,
+    Transformer,
+    info,
+    pragmas_attached,
+    as_tuple,
+    flatten,
+    ir,
+    FindExpressions,
+    SymbolAttributes,
+    BasicType,
+    SubstituteExpressions,
+    DerivedType,
+    FindVariables,
+    CaseInsensitiveDict,
+    pragma_regions_attached,
+    PragmaRegion,
+    is_loki_pragma,
+    HoistVariablesTransformation,
 )
 
 __all__ = [
-    'SCCBaseTransformation', 'SCCAnnotateTransformation',
-    'SCCHoistTemporaryArraysTransformation'
+    "SCCBaseTransformation",
+    "SCCAnnotateTransformation",
+    "SCCHoistTemporaryArraysTransformation",
 ]
 
 
@@ -43,7 +58,7 @@ class SCCBaseTransformation(Transformation):
     def __init__(self, horizontal, directive=None, inline_members=False):
         self.horizontal = horizontal
 
-        assert directive in [None, 'openacc']
+        assert directive in [None, "openacc"]
         self.directive = directive
 
         self.inline_members = inline_members
@@ -63,14 +78,16 @@ class SCCBaseTransformation(Transformation):
         """
 
         pragmas = FindNodes(ir.Pragma).visit(routine.ir)
-        routine_pragmas = [p for p in pragmas if p.keyword.lower() in ['loki', 'acc']]
-        routine_pragmas = [p for p in routine_pragmas if 'routine' in p.content.lower()]
+        routine_pragmas = [p for p in pragmas if p.keyword.lower() in ["loki", "acc"]]
+        routine_pragmas = [p for p in routine_pragmas if "routine" in p.content.lower()]
 
-        seq_pragmas = [r for r in routine_pragmas if 'seq' in r.content.lower()]
+        seq_pragmas = [r for r in routine_pragmas if "seq" in r.content.lower()]
         if seq_pragmas:
-            loki_seq_pragmas = [r for r in routine_pragmas if 'loki' == r.keyword.lower()]
+            loki_seq_pragmas = [
+                r for r in routine_pragmas if "loki" == r.keyword.lower()
+            ]
             if loki_seq_pragmas:
-                if directive == 'openacc':
+                if directive == "openacc":
                     # Mark routine as acc seq
                     mapper = {seq_pragmas[0]: None}
                     routine.spec = Transformer(mapper).visit(routine.spec)
@@ -78,12 +95,12 @@ class SCCBaseTransformation(Transformation):
 
                     # Append the acc pragma to routine.spec, regardless of where the corresponding
                     # loki pragma is found
-                    routine.spec.append(ir.Pragma(keyword='acc', content='routine seq'))
+                    routine.spec.append(ir.Pragma(keyword="acc", content="routine seq"))
             return True
 
-        vec_pragmas = [r for r in routine_pragmas if 'vector' in r.content.lower()]
+        vec_pragmas = [r for r in routine_pragmas if "vector" in r.content.lower()]
         if vec_pragmas:
-            if directive == 'openacc':
+            if directive == "openacc":
                 return True
 
         return False
@@ -103,9 +120,9 @@ class SCCBaseTransformation(Transformation):
         """
 
         if horizontal.bounds[0] not in routine.variable_map:
-            raise RuntimeError(f'No horizontal start variable found in {routine.name}')
+            raise RuntimeError(f"No horizontal start variable found in {routine.name}")
         if horizontal.bounds[1] not in routine.variable_map:
-            raise RuntimeError(f'No horizontal end variable found in {routine.name}')
+            raise RuntimeError(f"No horizontal end variable found in {routine.name}")
 
     @classmethod
     def get_integer_variable(cls, routine, name):
@@ -143,12 +160,20 @@ class SCCBaseTransformation(Transformation):
         for masked in FindNodes(ir.MaskedStatement).visit(routine.body):
             # TODO: Currently limited to simple, single-clause WHERE stmts
             assert len(masked.conditions) == 1 and len(masked.bodies) == 1
-            ranges = [e for e in FindExpressions().visit(masked.conditions[0]) if isinstance(e, sym.RangeIndex)]
+            ranges = [
+                e
+                for e in FindExpressions().visit(masked.conditions[0])
+                if isinstance(e, sym.RangeIndex)
+            ]
             exprmap = {r: loop_variable for r in ranges}
             assert len(ranges) > 0
             assert all(r == ranges[0] for r in ranges)
             bounds = sym.LoopRange((ranges[0].start, ranges[0].stop, ranges[0].step))
-            cond = ir.Conditional(condition=masked.conditions[0], body=masked.bodies[0], else_body=masked.default)
+            cond = ir.Conditional(
+                condition=masked.conditions[0],
+                body=masked.bodies[0],
+                else_body=masked.default,
+            )
             loop = ir.Loop(variable=loop_variable, bounds=bounds, body=(cond,))
             # Substitute the loop ranges with the loop index and add to mapper
             mapper[masked] = SubstituteExpressions(exprmap).visit(loop)
@@ -177,19 +202,23 @@ class SCCBaseTransformation(Transformation):
         bounds : tuple of :any:`Scalar`
             Tuple defining the iteration space of the inserted loops.
         """
-        bounds_str = f'{bounds[0]}:{bounds[1]}'
+        bounds_str = f"{bounds[0]}:{bounds[1]}"
 
         bounds_v = (sym.Variable(name=bounds[0]), sym.Variable(name=bounds[1]))
 
         mapper = {}
         for stmt in FindNodes(ir.Assignment).visit(routine.body):
-            ranges = [e for e in FindExpressions().visit(stmt)
-                      if isinstance(e, sym.RangeIndex) and e == bounds_str]
+            ranges = [
+                e
+                for e in FindExpressions().visit(stmt)
+                if isinstance(e, sym.RangeIndex) and e == bounds_str
+            ]
             if ranges:
                 exprmap = {r: loop_variable for r in ranges}
                 loop = ir.Loop(
-                    variable=loop_variable, bounds=sym.LoopRange(bounds_v),
-                    body=as_tuple(SubstituteExpressions(exprmap).visit(stmt))
+                    variable=loop_variable,
+                    bounds=sym.LoopRange(bounds_v),
+                    body=as_tuple(SubstituteExpressions(exprmap).visit(stmt)),
                 )
                 mapper[stmt] = loop
 
@@ -214,7 +243,10 @@ class SCCBaseTransformation(Transformation):
         """
         if loop.pragma:
             for pragma in loop.pragma:
-                if pragma.keyword.lower() == "loki" and pragma.content.lower() == "driver-loop":
+                if (
+                    pragma.keyword.lower() == "loki"
+                    and pragma.content.lower() == "driver-loop"
+                ):
                     return True
         for call in FindNodes(ir.CallStatement).visit(loop.body):
             if call.name in targets:
@@ -263,11 +295,11 @@ class SCCBaseTransformation(Transformation):
         role : string
             Role of the subroutine in the call tree; should be ``"kernel"``
         """
-        role = kwargs['role']
+        role = kwargs["role"]
 
-        if role == 'kernel':
+        if role == "kernel":
             self.process_kernel(routine)
-        if role == 'driver':
+        if role == "driver":
             self.process_driver(routine)
 
     def process_kernel(self, routine):
@@ -303,7 +335,9 @@ class SCCBaseTransformation(Transformation):
         self.resolve_masked_stmts(routine, loop_variable=v_index)
 
         # Resolve vector notation, eg. VARIABLE(KIDIA:KFDIA)
-        self.resolve_vector_dimension(routine, loop_variable=v_index, bounds=self.horizontal.bounds)
+        self.resolve_vector_dimension(
+            routine, loop_variable=v_index, bounds=self.horizontal.bounds
+        )
 
     def process_driver(self, routine):
         """
@@ -369,25 +403,33 @@ class SCCAnnotateTransformation(Transformation):
         argument_map = CaseInsensitiveDict({a.name: a for a in routine.arguments})
         private_arrays = [v for v in routine.variables if not v.name in argument_map]
         private_arrays = [v for v in private_arrays if isinstance(v, sym.Array)]
-        private_arrays = [v for v in private_arrays if not any(vertical.size in d for d in v.shape)]
-        private_arrays = [v for v in private_arrays if not any(horizontal.size in d for d in v.shape)]
+        private_arrays = [
+            v for v in private_arrays if not any(vertical.size in d for d in v.shape)
+        ]
+        private_arrays = [
+            v for v in private_arrays if not any(horizontal.size in d for d in v.shape)
+        ]
 
         if private_arrays:
             # Log private arrays in vector regions, as these can impact performance
             info(
-                f'[Loki-SCC::Annotate] Marking private arrays in {routine.name}: '
-                f'{[a.name for a in private_arrays]}'
+                f"[Loki-SCC::Annotate] Marking private arrays in {routine.name}: "
+                f"{[a.name for a in private_arrays]}"
             )
 
         mapper = {}
         with pragma_regions_attached(routine):
             for region in FindNodes(PragmaRegion).visit(routine.body):
-                if is_loki_pragma(region.pragma, starts_with='vector-reduction'):
-                    if (reduction_clause := re.search(r'reduction\([\w:0-9 \t]+\)', region.pragma.content)):
+                if is_loki_pragma(region.pragma, starts_with="vector-reduction"):
+                    if reduction_clause := re.search(
+                        r"reduction\([\w:0-9 \t]+\)", region.pragma.content
+                    ):
 
                         loops = FindNodes(ir.Loop).visit(region)
                         assert len(loops) == 1
-                        pragma = ir.Pragma(keyword='acc', content=f'loop vector {reduction_clause[0]}')
+                        pragma = ir.Pragma(
+                            keyword="acc", content=f"loop vector {reduction_clause[0]}"
+                        )
                         mapper[loops[0]] = loops[0].clone(pragma=(pragma,))
                         mapper[region.pragma] = None
                         mapper[region.pragma_post] = None
@@ -396,16 +438,22 @@ class SCCAnnotateTransformation(Transformation):
             for loop in FindNodes(ir.Loop).visit(routine.body):
                 if loop.variable == horizontal.index and not loop in mapper:
                     # Construct pragma and wrap entire body in vector loop
-                    private_arrs = ', '.join(v.name for v in private_arrays)
+                    private_arrs = ", ".join(v.name for v in private_arrays)
                     pragma = ()
-                    private_clause = '' if not private_arrays else f' private({private_arrs})'
-                    pragma = ir.Pragma(keyword='acc', content=f'loop vector{private_clause}')
+                    private_clause = (
+                        "" if not private_arrays else f" private({private_arrs})"
+                    )
+                    pragma = ir.Pragma(
+                        keyword="acc", content=f"loop vector{private_clause}"
+                    )
                     mapper[loop] = loop.clone(pragma=(pragma,))
 
             routine.body = Transformer(mapper).visit(routine.body)
 
     @classmethod
-    def kernel_annotate_sequential_loops_openacc(cls, routine, horizontal, block_dim=None, ignore=()):
+    def kernel_annotate_sequential_loops_openacc(
+        cls, routine, horizontal, block_dim=None, ignore=()
+    ):
         """
         Insert ``!$acc loop seq`` annotations around all loops that
         are not horizontal vector loops.
@@ -426,18 +474,28 @@ class SCCAnnotateTransformation(Transformation):
 
             for loop in FindNodes(ir.Loop).visit(routine.body):
                 # Skip loops explicitly marked with `!$loki/claw nodep`
-                if loop.pragma and any('nodep' in p.content.lower() for p in as_tuple(loop.pragma)):
+                if loop.pragma and any(
+                    "nodep" in p.content.lower() for p in as_tuple(loop.pragma)
+                ):
                     continue
 
-                if loop.variable != horizontal.index and loop.variable != block_dim_index and loop not in ignore:
+                if (
+                    loop.variable != horizontal.index
+                    and loop.variable != block_dim_index
+                    and loop not in ignore
+                ):
                     # Perform pragma addition in place to avoid nested loop replacements
-                    loop._update(pragma=(ir.Pragma(keyword='acc', content='loop seq'),))
+                    loop._update(pragma=(ir.Pragma(keyword="acc", content="loop seq"),))
 
                 # Warn if we detect vector insisde sequential loop nesting
                 nested_loops = FindNodes(ir.Loop).visit(loop.body)
-                loop_pragmas = flatten(as_tuple(l.pragma) for l in as_tuple(nested_loops))
-                if any('loop vector' in pragma.content for pragma in loop_pragmas):
-                    info(f'[Loki-SCC::Annotate] Detected vector loop in sequential loop in {routine.name}')
+                loop_pragmas = flatten(
+                    as_tuple(l.pragma) for l in as_tuple(nested_loops)
+                )
+                if any("loop vector" in pragma.content for pragma in loop_pragmas):
+                    info(
+                        f"[Loki-SCC::Annotate] Detected vector loop in sequential loop in {routine.name}"
+                    )
 
     @classmethod
     def kernel_annotate_subroutine_present_openacc(cls, routine):
@@ -455,9 +513,13 @@ class SCCAnnotateTransformation(Transformation):
         args += [a for a in routine.arguments if isinstance(a.type.dtype, DerivedType)]
         argnames = [str(a.name) for a in args]
 
-        routine.body.prepend(ir.Pragma(keyword='acc', content=f'data present({", ".join(argnames)})'))
+        routine.body.prepend(
+            ir.Pragma(keyword="acc", content=f'data present({", ".join(argnames)})')
+        )
         # Add comment to prevent false-attachment in case it is preceded by an "END DO" statement
-        routine.body.append((ir.Comment(text=''), ir.Pragma(keyword='acc', content='end data')))
+        routine.body.append(
+            (ir.Comment(text=""), ir.Pragma(keyword="acc", content="end data"))
+        )
 
     @classmethod
     def insert_annotations(cls, routine, horizontal, vertical):
@@ -473,7 +535,7 @@ class SCCAnnotateTransformation(Transformation):
         cls.kernel_annotate_subroutine_present_openacc(routine)
 
         # Mark routine as `!$acc routine vector` to make it device-callable
-        routine.spec.append(ir.Pragma(keyword='acc', content='routine vector'))
+        routine.spec.append(ir.Pragma(keyword="acc", content="routine vector"))
 
     def transform_subroutine(self, routine, **kwargs):
         """
@@ -487,12 +549,12 @@ class SCCAnnotateTransformation(Transformation):
             Role of the subroutine in the call tree; should be ``"kernel"``
         """
 
-        role = kwargs['role']
-        targets = as_tuple(kwargs.get('targets'))
+        role = kwargs["role"]
+        targets = as_tuple(kwargs.get("targets"))
 
-        if role == 'kernel':
+        if role == "kernel":
             self.process_kernel(routine)
-        if role == 'driver':
+        if role == "driver":
             self.process_driver(routine, targets=targets)
 
     def process_kernel(self, routine):
@@ -510,12 +572,16 @@ class SCCAnnotateTransformation(Transformation):
         if SCCBaseTransformation.check_routine_pragmas(routine, self.directive):
             return
 
-        if self.directive == 'openacc':
+        if self.directive == "openacc":
             self.insert_annotations(routine, self.horizontal, self.vertical)
 
         # Remove the vector section wrappers
         # These have been inserted by SCCDevectorTransformation
-        section_mapper = {s: s.body for s in FindNodes(ir.Section).visit(routine.body) if s.label == 'vector_section'}
+        section_mapper = {
+            s: s.body
+            for s in FindNodes(ir.Section).visit(routine.body)
+            if s.label == "vector_section"
+        }
         if section_mapper:
             routine.body = Transformer(section_mapper).visit(routine.body)
 
@@ -542,7 +608,9 @@ class SCCAnnotateTransformation(Transformation):
                 break
 
         with pragmas_attached(routine, ir.Loop, attach_pragma_post=True):
-            driver_loops = SCCBaseTransformation.find_driver_loops(routine=routine, targets=targets)
+            driver_loops = SCCBaseTransformation.find_driver_loops(
+                routine=routine, targets=targets
+            )
             for loop in driver_loops:
                 loops = FindNodes(ir.Loop).visit(loop.body)
                 kernel_loops = [l for l in loops if l.variable == self.horizontal.index]
@@ -552,14 +620,19 @@ class SCCAnnotateTransformation(Transformation):
                     self.directive, loop, kernel_loops, self.block_dim, num_threads
                 )
 
-            if self.directive == 'openacc':
+            if self.directive == "openacc":
                 # Mark all non-parallel loops as `!$acc loop seq`
-                self.kernel_annotate_sequential_loops_openacc(routine, self.horizontal, self.block_dim,
-                                                              ignore=driver_loops)
+                self.kernel_annotate_sequential_loops_openacc(
+                    routine, self.horizontal, self.block_dim, ignore=driver_loops
+                )
 
         # Remove the vector section wrappers
         # These have been inserted by SCCDevectorTransformation
-        section_mapper = {s: s.body for s in FindNodes(ir.Section).visit(routine.body) if s.label == 'vector_section'}
+        section_mapper = {
+            s: s.body
+            for s in FindNodes(ir.Section).visit(routine.body)
+            if s.label == "vector_section"
+        }
         if section_mapper:
             routine.body = Transformer(section_mapper).visit(routine.body)
 
@@ -577,15 +650,19 @@ class SCCAnnotateTransformation(Transformation):
         """
 
         if column_locals:
-            vnames = ', '.join(v.name for v in column_locals)
-            pragma = ir.Pragma(keyword='acc', content=f'enter data create({vnames})')
-            pragma_post = ir.Pragma(keyword='acc', content=f'exit data delete({vnames})')
+            vnames = ", ".join(v.name for v in column_locals)
+            pragma = ir.Pragma(keyword="acc", content=f"enter data create({vnames})")
+            pragma_post = ir.Pragma(
+                keyword="acc", content=f"exit data delete({vnames})"
+            )
             # Add comments around standalone pragmas to avoid false attachment
-            routine.body.prepend((ir.Comment(''), pragma, ir.Comment('')))
-            routine.body.append((ir.Comment(''), pragma_post, ir.Comment('')))
+            routine.body.prepend((ir.Comment(""), pragma, ir.Comment("")))
+            routine.body.append((ir.Comment(""), pragma_post, ir.Comment("")))
 
     @classmethod
-    def annotate_driver(cls, directive, driver_loop, kernel_loops, block_dim, num_threads):
+    def annotate_driver(
+        cls, directive, driver_loop, kernel_loops, block_dim, num_threads
+    ):
         """
         Annotate driver block loop with ``'openacc'`` pragmas.
 
@@ -606,7 +683,7 @@ class SCCAnnotateTransformation(Transformation):
         """
 
         # Mark driver loop as "gang parallel".
-        if directive == 'openacc':
+        if directive == "openacc":
             arrays = FindVariables(unique=True).visit(driver_loop)
             arrays = [v for v in arrays if isinstance(v, sym.Array)]
             arrays = [v for v in arrays if not v.type.intent]
@@ -614,31 +691,55 @@ class SCCAnnotateTransformation(Transformation):
 
             # Filter out arrays that are explicitly allocated with block dimension
             sizes = block_dim.size_expressions
-            arrays = [v for v in arrays if not any(d in sizes for d in as_tuple(v.shape))]
-            private_arrays = ', '.join(set(v.name for v in arrays))
-            private_clause = '' if not private_arrays else f' private({private_arrays})'
-            vector_length_clause = '' if not num_threads else f' vector_length({num_threads})'
+            arrays = [
+                v for v in arrays if not any(d in sizes for d in as_tuple(v.shape))
+            ]
+            private_arrays = ", ".join(set(v.name for v in arrays))
+            private_clause = "" if not private_arrays else f" private({private_arrays})"
+            vector_length_clause = (
+                "" if not num_threads else f" vector_length({num_threads})"
+            )
 
             # Annotate vector loops with OpenACC pragmas
             if kernel_loops:
                 for loop in as_tuple(kernel_loops):
-                    loop._update(pragma=(ir.Pragma(keyword='acc', content='loop vector'),))
+                    loop._update(
+                        pragma=(ir.Pragma(keyword="acc", content="loop vector"),)
+                    )
 
-            if driver_loop.pragma is None or (len(driver_loop.pragma) == 1 and
-                                              driver_loop.pragma[0].keyword.lower() == "loki" and
-                                              driver_loop.pragma[0].content.lower() == "driver-loop"):
-                p_content = f'parallel loop gang{private_clause}{vector_length_clause}'
-                driver_loop._update(pragma=(ir.Pragma(keyword='acc', content=p_content),))
-                driver_loop._update(pragma_post=(ir.Pragma(keyword='acc', content='end parallel loop'),))
+            if driver_loop.pragma is None or (
+                len(driver_loop.pragma) == 1
+                and driver_loop.pragma[0].keyword.lower() == "loki"
+                and driver_loop.pragma[0].content.lower() == "driver-loop"
+            ):
+                p_content = f"parallel loop gang{private_clause}{vector_length_clause}"
+                driver_loop._update(
+                    pragma=(ir.Pragma(keyword="acc", content=p_content),)
+                )
+                driver_loop._update(
+                    pragma_post=(ir.Pragma(keyword="acc", content="end parallel loop"),)
+                )
 
             # add acc parallel loop gang if the only existing pragma is acc data
             elif len(driver_loop.pragma) == 1:
-                if (driver_loop.pragma[0].keyword == 'acc' and
-                    driver_loop.pragma[0].content.lower().lstrip().startswith('data ')):
-                    p_content = f'parallel loop gang{private_clause}{vector_length_clause}'
-                    driver_loop._update(pragma=(driver_loop.pragma[0], ir.Pragma(keyword='acc', content=p_content)))
-                    driver_loop._update(pragma_post=(ir.Pragma(keyword='acc', content='end parallel loop'),
-                                              driver_loop.pragma_post[0]))
+                if driver_loop.pragma[0].keyword == "acc" and driver_loop.pragma[
+                    0
+                ].content.lower().lstrip().startswith("data "):
+                    p_content = (
+                        f"parallel loop gang{private_clause}{vector_length_clause}"
+                    )
+                    driver_loop._update(
+                        pragma=(
+                            driver_loop.pragma[0],
+                            ir.Pragma(keyword="acc", content=p_content),
+                        )
+                    )
+                    driver_loop._update(
+                        pragma_post=(
+                            ir.Pragma(keyword="acc", content="end parallel loop"),
+                            driver_loop.pragma_post[0],
+                        )
+                    )
 
 
 class SCCHoistTemporaryArraysTransformation(HoistVariablesTransformation):
@@ -679,26 +780,29 @@ class SCCHoistTemporaryArraysTransformation(HoistVariablesTransformation):
         """
         if not self.block_dim:
             raise RuntimeError(
-                '[Loki] SingleColumnCoalescedTransform: No blocking dimension found '
-                'for array argument hoisting.'
+                "[Loki] SingleColumnCoalescedTransform: No blocking dimension found "
+                "for array argument hoisting."
             )
 
-        block_var = SCCBaseTransformation.get_integer_variable(routine, self.block_dim.size)
+        block_var = SCCBaseTransformation.get_integer_variable(
+            routine, self.block_dim.size
+        )
         routine.variables += tuple(
             v.clone(
                 dimensions=v.dimensions + (block_var,),
-                type=v.type.clone(shape=v.shape + (block_var,))
-            ) for v in variables
+                type=v.type.clone(shape=v.shape + (block_var,)),
+            )
+            for v in variables
         )
 
         # Add explicit device-side allocations/deallocations for hoisted temporaries
-        vnames = ', '.join(v.name for v in variables)
-        pragma = ir.Pragma(keyword='acc', content=f'enter data create({vnames})')
-        pragma_post = ir.Pragma(keyword='acc', content=f'exit data delete({vnames})')
+        vnames = ", ".join(v.name for v in variables)
+        pragma = ir.Pragma(keyword="acc", content=f"enter data create({vnames})")
+        pragma_post = ir.Pragma(keyword="acc", content=f"exit data delete({vnames})")
 
         # Add comments around standalone pragmas to avoid false attachment
-        routine.body.prepend((ir.Comment(''), pragma, ir.Comment('')))
-        routine.body.append((ir.Comment(''), pragma_post, ir.Comment('')))
+        routine.body.prepend((ir.Comment(""), pragma, ir.Comment("")))
+        routine.body.append((ir.Comment(""), pragma_post, ir.Comment("")))
 
     def driver_call_argument_remapping(self, routine, call, variables):
         """
@@ -719,13 +823,18 @@ class SCCHoistTemporaryArraysTransformation(HoistVariablesTransformation):
         """
         if not self.block_dim:
             raise RuntimeError(
-                '[Loki] SingleColumnCoalescedTransform: No blocking dimension found '
-                'for array argument hoisting.'
+                "[Loki] SingleColumnCoalescedTransform: No blocking dimension found "
+                "for array argument hoisting."
             )
 
-        idx_var = SCCBaseTransformation.get_integer_variable(routine, self.block_dim.index)
+        idx_var = SCCBaseTransformation.get_integer_variable(
+            routine, self.block_dim.index
+        )
         new_args = tuple(
-            v.clone(dimensions=tuple(sym.RangeIndex((None, None)) for _ in v.dimensions) + (idx_var,))
+            v.clone(
+                dimensions=tuple(sym.RangeIndex((None, None)) for _ in v.dimensions)
+                + (idx_var,)
+            )
             for v in variables
         )
         return call.clone(arguments=call.arguments + new_args)

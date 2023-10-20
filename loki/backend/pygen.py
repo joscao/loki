@@ -12,20 +12,20 @@ from loki.visitors import Stringifier
 from loki.types import BasicType, DerivedType, SymbolAttributes
 
 
-__all__ = ['pygen', 'PyCodegen', 'PyCodeMapper']
+__all__ = ["pygen", "PyCodegen", "PyCodeMapper"]
 
 
 def numpy_type(_type):
     if _type.shape is not None:
-        return 'np.ndarray'
+        return "np.ndarray"
     if _type.dtype == BasicType.LOGICAL:
-        return 'bool'
+        return "bool"
     if _type.dtype == BasicType.INTEGER:
-        return 'np.int32'
+        return "np.int32"
     if _type.dtype == BasicType.REAL:
-        if str(_type.kind) in ('real32',):
-            return 'np.float32'
-        return 'np.float64'
+        if str(_type.kind) in ("real32",):
+            return "np.float32"
+        return "np.float64"
     if isinstance(_type.dtype, DerivedType):
         return _type.dtype.name
     raise ValueError(str(_type))
@@ -35,10 +35,11 @@ class PyCodeMapper(LokiStringifyMapper):
     """
     Generate Python representation of expression trees using numpy syntax.
     """
+
     # pylint: disable=abstract-method, unused-argument
 
     def map_logic_literal(self, expr, enclosing_prec, *args, **kwargs):
-        return 'True' if bool(expr.value) else 'False'
+        return "True" if bool(expr.value) else "False"
 
     def map_float_literal(self, expr, enclosing_prec, *args, **kwargs):
         return str(expr.value)
@@ -48,13 +49,18 @@ class PyCodeMapper(LokiStringifyMapper):
     def map_cast(self, expr, enclosing_prec, *args, **kwargs):
         _type = SymbolAttributes(BasicType.from_fortran_type(expr.name), kind=expr.kind)
         expression = self.parenthesize_if_needed(
-            self.join_rec('', expr.parameters, PREC_NONE, *args, **kwargs),
-            PREC_CALL, PREC_NONE)
+            self.join_rec("", expr.parameters, PREC_NONE, *args, **kwargs),
+            PREC_CALL,
+            PREC_NONE,
+        )
         return self.parenthesize_if_needed(
-            self.format('%s(%s)', numpy_type(_type), expression), enclosing_prec, PREC_CALL)
+            self.format("%s(%s)", numpy_type(_type), expression),
+            enclosing_prec,
+            PREC_CALL,
+        )
 
     def map_variable_symbol(self, expr, enclosing_prec, *args, **kwargs):
-        return expr.name.replace('%', '.')
+        return expr.name.replace("%", ".")
 
     def map_meta_symbol(self, expr, enclosing_prec, *args, **kwargs):
         return self.rec(expr._symbol, enclosing_prec, *args, **kwargs)
@@ -64,33 +70,40 @@ class PyCodeMapper(LokiStringifyMapper):
 
     def map_array_subscript(self, expr, enclosing_prec, *args, **kwargs):
         name_str = self.rec(expr.aggregate, PREC_NONE, *args, **kwargs)
-        dims = [self.format(self.rec(d, PREC_NONE, *args, **kwargs)) for d in expr.index_tuple]
+        dims = [
+            self.format(self.rec(d, PREC_NONE, *args, **kwargs))
+            for d in expr.index_tuple
+        ]
         dims = [d for d in dims if d]
         if not dims:
-            index_str = ''
+            index_str = ""
         else:
             index_str = f'[{", ".join(dims)}]'
-        return self.format('%s%s', name_str, index_str)
+        return self.format("%s%s", name_str, index_str)
 
     map_string_subscript = map_array_subscript
 
     def map_string_concat(self, expr, enclosing_prec, *args, **kwargs):
-        return ' + '.join(self.rec(c, enclosing_prec, *args, **kwargs) for c in expr.children)
+        return " + ".join(
+            self.rec(c, enclosing_prec, *args, **kwargs) for c in expr.children
+        )
 
     def map_inline_call(self, expr, enclosing_prec, *args, **kwargs):
-        arguments = ', '.join(self.rec(p, PREC_NONE, *args, **kwargs) for p in expr.parameters)
+        arguments = ", ".join(
+            self.rec(p, PREC_NONE, *args, **kwargs) for p in expr.parameters
+        )
 
         if expr.kw_parameters:
-            arguments += ', ' + ', '.join(
-                f'{self.rec(k, PREC_NONE, *args, **kwargs)}={self.rec(v, PREC_NONE, *args, **kwargs)}'
+            arguments += ", " + ", ".join(
+                f"{self.rec(k, PREC_NONE, *args, **kwargs)}={self.rec(v, PREC_NONE, *args, **kwargs)}"
                 for k, v in expr.kw_parameters.items()
             )
 
         f = self.rec(expr.function, PREC_NONE, *args, **kwargs)
-        return self.format(f'{str(f)}({arguments})')
+        return self.format(f"{str(f)}({arguments})")
 
     def map_deferred_type_symbol(self, expr, *args, **kwargs):
-        return str(expr.name).replace('%', '.')
+        return str(expr.name).replace("%", ".")
 
 
 class PyCodegen(Stringifier):
@@ -98,9 +111,14 @@ class PyCodegen(Stringifier):
     Tree visitor to generate standard Python code (with Numpy) from IR.
     """
 
-    def __init__(self, depth=0, indent='  ', linewidth=100):
-        super().__init__(depth=depth, indent=indent, linewidth=linewidth,
-                         line_cont='\n{}  '.format, symgen=PyCodeMapper())
+    def __init__(self, depth=0, indent="  ", linewidth=100):
+        super().__init__(
+            depth=depth,
+            indent=indent,
+            linewidth=linewidth,
+            line_cont="\n{}  ".format,
+            symgen=PyCodeMapper(),
+        )
 
     # Handler for outer objects
 
@@ -124,8 +142,8 @@ class PyCodegen(Stringifier):
                 ...body...
         """
         # Some boilerplate imports...
-        standard_imports = ['numpy as np']
-        header = [self.format_line('import ', name) for name in standard_imports]
+        standard_imports = ["numpy as np"]
+        header = [self.format_line("import ", name) for name in standard_imports]
 
         # ...and imports from the spec
         # TODO
@@ -133,17 +151,23 @@ class PyCodegen(Stringifier):
         # Generate header with argument signature
         # Note: we skip scalar out arguments and add a return statement for those below
         scalar_args = [a for a in o.arguments if isinstance(a, sym.Scalar)]
-        inout_args = [a for a in scalar_args if a.type.intent and a.type.intent.lower() == 'inout']
-        out_args = [a for a in scalar_args if a.type.intent and a.type.intent.lower() == 'out']
+        inout_args = [
+            a for a in scalar_args if a.type.intent and a.type.intent.lower() == "inout"
+        ]
+        out_args = [
+            a for a in scalar_args if a.type.intent and a.type.intent.lower() == "out"
+        ]
         arguments = [arg for arg in o.arguments if arg not in out_args]
         arg_str = []
         for arg in arguments:
             if isinstance(arg.type.dtype, DerivedType):
-                arg_str += [f'{arg.name}']
+                arg_str += [f"{arg.name}"]
             else:
                 dtype = self.visit(arg.type, **kwargs)
-                arg_str += [f'{arg.name}: {dtype}']
-        header += [self.format_line('def ', o.name, '(', self.join_items(arg_str), '):')]
+                arg_str += [f"{arg.name}: {dtype}"]
+        header += [
+            self.format_line("def ", o.name, "(", self.join_items(arg_str), "):")
+        ]
 
         # ...and generate the spec without imports and only declarations for variables that
         # either are local arrays or are assigned an initial value
@@ -155,7 +179,11 @@ class PyCodegen(Stringifier):
 
         # Add return statement for scalar out arguments and close everything off
         ret_args = [arg for arg in o.arguments if arg in inout_args + out_args]
-        body += [self.format_line('return ', self.join_items(self.visit_all(ret_args, **kwargs)))]
+        body += [
+            self.format_line(
+                "return ", self.join_items(self.visit_all(ret_args, **kwargs))
+            )
+        ]
         self.depth -= 1
 
         return self.join_lines(*header, *body)
@@ -173,7 +201,7 @@ class PyCodegen(Stringifier):
         Format comments.
         """
         text = o.text or o.source.string
-        text = str(text).lstrip().replace('!', '#', 1)
+        text = str(text).lstrip().replace("!", "#", 1)
         return self.format_line(text, no_wrap=True)
 
     def visit_CommentBlock(self, o, **kwargs):
@@ -192,18 +220,24 @@ class PyCodegen(Stringifier):
         comment = self.visit(o.comment, **kwargs) if o.comment else None
 
         # Initialise local arrays via numpy
-        local_arrays = [v for v in o.symbols if isinstance(v, sym.Array) and not v.type.intent]
+        local_arrays = [
+            v for v in o.symbols if isinstance(v, sym.Array) and not v.type.intent
+        ]
         array_decls = tuple(
             self.format_line(
-                v.name, ' = np.ndarray(order="F", shape=(',
-                self.join_items(self.visit_all(v.dimensions, **kwargs)), ',))'
-            ) for v in local_arrays
+                v.name,
+                ' = np.ndarray(order="F", shape=(',
+                self.join_items(self.visit_all(v.dimensions, **kwargs)),
+                ",))",
+            )
+            for v in local_arrays
         )
 
         # Assign initial values, if given
         init_decls = tuple(
-            self.format_line(v.name, ' = ', self.visit(v.initial, **kwargs))
-            for v in o.symbols if hasattr(v, 'initial') and v.initial is not None
+            self.format_line(v.name, " = ", self.visit(v.initial, **kwargs))
+            for v in o.symbols
+            if hasattr(v, "initial") and v.initial is not None
         )
 
         # Break out early to avoid needless newlines
@@ -229,10 +263,10 @@ class PyCodegen(Stringifier):
         end = self.visit(o.bounds.stop, **kwargs)
         if o.bounds.step:
             incr = self.visit(o.bounds.step, **kwargs)
-            cntrl = f'range({start}, {end} + {incr}, {incr})'
+            cntrl = f"range({start}, {end} + {incr}, {incr})"
         else:
-            cntrl = f'range({start}, {end} + 1)'
-        header = self.format_line('for ', var, ' in ', cntrl, ':')
+            cntrl = f"range({start}, {end} + 1)"
+        header = self.format_line("for ", var, " in ", cntrl, ":")
         self.depth += 1
         body = self.visit(o.body, **kwargs)
         self.depth -= 1
@@ -247,8 +281,8 @@ class PyCodegen(Stringifier):
         if o.condition is not None:
             condition = self.visit(o.condition, **kwargs)
         else:
-            condition = 'True'
-        header = self.format_line('while ', condition, ':')
+            condition = "True"
+        header = self.format_line("while ", condition, ":")
         self.depth += 1
         body = self.visit(o.body, **kwargs)
         self.depth -= 1
@@ -264,9 +298,9 @@ class PyCodegen(Stringifier):
         [else:]
           [...body...]
         """
-        is_elseif = kwargs.pop('is_elseif', False)
-        keyword = 'elif' if is_elseif else 'if'
-        header = self.format_line(keyword, ' ', self.visit(o.condition, **kwargs), ':')
+        is_elseif = kwargs.pop("is_elseif", False)
+        keyword = "elif" if is_elseif else "if"
+        header = self.format_line(keyword, " ", self.visit(o.condition, **kwargs), ":")
         self.depth += 1
         body = self.visit(o.body, **kwargs)
         if o.has_elseif:
@@ -276,7 +310,7 @@ class PyCodegen(Stringifier):
             else_body = [self.visit(o.else_body, **kwargs)]
             self.depth -= 1
             if o.else_body:
-                else_body = [self.format_line('else:')] + else_body
+                else_body = [self.format_line("else:")] + else_body
         return self.join_lines(header, body, *else_body)
 
     def visit_Assignment(self, o, **kwargs):
@@ -288,8 +322,8 @@ class PyCodegen(Stringifier):
         rhs = self.visit(o.rhs, **kwargs)
         comment = None
         if o.comment:
-            comment = f'  {self.visit(o.comment, **kwargs)}'
-        return self.format_line(lhs, ' = ', rhs, comment=comment)
+            comment = f"  {self.visit(o.comment, **kwargs)}"
+        return self.format_line(lhs, " = ", rhs, comment=comment)
 
     def visit_Section(self, o, **kwargs):
         """
@@ -303,20 +337,24 @@ class PyCodegen(Stringifier):
           <name>(<args>)
         """
         args = self.visit_all(o.arguments, **kwargs)
-        kw_args = tuple(f'{kw}={self.visit(arg, **kwargs)}' for kw, arg in o.kwarguments)
-        return self.format_line(o.name, '(', self.join_items(args + kw_args), ')')
+        kw_args = tuple(
+            f"{kw}={self.visit(arg, **kwargs)}" for kw, arg in o.kwarguments
+        )
+        return self.format_line(o.name, "(", self.join_items(args + kw_args), ")")
 
     def visit_SymbolAttributes(self, o, **kwargs):  # pylint: disable=unused-argument
         return numpy_type(o)
 
     def visit_StatementFunction(self, o, **kwargs):
         args = tuple(self.visit(a, **kwargs) for a in o.arguments)
-        header = self.format_line('def ', o.variable.name, f'({self.join_items(args)}):')
+        header = self.format_line(
+            "def ", o.variable.name, f"({self.join_items(args)}):"
+        )
 
         self.depth += 1
-        body = self.format_line('return ', self.visit(o.rhs, **kwargs))
+        body = self.format_line("return ", self.visit(o.rhs, **kwargs))
         self.depth -= 1
-        return f'{header}\n{body}'
+        return f"{header}\n{body}"
 
 
 def pygen(ir):

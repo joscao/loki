@@ -88,8 +88,12 @@ from loki.transform.transform_utilities import single_variable_declaration
 import loki.expression.symbols as sym
 
 
-__all__ = ['HoistVariablesAnalysis', 'HoistVariablesTransformation',
-           'HoistTemporaryArraysAnalysis', 'HoistTemporaryArraysTransformationAllocatable']
+__all__ = [
+    "HoistVariablesAnalysis",
+    "HoistVariablesTransformation",
+    "HoistTemporaryArraysAnalysis",
+    "HoistTemporaryArraysTransformationAllocatable",
+]
 
 
 class HoistVariablesAnalysis(Transformation):
@@ -110,7 +114,7 @@ class HoistVariablesAnalysis(Transformation):
         these transformations are carried out in succession.
     """
 
-    _key = 'HoistVariablesTransformation'
+    _key = "HoistVariablesTransformation"
 
     def __init__(self, key=None):
         if key is not None:
@@ -131,17 +135,18 @@ class HoistVariablesAnalysis(Transformation):
             Keyword arguments for the transformation.
         """
 
-        role = kwargs.get('role', None)
-        item = kwargs.get('item', None)
-        successors = kwargs.get('successors', ())
+        role = kwargs.get("role", None)
+        item = kwargs.get("item", None)
+        successors = kwargs.get("successors", ())
 
         item.trafo_data[self._key] = {}
 
-        if role != 'driver':
+        if role != "driver":
             variables = self.find_variables(routine)
             item.trafo_data[self._key]["to_hoist"] = variables
-            item.trafo_data[self._key]["hoist_variables"] = [var.clone(name=f'{routine.name}_{var.name}')
-                                                             for var in variables]
+            item.trafo_data[self._key]["hoist_variables"] = [
+                var.clone(name=f"{routine.name}_{var.name}") for var in variables
+            ]
         else:
             item.trafo_data[self._key]["to_hoist"] = []
             item.trafo_data[self._key]["hoist_variables"] = []
@@ -155,14 +160,21 @@ class HoistVariablesAnalysis(Transformation):
             for var in child.trafo_data[self._key]["hoist_variables"]:
                 if isinstance(var, sym.Array):
                     dimensions = SubstituteExpressions(arg_map).visit(var.dimensions)
-                    hoist_variables.append(var.clone(dimensions=dimensions, type=var.type.clone(shape=dimensions)))
+                    hoist_variables.append(
+                        var.clone(
+                            dimensions=dimensions, type=var.type.clone(shape=dimensions)
+                        )
+                    )
                 else:
                     hoist_variables.append(var)
             item.trafo_data[self._key]["to_hoist"].extend(hoist_variables)
-            item.trafo_data[self._key]["to_hoist"] = list(dict.fromkeys(item.trafo_data[self._key]["to_hoist"]))
+            item.trafo_data[self._key]["to_hoist"] = list(
+                dict.fromkeys(item.trafo_data[self._key]["to_hoist"])
+            )
             item.trafo_data[self._key]["hoist_variables"].extend(hoist_variables)
-            item.trafo_data[self._key]["hoist_variables"] = list(dict.fromkeys(
-                item.trafo_data[self._key]["hoist_variables"]))
+            item.trafo_data[self._key]["hoist_variables"] = list(
+                dict.fromkeys(item.trafo_data[self._key]["hoist_variables"])
+            )
 
     def find_variables(self, routine):
         """
@@ -175,7 +187,12 @@ class HoistVariablesAnalysis(Transformation):
         routine : :any:`Subroutine`
             The subroutine find the variables.
         """
-        return [var for var in routine.variables if var not in routine.arguments if not var.type.parameter]
+        return [
+            var
+            for var in routine.variables
+            if var not in routine.arguments
+            if not var.type.parameter
+        ]
 
 
 class HoistVariablesTransformation(Transformation):
@@ -196,7 +213,7 @@ class HoistVariablesTransformation(Transformation):
         these transformations are carried out in succession.
     """
 
-    _key = 'HoistVariablesTransformation'
+    _key = "HoistVariablesTransformation"
 
     def __init__(self, key=None):
         if key is not None:
@@ -220,29 +237,36 @@ class HoistVariablesTransformation(Transformation):
         **kwargs : optional
             Keyword arguments for the transformation.
         """
-        role = kwargs.get('role', None)
-        item = kwargs.get('item', None)
-        successors = kwargs.get('successors', ())
+        role = kwargs.get("role", None)
+        item = kwargs.get("item", None)
+        successors = kwargs.get("successors", ())
         successor_map = CaseInsensitiveDict(
             (successor.routine.name, successor) for successor in successors
         )
 
         if self._key not in item.trafo_data:
-            raise RuntimeError(f'{self.__class__.__name__} requires key "{self._key}" in item.trafo_data!\n'
-                               f'Make sure to call HoistVariablesAnalysis (or any derived class) before and to provide '
-                               f'the correct key.')
+            raise RuntimeError(
+                f'{self.__class__.__name__} requires key "{self._key}" in item.trafo_data!\n'
+                f"Make sure to call HoistVariablesAnalysis (or any derived class) before and to provide "
+                f"the correct key."
+            )
 
-        if role == 'driver':
-            self.driver_variable_declaration(routine, item.trafo_data[self._key]["to_hoist"])
+        if role == "driver":
+            self.driver_variable_declaration(
+                routine, item.trafo_data[self._key]["to_hoist"]
+            )
         else:
             # We build the list of temporaries that are hoisted to the calling routine
             # Because this requires adding an intent, we need to make sure they are not
             # declared together with non-hoisted variables
             hoisted_temporaries = tuple(
-                var.clone(type=var.type.clone(intent='inout'), scope=routine)
-                for var in item.trafo_data[self._key]['to_hoist']
+                var.clone(type=var.type.clone(intent="inout"), scope=routine)
+                for var in item.trafo_data[self._key]["to_hoist"]
             )
-            single_variable_declaration(routine, variables=[var.clone(dimensions=None) for var in hoisted_temporaries])
+            single_variable_declaration(
+                routine,
+                variables=[var.clone(dimensions=None) for var in hoisted_temporaries],
+            )
             routine.arguments += hoisted_temporaries
 
         call_map = {}
@@ -343,12 +367,21 @@ class HoistTemporaryArraysAnalysis(HoistVariablesAnalysis):
         routine : :any:`Subroutine`
             The subroutine find the variables.
         """
-        return [var for var in routine.variables
-                if var not in routine.arguments    # local variable
-                and not var.type.parameter         # not a parameter
-                and isinstance(var, sym.Array)     # is an array
-                and (self.dim_vars is None         # if dim_vars not empty check if at least one dim is within dim_vars
-                     or any(dim_var in self.dim_vars for dim_var in FindVariables().visit(var.dimensions)))]
+        return [
+            var
+            for var in routine.variables
+            if var not in routine.arguments  # local variable
+            and not var.type.parameter  # not a parameter
+            and isinstance(var, sym.Array)  # is an array
+            and (
+                self.dim_vars
+                is None  # if dim_vars not empty check if at least one dim is within dim_vars
+                or any(
+                    dim_var in self.dim_vars
+                    for dim_var in FindVariables().visit(var.dimensions)
+                )
+            )
+        ]
 
 
 class HoistTemporaryArraysTransformationAllocatable(HoistVariablesTransformation):
@@ -382,8 +415,11 @@ class HoistTemporaryArraysTransformationAllocatable(HoistVariablesTransformation
         for var in variables:
             routine.variables += as_tuple(
                 var.clone(
-                    dimensions=as_tuple([sym.RangeIndex((None, None))] * len(var.dimensions)),
-                    type=var.type.clone(allocatable=True), scope=routine
+                    dimensions=as_tuple(
+                        [sym.RangeIndex((None, None))] * len(var.dimensions)
+                    ),
+                    type=var.type.clone(allocatable=True),
+                    scope=routine,
                 )
             )
             routine.body.prepend(Allocation((var.clone(),)))

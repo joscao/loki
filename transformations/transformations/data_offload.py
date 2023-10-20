@@ -6,14 +6,31 @@
 # nor does it submit to any jurisdiction.
 
 from loki import (
-    pragma_regions_attached, PragmaRegion, Transformation, FindNodes,
-    CallStatement, Pragma, Array, as_tuple, Transformer, warning, BasicType,
-    GlobalVarImportItem, SubroutineItem, dataflow_analysis_attached, Import,
-    Comment, Variable, flatten, DerivedType, get_pragma_parameters, CaseInsensitiveDict
+    pragma_regions_attached,
+    PragmaRegion,
+    Transformation,
+    FindNodes,
+    CallStatement,
+    Pragma,
+    Array,
+    as_tuple,
+    Transformer,
+    warning,
+    BasicType,
+    GlobalVarImportItem,
+    SubroutineItem,
+    dataflow_analysis_attached,
+    Import,
+    Comment,
+    Variable,
+    flatten,
+    DerivedType,
+    get_pragma_parameters,
+    CaseInsensitiveDict,
 )
 
 
-__all__ = ['DataOffloadTransformation', 'GlobalVarOffloadTransformation']
+__all__ = ["DataOffloadTransformation", "GlobalVarOffloadTransformation"]
 
 
 class DataOffloadTransformation(Transformation):
@@ -36,8 +53,8 @@ class DataOffloadTransformation(Transformation):
         # We need to record if we actually added any, so
         # that down-stream processing can use that info
         self.has_data_regions = False
-        self.remove_openmp = kwargs.get('remove_openmp', False)
-        self.assume_deviceptr = kwargs.get('assume_deviceptr', False)
+        self.remove_openmp = kwargs.get("remove_openmp", False)
+        self.assume_deviceptr = kwargs.get("assume_deviceptr", False)
 
     def transform_subroutine(self, routine, **kwargs):
         """
@@ -54,13 +71,13 @@ class DataOffloadTransformation(Transformation):
             List of subroutines that are to be considered as part of
             the transformation call tree.
         """
-        role = kwargs.get('role')
-        targets = as_tuple(kwargs.get('targets', None))
+        role = kwargs.get("role")
+        targets = as_tuple(kwargs.get("targets", None))
 
         if targets:
             targets = tuple(t.lower() for t in targets)
 
-        if role == 'driver':
+        if role == "driver":
             self.remove_openmp_pragmas(routine, targets)
             self.insert_data_offload_pragmas(routine, targets)
 
@@ -70,9 +87,9 @@ class DataOffloadTransformation(Transformation):
         Utility to decide if a ``PragmaRegion`` is of type ``!$loki data``
         and has active target routines.
         """
-        if region.pragma.keyword.lower() != 'loki':
+        if region.pragma.keyword.lower() != "loki":
             return False
-        if 'data' not in region.pragma.content.lower():
+        if "data" not in region.pragma.content.lower():
             return False
 
         # Find all targeted kernel calls
@@ -114,17 +131,28 @@ class DataOffloadTransformation(Transformation):
 
                 for call in calls:
                     if call.routine is BasicType.DEFERRED:
-                        warning(f'[Loki] Data offload: Routine {routine.name} has not been enriched with ' +
-                                f'in {str(call.name).lower()}')
+                        warning(
+                            f"[Loki] Data offload: Routine {routine.name} has not been enriched with "
+                            + f"in {str(call.name).lower()}"
+                        )
 
                         continue
 
                     for param, arg in call.arg_iter():
-                        if isinstance(param, Array) and param.type.intent.lower() == 'in':
+                        if (
+                            isinstance(param, Array)
+                            and param.type.intent.lower() == "in"
+                        ):
                             inargs += (str(arg.name).lower(),)
-                        if isinstance(param, Array) and param.type.intent.lower() == 'inout':
+                        if (
+                            isinstance(param, Array)
+                            and param.type.intent.lower() == "inout"
+                        ):
                             inoutargs += (str(arg.name).lower(),)
-                        if isinstance(param, Array) and param.type.intent.lower() == 'out':
+                        if (
+                            isinstance(param, Array)
+                            and param.type.intent.lower() == "out"
+                        ):
                             outargs += (str(arg.name).lower(),)
 
                 # Sanitize data access categories to avoid double-counting variables
@@ -143,14 +171,16 @@ class DataOffloadTransformation(Transformation):
                     if offload_args:
                         deviceptr = f' deviceptr({", ".join(offload_args)})'
                     else:
-                        deviceptr = ''
-                    pragma = Pragma(keyword='acc', content=f'data{deviceptr}')
+                        deviceptr = ""
+                    pragma = Pragma(keyword="acc", content=f"data{deviceptr}")
                 else:
-                    copyin = f'copyin({", ".join(inargs)})' if inargs else ''
-                    copy = f'copy({", ".join(inoutargs)})' if inoutargs else ''
-                    copyout = f'copyout({", ".join(outargs)})' if outargs else ''
-                    pragma = Pragma(keyword='acc', content=f'data {copyin} {copy} {copyout}')
-                pragma_post = Pragma(keyword='acc', content='end data')
+                    copyin = f'copyin({", ".join(inargs)})' if inargs else ""
+                    copy = f'copy({", ".join(inoutargs)})' if inoutargs else ""
+                    copyout = f'copyout({", ".join(outargs)})' if outargs else ""
+                    pragma = Pragma(
+                        keyword="acc", content=f"data {copyin} {copy} {copyout}"
+                    )
+                pragma_post = Pragma(keyword="acc", content="end data")
                 pragma_map[region.pragma] = pragma
                 pragma_map[region.pragma_post] = pragma_post
 
@@ -182,10 +212,10 @@ class DataOffloadTransformation(Transformation):
                     continue
 
                 for p in FindNodes(Pragma).visit(routine.body):
-                    if p.keyword.lower() == 'omp':
+                    if p.keyword.lower() == "omp":
                         pragma_map[p] = None
                 for r in FindNodes(PragmaRegion).visit(region):
-                    if r.pragma.keyword.lower() == 'omp':
+                    if r.pragma.keyword.lower() == "omp":
                         pragma_map[r.pragma] = None
                         pragma_map[r.pragma_post] = None
 
@@ -285,7 +315,7 @@ class GlobalVarOffloadTransformation(Transformation):
         Overwrite the key that is used to store analysis results in ``trafo_data``.
     """
 
-    _key = 'GlobalVarOffloadTransformation'
+    _key = "GlobalVarOffloadTransformation"
 
     def __init__(self, key=None):
         if key:
@@ -296,7 +326,7 @@ class GlobalVarOffloadTransformation(Transformation):
         Add device-side declarations for imported variables.
         """
 
-        item = kwargs['item']
+        item = kwargs["item"]
 
         # bail if not global variable import
         if not isinstance(item, GlobalVarImportItem):
@@ -307,46 +337,56 @@ class GlobalVarOffloadTransformation(Transformation):
         assert symbol in [s.name.lower() for s in module.variables]
 
         if not item.trafo_data.get(self._key, None):
-            item.trafo_data[self._key] = {'var_set': set()}
+            item.trafo_data[self._key] = {"var_set": set()}
 
         # do nothing if var is a parameter
         if module.symbol_map[symbol].type.parameter:
             return
 
         # check if var is already declared
-        pragmas = [p for p in FindNodes(Pragma).visit(module.spec) if p.keyword.lower() == 'acc']
-        acc_pragma_parameters = get_pragma_parameters(pragmas, starts_with='declare', only_loki_pragmas=False)
+        pragmas = [
+            p
+            for p in FindNodes(Pragma).visit(module.spec)
+            if p.keyword.lower() == "acc"
+        ]
+        acc_pragma_parameters = get_pragma_parameters(
+            pragmas, starts_with="declare", only_loki_pragmas=False
+        )
         if acc_pragma_parameters:
-            if symbol in flatten([v.replace(' ','').lower().split(',')
-                                 for v in as_tuple(acc_pragma_parameters['create'])]):
+            if symbol in flatten(
+                [
+                    v.replace(" ", "").lower().split(",")
+                    for v in as_tuple(acc_pragma_parameters["create"])
+                ]
+            ):
                 return
 
         # Update the set of variables to be offloaded
-        item.trafo_data[self._key]['var_set'].add(symbol)
+        item.trafo_data[self._key]["var_set"].add(symbol)
 
         # Write ACC declare pragma
-        module.spec.append(Pragma(keyword='acc', content=f'declare create({symbol})'))
+        module.spec.append(Pragma(keyword="acc", content=f"declare create({symbol})"))
 
     def transform_subroutine(self, routine, **kwargs):
 
-        role = kwargs.get('role')
-        item = kwargs['item']
+        role = kwargs.get("role")
+        item = kwargs["item"]
 
         if not item.trafo_data.get(self._key, None):
             item.trafo_data[self._key] = {}
 
         # Initialize sets/maps to store analysis
-        item.trafo_data[self._key]['modules'] = {}
-        item.trafo_data[self._key]['enter_data_copyin'] = set()
-        item.trafo_data[self._key]['enter_data_create'] = set()
-        item.trafo_data[self._key]['exit_data'] = set()
-        item.trafo_data[self._key]['acc_copyin'] = set()
-        item.trafo_data[self._key]['acc_copyout'] = set()
+        item.trafo_data[self._key]["modules"] = {}
+        item.trafo_data[self._key]["enter_data_copyin"] = set()
+        item.trafo_data[self._key]["enter_data_create"] = set()
+        item.trafo_data[self._key]["exit_data"] = set()
+        item.trafo_data[self._key]["acc_copyin"] = set()
+        item.trafo_data[self._key]["acc_copyout"] = set()
 
-        successors = kwargs.get('successors', ())
-        if role == 'driver':
+        successors = kwargs.get("successors", ())
+        if role == "driver":
             self.process_driver(routine, successors)
-        if role == 'kernel':
+        if role == "kernel":
             self.process_kernel(routine, successors, item)
 
     def process_driver(self, routine, successors):
@@ -358,42 +398,92 @@ class GlobalVarOffloadTransformation(Transformation):
         update_host = ()
 
         # build offload pragmas
-        _acc_copyin = set.union(*[s.trafo_data[self._key]['acc_copyin']
-                             for s in successors if isinstance(s, SubroutineItem)], set())
+        _acc_copyin = set.union(
+            *[
+                s.trafo_data[self._key]["acc_copyin"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
         if _acc_copyin:
-            update_device += as_tuple(Pragma(keyword='acc',
-                                             content='update device(' + ','.join(_acc_copyin) + ')'),)
-        _enter_data_copyin = set.union(*[s.trafo_data[self._key]['enter_data_copyin']
-                             for s in successors if isinstance(s, SubroutineItem)], set())
+            update_device += as_tuple(
+                Pragma(
+                    keyword="acc",
+                    content="update device(" + ",".join(_acc_copyin) + ")",
+                ),
+            )
+        _enter_data_copyin = set.union(
+            *[
+                s.trafo_data[self._key]["enter_data_copyin"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
         if _enter_data_copyin:
-            update_device += as_tuple(Pragma(keyword='acc',
-                                             content='enter data copyin(' + ','.join(_enter_data_copyin) + ')'),)
-        _enter_data_create = set.union(*[s.trafo_data[self._key]['enter_data_create']
-                             for s in successors if isinstance(s, SubroutineItem)], set())
+            update_device += as_tuple(
+                Pragma(
+                    keyword="acc",
+                    content="enter data copyin(" + ",".join(_enter_data_copyin) + ")",
+                ),
+            )
+        _enter_data_create = set.union(
+            *[
+                s.trafo_data[self._key]["enter_data_create"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
         if _enter_data_create:
-            update_device += as_tuple(Pragma(keyword='acc',
-                                             content='enter data create(' + ','.join(_enter_data_create) + ')'),)
-        _exit_data = set.union(*[s.trafo_data[self._key]['exit_data']
-                            for s in successors if isinstance(s, SubroutineItem)], set())
+            update_device += as_tuple(
+                Pragma(
+                    keyword="acc",
+                    content="enter data create(" + ",".join(_enter_data_create) + ")",
+                ),
+            )
+        _exit_data = set.union(
+            *[
+                s.trafo_data[self._key]["exit_data"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
         if _exit_data:
-            update_host += as_tuple(Pragma(keyword='acc',
-                                           content='exit data copyout(' + ','.join(_exit_data) + ')'),)
-        _acc_copyout = set.union(*[s.trafo_data[self._key]['acc_copyout']
-                            for s in successors if isinstance(s, SubroutineItem)], set())
+            update_host += as_tuple(
+                Pragma(
+                    keyword="acc",
+                    content="exit data copyout(" + ",".join(_exit_data) + ")",
+                ),
+            )
+        _acc_copyout = set.union(
+            *[
+                s.trafo_data[self._key]["acc_copyout"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
         if _acc_copyout:
-            update_host += as_tuple(Pragma(keyword='acc', content='update self(' + ','.join(_acc_copyout) + ')'),)
+            update_host += as_tuple(
+                Pragma(
+                    keyword="acc", content="update self(" + ",".join(_acc_copyout) + ")"
+                ),
+            )
 
         # replace Loki pragmas with acc data/update pragmas
         pragma_map = {}
         for pragma in FindNodes(Pragma).visit(routine.body):
-            if pragma.keyword == 'loki':
-                if 'update_device' in pragma.content:
+            if pragma.keyword == "loki":
+                if "update_device" in pragma.content:
                     if update_device:
                         pragma_map[pragma] = update_device
                     else:
                         pragma_map[pragma] = None
 
-                if 'update_host' in pragma.content:
+                if "update_host" in pragma.content:
                     if update_host:
                         pragma_map[pragma] = update_host
                     else:
@@ -403,14 +493,22 @@ class GlobalVarOffloadTransformation(Transformation):
 
         # build set of symbols to be offloaded
         _var_set = set.union(
-            *[s.trafo_data.get(self._key, {}).get('var_set', set()) for s in successors],
-            set()
+            *[
+                s.trafo_data.get(self._key, {}).get("var_set", set())
+                for s in successors
+            ],
+            set(),
         )
-        #build map of module imports corresponding to offloaded symbols
+        # build map of module imports corresponding to offloaded symbols
         _modules = {}
-        _modules.update({k: v
-                         for s in successors if isinstance(s, SubroutineItem)
-                         for k, v in s.trafo_data[self._key]['modules'].items()})
+        _modules.update(
+            {
+                k: v
+                for s in successors
+                if isinstance(s, SubroutineItem)
+                for k, v in s.trafo_data[self._key]["modules"].items()
+            }
+        )
 
         # build new imports to add offloaded global vars to driver symbol table
         new_import_map = {}
@@ -425,15 +523,21 @@ class GlobalVarOffloadTransformation(Transformation):
 
         new_imports = ()
         for k, v in new_import_map.items():
-            new_imports += as_tuple(Import(k, symbols=tuple(Variable(name=s, scope=routine) for s in v)))
+            new_imports += as_tuple(
+                Import(k, symbols=tuple(Variable(name=s, scope=routine) for s in v))
+            )
 
         # add new imports to driver subroutine sepcification
         import_pos = 0
-        if (old_imports := FindNodes(Import).visit(routine.spec)):
+        if old_imports := FindNodes(Import).visit(routine.spec):
             import_pos = routine.spec.body.index(old_imports[-1]) + 1
         if new_imports:
-            routine.spec.insert(import_pos, Comment(text=
-               '![Loki::GlobalVarOffload].....Adding global variables to driver symbol table for offload instructions'))
+            routine.spec.insert(
+                import_pos,
+                Comment(
+                    text="![Loki::GlobalVarOffload].....Adding global variables to driver symbol table for offload instructions"
+                ),
+            )
             import_pos += 1
             routine.spec.insert(import_pos, new_imports)
 
@@ -443,74 +547,137 @@ class GlobalVarOffloadTransformation(Transformation):
         """
 
         # build map of modules corresponding to imported symbols
-        import_mod = CaseInsensitiveDict((s.name, i.module) for i in routine.imports for s in i.symbols)
-
-        #build set of offloaded symbols
-        item.trafo_data[self._key]['var_set'] = set.union(
-            *[s.trafo_data.get(self._key, {}).get('var_set', set()) for s in successors],
-            set()
+        import_mod = CaseInsensitiveDict(
+            (s.name, i.module) for i in routine.imports for s in i.symbols
         )
 
-        #build map of module imports corresponding to offloaded symbols
-        item.trafo_data[self._key]['modules'].update({k: v
-                                                     for s in successors if isinstance(s, SubroutineItem)
-                                                     for k, v in s.trafo_data[self._key]['modules'].items()})
+        # build set of offloaded symbols
+        item.trafo_data[self._key]["var_set"] = set.union(
+            *[
+                s.trafo_data.get(self._key, {}).get("var_set", set())
+                for s in successors
+            ],
+            set(),
+        )
+
+        # build map of module imports corresponding to offloaded symbols
+        item.trafo_data[self._key]["modules"].update(
+            {
+                k: v
+                for s in successors
+                if isinstance(s, SubroutineItem)
+                for k, v in s.trafo_data[self._key]["modules"].items()
+            }
+        )
 
         # separate out derived and basic types
-        imported_vars = [var for var in routine.imported_symbols if var in item.trafo_data[self._key]['var_set']]
-        basic_types = [var.name.lower() for var in imported_vars if isinstance(var.type.dtype, BasicType)]
-        deriv_types = [var              for var in imported_vars if isinstance(var.type.dtype, DerivedType)]
+        imported_vars = [
+            var
+            for var in routine.imported_symbols
+            if var in item.trafo_data[self._key]["var_set"]
+        ]
+        basic_types = [
+            var.name.lower()
+            for var in imported_vars
+            if isinstance(var.type.dtype, BasicType)
+        ]
+        deriv_types = [
+            var for var in imported_vars if isinstance(var.type.dtype, DerivedType)
+        ]
 
         # accumulate contents of acc directives
-        item.trafo_data[self._key]['enter_data_copyin'] = set.union(
-                                                       *[s.trafo_data[self._key]['enter_data_copyin']
-                                                        for s in successors if isinstance(s, SubroutineItem)], set())
-        item.trafo_data[self._key]['enter_data_create'] = set.union(
-                                                       *[s.trafo_data[self._key]['enter_data_create']
-                                                        for s in successors if isinstance(s, SubroutineItem)], set())
-        item.trafo_data[self._key]['exit_data'] = set.union(
-                                                       *[s.trafo_data[self._key]['exit_data']
-                                                        for s in successors if isinstance(s, SubroutineItem)], set())
-        item.trafo_data[self._key]['acc_copyin'] = set.union(
-                                                          *[s.trafo_data[self._key]['acc_copyin']
-                                                           for s in successors if isinstance(s, SubroutineItem)], set())
-        item.trafo_data[self._key]['acc_copyout'] = set.union(
-                                                           *[s.trafo_data[self._key]['acc_copyout']
-                                                           for s in successors if isinstance(s, SubroutineItem)], set())
+        item.trafo_data[self._key]["enter_data_copyin"] = set.union(
+            *[
+                s.trafo_data[self._key]["enter_data_copyin"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
+        item.trafo_data[self._key]["enter_data_create"] = set.union(
+            *[
+                s.trafo_data[self._key]["enter_data_create"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
+        item.trafo_data[self._key]["exit_data"] = set.union(
+            *[
+                s.trafo_data[self._key]["exit_data"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
+        item.trafo_data[self._key]["acc_copyin"] = set.union(
+            *[
+                s.trafo_data[self._key]["acc_copyin"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
+        item.trafo_data[self._key]["acc_copyout"] = set.union(
+            *[
+                s.trafo_data[self._key]["acc_copyout"]
+                for s in successors
+                if isinstance(s, SubroutineItem)
+            ],
+            set(),
+        )
 
         with dataflow_analysis_attached(routine):
 
             # collect symbols to add to acc update pragmas in driver layer
             for basic in basic_types:
                 if basic in routine.body.uses_symbols:
-                    item.trafo_data[self._key]['acc_copyin'].add(basic)
-                    item.trafo_data[self._key]['modules'].update({basic: import_mod[basic]})
+                    item.trafo_data[self._key]["acc_copyin"].add(basic)
+                    item.trafo_data[self._key]["modules"].update(
+                        {basic: import_mod[basic]}
+                    )
                 if basic in routine.body.defines_symbols:
-                    item.trafo_data[self._key]['acc_copyout'].add(basic)
-                    item.trafo_data[self._key]['modules'].update({basic: import_mod[basic]})
+                    item.trafo_data[self._key]["acc_copyout"].add(basic)
+                    item.trafo_data[self._key]["modules"].update(
+                        {basic: import_mod[basic]}
+                    )
 
             # collect symbols to add to acc enter/exit data pragmas in driver layer
             for deriv in deriv_types:
                 deriv_vars = deriv.type.dtype.typedef.variables
                 if isinstance(deriv, Array):
                     # pylint: disable-next=line-too-long
-                    warning(f'[Loki::GlobalVarOffload] Arrays of derived-types must be offloaded manually - {deriv} in {routine}')
-                    item.trafo_data[self._key]['var_set'].remove(deriv.name.lower())
+                    warning(
+                        f"[Loki::GlobalVarOffload] Arrays of derived-types must be offloaded manually - {deriv} in {routine}"
+                    )
+                    item.trafo_data[self._key]["var_set"].remove(deriv.name.lower())
                 elif any(isinstance(v.type.dtype, DerivedType) for v in deriv_vars):
                     # pylint: disable-next=line-too-long
-                    warning(f'[Loki::GlobalVarOffload] Nested derived-types must be offloaded manually - {deriv} in {routine}')
-                    item.trafo_data[self._key]['var_set'].remove(deriv.name.lower())
+                    warning(
+                        f"[Loki::GlobalVarOffload] Nested derived-types must be offloaded manually - {deriv} in {routine}"
+                    )
+                    item.trafo_data[self._key]["var_set"].remove(deriv.name.lower())
                 else:
                     for var in deriv_vars:
-                        symbol = f'{deriv.name.lower()}%{var.name.lower()}'
+                        symbol = f"{deriv.name.lower()}%{var.name.lower()}"
 
                         if symbol in routine.body.uses_symbols:
-                            item.trafo_data[self._key]['enter_data_copyin'].add(symbol)
-                            item.trafo_data[self._key]['modules'].update({deriv: import_mod[deriv.name.lower()]})
+                            item.trafo_data[self._key]["enter_data_copyin"].add(symbol)
+                            item.trafo_data[self._key]["modules"].update(
+                                {deriv: import_mod[deriv.name.lower()]}
+                            )
 
                         if symbol in routine.body.defines_symbols:
-                            item.trafo_data[self._key]['exit_data'].add(symbol)
+                            item.trafo_data[self._key]["exit_data"].add(symbol)
 
-                            if not symbol in item.trafo_data[self._key]['enter_data_copyin'] and var.type.allocatable:
-                                item.trafo_data[self._key]['enter_data_create'].add(symbol)
-                                item.trafo_data[self._key]['modules'].update({deriv: import_mod[deriv.name.lower()]})
+                            if (
+                                not symbol
+                                in item.trafo_data[self._key]["enter_data_copyin"]
+                                and var.type.allocatable
+                            ):
+                                item.trafo_data[self._key]["enter_data_create"].add(
+                                    symbol
+                                )
+                                item.trafo_data[self._key]["modules"].update(
+                                    {deriv: import_mod[deriv.name.lower()]}
+                                )

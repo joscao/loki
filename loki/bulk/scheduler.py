@@ -16,12 +16,17 @@ from loki.sourcefile import Sourcefile
 from loki.dimension import Dimension
 from loki.tools import as_tuple, CaseInsensitiveDict, flatten
 from loki.logging import info, perf, warning, debug
-from loki.bulk.item import ProcedureBindingItem, SubroutineItem, GlobalVarImportItem, GenericImportItem
+from loki.bulk.item import (
+    ProcedureBindingItem,
+    SubroutineItem,
+    GlobalVarImportItem,
+    GenericImportItem,
+)
 from loki.subroutine import Subroutine
 from loki.module import Module
 
 
-__all__ = ['Scheduler', 'SchedulerConfig']
+__all__ = ["Scheduler", "SchedulerConfig"]
 
 
 class SchedulerConfig:
@@ -48,8 +53,16 @@ class SchedulerConfig:
         Disable the inclusion of module imports as scheduler dependencies.
     """
 
-    def __init__(self, default, routines, disable=None, dimensions=None, dic2p=None, derived_types=None,
-                 enable_imports=False):
+    def __init__(
+        self,
+        default,
+        routines,
+        disable=None,
+        dimensions=None,
+        dic2p=None,
+        derived_types=None,
+        enable_imports=False,
+    ):
         self.default = default
         if isinstance(routines, dict):
             self.routines = CaseInsensitiveDict(routines)
@@ -70,37 +83,47 @@ class SchedulerConfig:
 
     @classmethod
     def from_dict(cls, config):
-        default = config['default']
-        if 'routine' in config:
-            config['routines'] = OrderedDict((r['name'], r) for r in config.get('routine', []))
+        default = config["default"]
+        if "routine" in config:
+            config["routines"] = OrderedDict(
+                (r["name"], r) for r in config.get("routine", [])
+            )
         else:
-            config['routines'] = []
-        routines = config['routines']
-        disable = default.get('disable', None)
-        enable_imports = default.get('enable_imports', False)
+            config["routines"] = []
+        routines = config["routines"]
+        disable = default.get("disable", None)
+        enable_imports = default.get("enable_imports", False)
 
         # Add any dimension definitions contained in the config dict
         dimensions = {}
-        if 'dimension' in config:
-            dimensions = [Dimension(**d) for d in config['dimension']]
+        if "dimension" in config:
+            dimensions = [Dimension(**d) for d in config["dimension"]]
             dimensions = {d.name: d for d in dimensions}
 
         dic2p = {}
-        if 'dic2p' in config:
-            dic2p = config['dic2p']
+        if "dic2p" in config:
+            dic2p = config["dic2p"]
 
         derived_types = ()
-        if 'derived_types' in config:
-            derived_types = config['derived_types']
+        if "derived_types" in config:
+            derived_types = config["derived_types"]
 
-        return cls(default=default, routines=routines, disable=disable, dimensions=dimensions, dic2p=dic2p,
-                   derived_types=derived_types, enable_imports=enable_imports)
+        return cls(
+            default=default,
+            routines=routines,
+            disable=disable,
+            dimensions=dimensions,
+            dic2p=dic2p,
+            derived_types=derived_types,
+            enable_imports=enable_imports,
+        )
 
     @classmethod
     def from_file(cls, path):
         import toml  # pylint: disable=import-outside-toplevel
+
         # Load configuration file and process options
-        with Path(path).open('r') as f:
+        with Path(path).open("r") as f:
             config = toml.load(f)
 
         return cls.from_dict(config)
@@ -154,11 +177,22 @@ class Scheduler:
     """
 
     # TODO: Should be user-definable!
-    source_suffixes = ['.f90', '.F90', '.f', '.F']
+    source_suffixes = [".f90", ".F90", ".f", ".F"]
 
-    def __init__(self, paths, config=None, seed_routines=None, preprocess=False,
-                 includes=None, defines=None, definitions=None, xmods=None,
-                 omni_includes=None, full_parse=True, frontend=FP):
+    def __init__(
+        self,
+        paths,
+        config=None,
+        seed_routines=None,
+        preprocess=False,
+        includes=None,
+        defines=None,
+        definitions=None,
+        xmods=None,
+        omni_includes=None,
+        full_parse=True,
+        frontend=FP,
+    ):
         # Derive config from file or dict
         if isinstance(config, SchedulerConfig):
             self.config = config
@@ -174,13 +208,13 @@ class Scheduler:
 
         # Accumulate all build arguments to pass to `Sourcefile` constructors
         self.build_args = {
-            'definitions': definitions,
-            'preprocess': preprocess,
-            'includes': includes,
-            'defines': defines,
-            'xmods': xmods,
-            'omni_includes': omni_includes,
-            'frontend': frontend
+            "definitions": definitions,
+            "preprocess": preprocess,
+            "includes": includes,
+            "defines": defines,
+            "xmods": xmods,
+            "omni_includes": omni_includes,
+            "frontend": frontend,
         }
 
         # Internal data structures to store the callgraph
@@ -207,48 +241,69 @@ class Scheduler:
             for item in gen:
                 self.depths[item] = i_gen
 
-    @Timer(logger=info, text='[Loki::Scheduler] Performed initial source scan in {:.2f}s')
+    @Timer(
+        logger=info, text="[Loki::Scheduler] Performed initial source scan in {:.2f}s"
+    )
     def _discover(self):
         # Scan all source paths and create light-weight `Sourcefile` objects for each file.
         frontend_args = {
-            'preprocess': self.build_args['preprocess'],
-            'includes': self.build_args['includes'],
-            'defines': self.build_args['defines'],
-            'parser_classes': RegexParserClass.AllClasses,
-            'frontend': REGEX
+            "preprocess": self.build_args["preprocess"],
+            "includes": self.build_args["includes"],
+            "defines": self.build_args["defines"],
+            "parser_classes": RegexParserClass.AllClasses,
+            "frontend": REGEX,
         }
 
         # Create a list of initial files to scan with the fast REGEX frontend
-        path_list = [path.glob(f'**/*{ext}') for path in self.paths for ext in self.source_suffixes]
+        path_list = [
+            path.glob(f"**/*{ext}")
+            for path in self.paths
+            for ext in self.source_suffixes
+        ]
         path_list = list(set(flatten(path_list)))  # Filter duplicates and flatten
 
         # Perform the full initial scan of the search space with the REGEX frontend
-        obj_list = [Sourcefile.from_file(filename=f, **frontend_args) for f in path_list]
+        obj_list = [
+            Sourcefile.from_file(filename=f, **frontend_args) for f in path_list
+        ]
 
-        debug(f'Total number of lines parsed: {sum(obj.source.lines[1] for obj in obj_list)}')
+        debug(
+            f"Total number of lines parsed: {sum(obj.source.lines[1] for obj in obj_list)}"
+        )
 
         # Create a map of all potential target objs for fast lookup later
         self.obj_map = CaseInsensitiveDict(
-            (f'#{r.name}', obj) for obj in obj_list for r in obj.subroutines
+            (f"#{r.name}", obj) for obj in obj_list for r in obj.subroutines
         )
         self.obj_map.update(
-            (f'{module.name}#{r.name}', obj)
-            for obj in obj_list for module in obj.modules
+            (f"{module.name}#{r.name}", obj)
+            for obj in obj_list
+            for module in obj.modules
             for r in module.subroutines + module.typedefs + module.variables
         )
         self.obj_map.update(
-            (f'{module.name}#{r.spec.name}', obj)
-            for obj in obj_list for module in obj.modules
-            for r in module.interfaces if r.spec
+            (f"{module.name}#{r.spec.name}", obj)
+            for obj in obj_list
+            for module in obj.modules
+            for r in module.interfaces
+            if r.spec
         )
 
     @property
     def routines(self):
-        return as_tuple(item.routine for item in self.item_graph.nodes if item.routine is not None)
+        return as_tuple(
+            item.routine for item in self.item_graph.nodes if item.routine is not None
+        )
 
     @property
     def typedefs(self):
-        return as_tuple(flatten(module.typedefs for obj in self.obj_map.values() for module in obj.modules))
+        return as_tuple(
+            flatten(
+                module.typedefs
+                for obj in self.obj_map.values()
+                for module in obj.modules
+            )
+        )
 
     @property
     def items(self):
@@ -296,7 +351,6 @@ class Scheduler:
 
         return file_graph
 
-
     def __getitem__(self, name):
         """
         Find and return an item in the Scheduler's call graph
@@ -331,8 +385,8 @@ class Scheduler:
                     continue
                 if item is not None:
                     break
-            if item is None and self.config.default['strict']:
-                raise FileNotFoundError(f'Sourcefile not found for {name}')
+            if item is None and self.config.default["strict"]:
+                raise FileNotFoundError(f"Sourcefile not found for {name}")
             return item
 
         name = name.lower()
@@ -340,38 +394,40 @@ class Scheduler:
         # For type bound procedures, we use the (fully-qualified) type name to
         # look up the corresponding sourcefile (since we're not storing every
         # procedure binding in obj_map)
-        pos = name.find('%')
+        pos = name.find("%")
         if pos == -1:
             sourcefile = self.obj_map.get(name)
         else:
             sourcefile = self.obj_map.get(name[:pos])
 
         if sourcefile is None:
-            warning(f'Scheduler could not create item: {name}')
-            if self.config.default['strict']:
-                raise FileNotFoundError(f'Sourcefile not found for {name}')
+            warning(f"Scheduler could not create item: {name}")
+            if self.config.default["strict"]:
+                raise FileNotFoundError(f"Sourcefile not found for {name}")
             return None
 
         # Use default as base and override individual options
         item_conf = self.config.default.copy()
-        routine_names = {name, name[name.index('#')+1:]}
+        routine_names = {name, name[name.index("#") + 1 :]}
         config_matches = [r for r in self.config.routines if r.lower() in routine_names]
         if config_matches:
             if len(config_matches) != 1:
-                warning(f'Multiple config entries matching {name}')
-                if self.config.default['strict']:
-                    raise RuntimeError(f'Multiple config entries matching {name}')
+                warning(f"Multiple config entries matching {name}")
+                if self.config.default["strict"]:
+                    raise RuntimeError(f"Multiple config entries matching {name}")
             item_conf.update(self.config.routines[config_matches[0]])
 
-        debug(f'[Loki] Scheduler creating Item: {name} => {sourcefile.path}')
-        if '%' in name:
+        debug(f"[Loki] Scheduler creating Item: {name} => {sourcefile.path}")
+        if "%" in name:
             return ProcedureBindingItem(name=name, source=sourcefile, config=item_conf)
-        if isinstance(self.obj_map[name][name.split('#')[-1]], Subroutine):
+        if isinstance(self.obj_map[name][name.split("#")[-1]], Subroutine):
             return SubroutineItem(name=name, source=sourcefile, config=item_conf)
-        module = self.obj_map[name][name.split('#')[0]]
+        module = self.obj_map[name][name.split("#")[0]]
         if isinstance(module, Module):
-            if name.split('#')[-1] in module.variables:
-                return GlobalVarImportItem(name=name, source=sourcefile, config=item_conf)
+            if name.split("#")[-1] in module.variables:
+                return GlobalVarImportItem(
+                    name=name, source=sourcefile, config=item_conf
+                )
         return GenericImportItem(name=name, source=sourcefile, config=item_conf)
 
     def find_routine(self, routine):
@@ -396,20 +452,24 @@ class Scheduler:
             The fully-qualified name corresponding to :data:`routine` from
             the set of discovered routines
         """
-        if '#' in routine:
+        if "#" in routine:
             name = routine.lower()
         else:
-            name = f'#{routine.lower()}'
+            name = f"#{routine.lower()}"
 
         candidates = [c for c in self.obj_map if c.lower().endswith(name)]
         if not candidates:
-            warning(f'Scheduler could not find routine {routine}')
-            if self.config.default['strict']:
-                raise RuntimeError(f'Scheduler could not find routine {routine}')
+            warning(f"Scheduler could not find routine {routine}")
+            if self.config.default["strict"]:
+                raise RuntimeError(f"Scheduler could not find routine {routine}")
         elif len(candidates) != 1:
-            warning(f'Scheduler found multiple candidates for routine {routine}: {candidates}')
-            if self.config.default['strict']:
-                raise RuntimeError(f'Scheduler found multiple candidates for routine {routine}: {candidates}')
+            warning(
+                f"Scheduler found multiple candidates for routine {routine}: {candidates}"
+            )
+            if self.config.default["strict"]:
+                raise RuntimeError(
+                    f"Scheduler found multiple candidates for routine {routine}: {candidates}"
+                )
         return candidates[0]
 
     def _add_children(self, item, children):
@@ -454,7 +514,7 @@ class Scheduler:
 
         return new_items
 
-    @Timer(logger=perf, text='[Loki::Scheduler] Populated initial call tree in {:.2f}s')
+    @Timer(logger=perf, text="[Loki::Scheduler] Populated initial call tree in {:.2f}s")
     def _populate(self, routines):
         """
         Populate the callgraph of this scheduler through automatic expansion of
@@ -476,7 +536,9 @@ class Scheduler:
 
         while len(queue) > 0:
             item = queue.popleft()
-            children = item.qualify_names(item.children, available_names=self.obj_map.keys())
+            children = item.qualify_names(
+                item.children, available_names=self.obj_map.keys()
+            )
             new_items = self._add_children(item, children)
 
             if new_items:
@@ -488,11 +550,15 @@ class Scheduler:
         each cyclic dependency for all subroutine items with a ``RECURSIVE`` prefix
         """
         for item in self.items:
-            if item.routine and any('recursive' in prefix.lower() for prefix in item.routine.prefix or []):
+            if item.routine and any(
+                "recursive" in prefix.lower() for prefix in item.routine.prefix or []
+            ):
                 try:
                     while True:
                         cycle_path = nx.find_cycle(self.item_graph, item)
-                        debug(f'Removed edge {cycle_path[0]!s} to break cyclic dependency {cycle_path!s}')
+                        debug(
+                            f"Removed edge {cycle_path[0]!s} to break cyclic dependency {cycle_path!s}"
+                        )
                         self.item_graph.remove_edge(*cycle_path[0])
                 except nx.NetworkXNoCycle:
                     pass
@@ -511,7 +577,7 @@ class Scheduler:
             item = self.create_item(item_name)
 
             if item:
-                item.clear_cached_property('imports')
+                item.clear_cached_property("imports")
                 queue.append(item)
 
                 if item.name not in self.item_map:
@@ -521,7 +587,9 @@ class Scheduler:
 
         while len(queue) > 0:
             item = queue.popleft()
-            children = item.qualify_names(item.children, available_names=self.obj_map.keys())
+            children = item.qualify_names(
+                item.children, available_names=self.obj_map.keys()
+            )
             if item.name in dependencies:
                 children += as_tuple(dependencies[item.name])
             new_items = self._add_children(item, children)
@@ -533,7 +601,7 @@ class Scheduler:
             self._parse_items()
             self._enrich()
 
-    @Timer(logger=info, text='[Loki::Scheduler] Performed full source parse in {:.2f}s')
+    @Timer(logger=info, text="[Loki::Scheduler] Performed full source parse in {:.2f}s")
     def _parse_items(self):
         """
         Prepare processing by triggering a full parse of the items in
@@ -541,12 +609,12 @@ class Scheduler:
         """
         # Force the parsing of the routines
         build_args = self.build_args.copy()
-        build_args['definitions'] = as_tuple(build_args['definitions'])
+        build_args["definitions"] = as_tuple(build_args["definitions"])
         for item in reversed(list(nx.topological_sort(self.item_graph))):
             item.source.make_complete(**build_args)
-            build_args['definitions'] += item.source.definitions
+            build_args["definitions"] += item.source.definitions
 
-    @Timer(logger=perf, text='[Loki::Scheduler] Enriched call tree in {:.2f}s')
+    @Timer(logger=perf, text="[Loki::Scheduler] Enriched call tree in {:.2f}s")
     def _enrich(self):
         """
         Enrich subroutine calls for inter-procedural transformations
@@ -564,9 +632,11 @@ class Scheduler:
             for routine in item.enrich:
                 lookup_name = self.find_routine(routine)
                 if not lookup_name:
-                    warning(f'Scheduler could not find file for enrichment:\n{routine}')
-                    if self.config.default['strict']:
-                        raise FileNotFoundError(f'Source path not found for routine {routine}')
+                    warning(f"Scheduler could not find file for enrichment:\n{routine}")
+                    if self.config.default["strict"]:
+                        raise FileNotFoundError(
+                            f"Source path not found for routine {routine}"
+                        )
                     continue
                 self.obj_map[lookup_name].make_complete(**self.build_args)
                 item.routine.enrich_calls(self.obj_map[lookup_name].all_subroutines)
@@ -599,7 +669,13 @@ class Scheduler:
                 successors += [self.item_map[child.name]] + self.item_successors(child)
         return successors
 
-    def process(self, transformation, reverse=False, item_filter=SubroutineItem, use_file_graph=False):
+    def process(
+        self,
+        transformation,
+        reverse=False,
+        item_filter=SubroutineItem,
+        use_file_graph=False,
+    ):
         """
         Process all :attr:`items` in the scheduler's graph
 
@@ -620,7 +696,7 @@ class Scheduler:
         to an item of that type are processed.
         """
         trafo_name = transformation.__class__.__name__
-        log = f'[Loki::Scheduler] Applied transformation <{trafo_name}>' + ' in {:.2f}s'
+        log = f"[Loki::Scheduler] Applied transformation <{trafo_name}>" + " in {:.2f}s"
         with Timer(logger=info, text=log):
 
             if use_file_graph:
@@ -634,10 +710,12 @@ class Scheduler:
 
             if use_file_graph:
                 for node in traversal:
-                    items = graph.nodes[node]['items']
+                    items = graph.nodes[node]["items"]
 
                     if item_filter:
-                        items = [item for item in items if isinstance(item, item_filter)]
+                        items = [
+                            item for item in items if isinstance(item, item_filter)
+                        ]
                         if not items:
                             continue
 
@@ -659,9 +737,13 @@ class Scheduler:
 
                     # Process work item with appropriate kernel
                     transformation.apply(
-                        source, role=_item.role, mode=_item.mode,
-                        item=_item, targets=_item.targets,
-                        successors=self.item_successors(_item), depths=self.depths
+                        source,
+                        role=_item.role,
+                        mode=_item.mode,
+                        item=_item,
+                        targets=_item.targets,
+                        successors=self.item_successors(_item),
+                        depths=self.depths,
                     )
 
     def callgraph(self, path, with_file_graph=False):
@@ -678,75 +760,106 @@ class Scheduler:
         try:
             import graphviz as gviz  # pylint: disable=import-outside-toplevel
         except ImportError:
-            warning('[Loki] Failed to load graphviz, skipping callgraph generation...')
+            warning("[Loki] Failed to load graphviz, skipping callgraph generation...")
             return
 
         cg_path = Path(path)
-        callgraph = gviz.Digraph(format='pdf', strict=True, graph_attr=(('rankdir', 'LR'),))
+        callgraph = gviz.Digraph(
+            format="pdf", strict=True, graph_attr=(("rankdir", "LR"),)
+        )
 
         # Insert all nodes in the schedulers graph
         for item in self.items:
             style = {
-                'color': 'black',
-                'shape': 'box',
-                'fillcolor': 'limegreen',
-                'style': 'filled'
+                "color": "black",
+                "shape": "box",
+                "fillcolor": "limegreen",
+                "style": "filled",
             }
             if isinstance(item, ProcedureBindingItem):
-                style['fillcolor'] = 'palegreen'
+                style["fillcolor"] = "palegreen"
             elif isinstance(item, GlobalVarImportItem):
-                style['fillcolor'] = 'lightgoldenrod1'
+                style["fillcolor"] = "lightgoldenrod1"
             elif isinstance(item, GenericImportItem):
-                style['fillcolor'] = 'lightgoldenrodyellow'
+                style["fillcolor"] = "lightgoldenrodyellow"
             if item.replicate:
-                style['shape'] = 'diamond'
-                style['style'] += ',rounded'
+                style["shape"] = "diamond"
+                style["style"] += ",rounded"
             callgraph.node(item.name.upper(), **style)
 
         # Insert all edges in the schedulers graph
         for parent, child in self.dependencies:
-            callgraph.edge(parent.name.upper(), child.name.upper())  # pylint: disable=no-member
+            callgraph.edge(
+                parent.name.upper(), child.name.upper()
+            )  # pylint: disable=no-member
 
         # Insert all nodes we were told to either block or ignore
         for item in self.items:
             blocked_children = [child for child in item.children if child in item.block]
             blocked_children = item.qualify_names(blocked_children, self.obj_map.keys())
-            blocked_children = [child for child in blocked_children if isinstance(child, str)]
+            blocked_children = [
+                child for child in blocked_children if isinstance(child, str)
+            ]
             for child in blocked_children:
-                callgraph.node(child.upper(), color='black', shape='box',
-                               fillcolor='orangered', style='filled')
+                callgraph.node(
+                    child.upper(),
+                    color="black",
+                    shape="box",
+                    fillcolor="orangered",
+                    style="filled",
+                )
                 callgraph.edge(item.name.upper(), child.upper())
 
-            ignored_children = [child for child in item.children if child in item.ignore]
+            ignored_children = [
+                child for child in item.children if child in item.ignore
+            ]
             ignored_children = item.qualify_names(ignored_children, self.obj_map.keys())
-            ignored_children = [child for child in ignored_children if isinstance(child, str)]
+            ignored_children = [
+                child for child in ignored_children if isinstance(child, str)
+            ]
             for child in ignored_children:
-                callgraph.node(child.upper(), color='black', shape='box',
-                               fillcolor='lightblue', style='filled')
+                callgraph.node(
+                    child.upper(),
+                    color="black",
+                    shape="box",
+                    fillcolor="lightblue",
+                    style="filled",
+                )
                 callgraph.edge(item.name.upper(), child.upper())
 
             missing_children = item.qualify_names(item.children, self.obj_map.keys())
-            missing_children = [child[0] for child in missing_children if isinstance(child, tuple)]
+            missing_children = [
+                child[0] for child in missing_children if isinstance(child, tuple)
+            ]
             for child in missing_children:
-                callgraph.node(child.upper(), color='black', shape='box',
-                               fillcolor='lightgray', style='filled')
+                callgraph.node(
+                    child.upper(),
+                    color="black",
+                    shape="box",
+                    fillcolor="lightgray",
+                    style="filled",
+                )
                 callgraph.edge(item.name.upper(), child.upper())
 
         try:
             callgraph.render(cg_path, view=False)
         except gviz.ExecutableNotFound as e:
-            warning(f'[Loki] Failed to render callgraph due to graphviz error:\n  {e}')
+            warning(f"[Loki] Failed to render callgraph due to graphviz error:\n  {e}")
 
         if with_file_graph:
             if with_file_graph is True:
-                fg_path = cg_path.with_name(f'{cg_path.stem}_file_graph{cg_path.suffix}')
+                fg_path = cg_path.with_name(
+                    f"{cg_path.stem}_file_graph{cg_path.suffix}"
+                )
             else:
                 fg_path = Path(with_file_graph)
-            fg = gviz.Digraph(format='pdf', strict=True, graph_attr=(('rankdir', 'LR'),))
+            fg = gviz.Digraph(
+                format="pdf", strict=True, graph_attr=(("rankdir", "LR"),)
+            )
             file_graph = self.file_graph
 
             for item in file_graph:
-                fg.node(str(item), color='black', shape='box', style='rounded')
+                fg.node(str(item), color="black", shape="box", style="rounded")
 
             for parent, child in file_graph.edges:
                 fg.edge(str(parent), str(child))
@@ -754,10 +867,11 @@ class Scheduler:
             try:
                 fg.render(fg_path, view=False)
             except gviz.ExecutableNotFound as e:
-                warning(f'[Loki] Failed to render filegraph due to graphviz error:\n  {e}')
+                warning(
+                    f"[Loki] Failed to render filegraph due to graphviz error:\n  {e}"
+                )
 
-
-    @Timer(logger=perf, text='[Loki::Scheduler] Wrote CMake plan file in {:.2f}s')
+    @Timer(logger=perf, text="[Loki::Scheduler] Wrote CMake plan file in {:.2f}s")
     def write_cmake_plan(self, filepath, mode, buildpath, rootpath):
         """
         Generate the "plan file", a CMake file defining three lists
@@ -766,7 +880,7 @@ class Scheduler:
         schedule the source updates and update the source lists of the
         CMake target object accordingly.
         """
-        info(f'[Loki] Scheduler writing CMake plan: {filepath}')
+        info(f"[Loki] Scheduler writing CMake plan: {filepath}")
 
         rootpath = None if rootpath is None else Path(rootpath).resolve()
         buildpath = None if buildpath is None else Path(buildpath)
@@ -776,15 +890,15 @@ class Scheduler:
 
         for item in self.items:
             sourcepath = item.path.resolve()
-            newsource = sourcepath.with_suffix(f'.{mode.lower()}.F90')
+            newsource = sourcepath.with_suffix(f".{mode.lower()}.F90")
             if buildpath:
-                newsource = buildpath/newsource.name
+                newsource = buildpath / newsource.name
 
             # Make new CMake paths relative to source again
             if rootpath is not None:
                 sourcepath = sourcepath.relative_to(rootpath)
 
-            debug(f'Planning:: {item.name} (role={item.role}, mode={mode})')
+            debug(f"Planning:: {item.name} (role={item.role}, mode={mode})")
 
             # Inject new object into the final binary libs
             if newsource not in sources_to_append:
@@ -797,13 +911,13 @@ class Scheduler:
                     sources_to_append += [newsource]
                     sources_to_remove += [sourcepath]
 
-        info(f'[Loki] CMakePlanner writing plan: {filepath}')
-        with Path(filepath).open('w') as f:
-            s_transform = '\n'.join(f'    {s}' for s in sources_to_transform)
-            f.write(f'set( LOKI_SOURCES_TO_TRANSFORM \n{s_transform}\n   )\n')
+        info(f"[Loki] CMakePlanner writing plan: {filepath}")
+        with Path(filepath).open("w") as f:
+            s_transform = "\n".join(f"    {s}" for s in sources_to_transform)
+            f.write(f"set( LOKI_SOURCES_TO_TRANSFORM \n{s_transform}\n   )\n")
 
-            s_append = '\n'.join(f'    {s}' for s in sources_to_append)
-            f.write(f'set( LOKI_SOURCES_TO_APPEND \n{s_append}\n   )\n')
+            s_append = "\n".join(f"    {s}" for s in sources_to_append)
+            f.write(f"set( LOKI_SOURCES_TO_APPEND \n{s_append}\n   )\n")
 
-            s_remove = '\n'.join(f'    {s}' for s in sources_to_remove)
-            f.write(f'set( LOKI_SOURCES_TO_REMOVE \n{s_remove}\n   )\n')
+            s_remove = "\n".join(f"    {s}" for s in sources_to_remove)
+            f.write(f"set( LOKI_SOURCES_TO_REMOVE \n{s_remove}\n   )\n")

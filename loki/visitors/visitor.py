@@ -11,7 +11,7 @@ Visitor base classes for traversing the IR
 
 import inspect
 
-__all__ = ['GenericVisitor', 'Visitor']
+__all__ = ["GenericVisitor", "Visitor"]
 
 
 class GenericVisitor:
@@ -54,9 +54,11 @@ class GenericVisitor:
             #    visit_Foo(self, o, [*args, **kwargs])
             argspec = inspect.getfullargspec(meth)
             if len(argspec.args) < 2:
-                raise RuntimeError("Visit method signature must be "
-                                   "visit_Foo(self, o, [*args, **kwargs])")
-            handlers[name[len(prefix):]] = meth
+                raise RuntimeError(
+                    "Visit method signature must be "
+                    "visit_Foo(self, o, [*args, **kwargs])"
+                )
+            handlers[name[len(prefix) :]] = meth
         self._handlers = handlers
 
     default_args = {}
@@ -105,7 +107,7 @@ class GenericVisitor:
                     # Save it on this type name for faster lookup next time
                     self._handlers[cls.__name__] = entry
                     return entry
-        raise RuntimeError(f'No handler found for class {cls.__name__}')
+        raise RuntimeError(f"No handler found for class {cls.__name__}")
 
     def visit(self, o, *args, **kwargs):
         """

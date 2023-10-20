@@ -15,10 +15,16 @@ from itertools import zip_longest
 import pymbolic.primitives as pmbl
 from pymbolic.mapper import Mapper, WalkMapper, CombineMapper, IdentityMapper
 from pymbolic.mapper.stringifier import (
-    StringifyMapper, PREC_NONE, PREC_SUM, PREC_CALL, PREC_PRODUCT
+    StringifyMapper,
+    PREC_NONE,
+    PREC_SUM,
+    PREC_CALL,
+    PREC_PRODUCT,
 )
+
 try:
     from fparser.two.Fortran2003 import Intrinsic_Name
+
     _intrinsic_fortran_names = Intrinsic_Name.function_names
 except ImportError:
     _intrinsic_fortran_names = ()
@@ -28,10 +34,16 @@ from loki.tools import as_tuple, flatten
 from loki.types import SymbolAttributes, BasicType
 
 
-__all__ = ['LokiStringifyMapper', 'ExpressionRetriever', 'ExpressionDimensionsMapper',
-           'ExpressionCallbackMapper', 'SubstituteExpressionsMapper',
-           'LokiIdentityMapper', 'AttachScopesMapper', 'DetachScopesMapper']
-
+__all__ = [
+    "LokiStringifyMapper",
+    "ExpressionRetriever",
+    "ExpressionDimensionsMapper",
+    "ExpressionCallbackMapper",
+    "SubstituteExpressionsMapper",
+    "LokiIdentityMapper",
+    "AttachScopesMapper",
+    "DetachScopesMapper",
+]
 
 
 class LokiStringifyMapper(StringifyMapper):
@@ -41,31 +53,40 @@ class LokiStringifyMapper(StringifyMapper):
 
     This is the default pretty printer for nodes in the expression tree.
     """
+
     # pylint: disable=unused-argument,abstract-method
 
     _regex_string_literal = re.compile(r"((?<!')'(?:'')*(?!'))")
 
     def __init__(self, *args, **kwargs):
-        from loki.expression import operations as op  # pylint: disable=import-outside-toplevel,cyclic-import
+        from loki.expression import (
+            operations as op,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
         super().__init__(*args, **kwargs)
 
         # This should really be a class property but due to the circular dependency
         # (Pymbolic expression nodes requiring `LokiStringifyMapper` for `make_stringifier`)
         # we cannot perform the relevant import on a module level
         self.parenthesised_multiplicative_primitives = (
-            op.ParenthesisedAdd, op.ParenthesisedMul,
-            op.ParenthesisedDiv, op.ParenthesisedPow
+            op.ParenthesisedAdd,
+            op.ParenthesisedMul,
+            op.ParenthesisedDiv,
+            op.ParenthesisedPow,
         )
 
     def rec_with_force_parens_around(self, expr, *args, **kwargs):
         # Re-implement here to add no_force_parens_around
         force_parens_around = kwargs.pop("force_parens_around", ())
-        no_force_parens_around = kwargs.pop("no_force_parens_around",
-                                            self.parenthesised_multiplicative_primitives)
+        no_force_parens_around = kwargs.pop(
+            "no_force_parens_around", self.parenthesised_multiplicative_primitives
+        )
 
         result = self.rec(expr, *args, **kwargs)
 
-        if isinstance(expr, force_parens_around) and not isinstance(expr, no_force_parens_around):
+        if isinstance(expr, force_parens_around) and not isinstance(
+            expr, no_force_parens_around
+        ):
             result = f"({result})"
 
         return result
@@ -75,7 +96,7 @@ class LokiStringifyMapper(StringifyMapper):
 
     def map_float_literal(self, expr, enclosing_prec, *args, **kwargs):
         if expr.kind is not None:
-            return f'{str(expr.value)}_{str(expr.kind)}'
+            return f"{str(expr.value)}_{str(expr.kind)}"
         return str(expr.value)
 
     map_int_literal = map_logic_literal
@@ -88,7 +109,7 @@ class LokiStringifyMapper(StringifyMapper):
     def map_variable_symbol(self, expr, enclosing_prec, *args, **kwargs):
         if expr.parent is not None:
             parent = self.rec(expr.parent, enclosing_prec, *args, **kwargs)
-            return self.format('%s%%%s', parent, expr.basename)
+            return self.format("%s%%%s", parent, expr.basename)
         return expr.name
 
     map_deferred_type_symbol = map_variable_symbol
@@ -107,19 +128,23 @@ class LokiStringifyMapper(StringifyMapper):
         expression = self.rec(expr.parameters[0], PREC_NONE, *args, **kwargs)
         if expr.kind:
             if isinstance(expr.kind, pmbl.Expression):
-                kind = ', kind=' + self.rec(expr.kind, PREC_NONE, *args, **kwargs)
+                kind = ", kind=" + self.rec(expr.kind, PREC_NONE, *args, **kwargs)
             else:
-                kind = ', kind=' + str(expr.kind)
+                kind = ", kind=" + str(expr.kind)
         else:
-            kind = ''
-        return self.format('%s(%s%s)', name, expression, kind)
+            kind = ""
+        return self.format("%s(%s%s)", name, expression, kind)
 
     def map_range(self, expr, enclosing_prec, *args, **kwargs):
-        children = [self.rec(child, PREC_NONE, *args, **kwargs) if child is not None else ''
-                    for child in expr.children]
+        children = [
+            self.rec(child, PREC_NONE, *args, **kwargs) if child is not None else ""
+            for child in expr.children
+        ]
         if expr.step is None:
             children = children[:-1]
-        return self.parenthesize_if_needed(self.join(':', children), enclosing_prec, PREC_NONE)
+        return self.parenthesize_if_needed(
+            self.join(":", children), enclosing_prec, PREC_NONE
+        )
 
     map_range_index = map_range
     map_loop_range = map_range
@@ -129,15 +154,20 @@ class LokiStringifyMapper(StringifyMapper):
         Since substraction and unary minus are mapped to multiplication with (-1), we are here
         looking for such cases and determine the matching operator for the output.
         """
-        from loki.expression.operations import ParenthesisedMul  # pylint: disable=import-outside-toplevel,cyclic-import
+        from loki.expression.operations import (
+            ParenthesisedMul,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
         def get_op_prec_expr(expr):
-            if isinstance(expr, pmbl.Product) and not isinstance(expr, ParenthesisedMul):
-                if pmbl.is_zero(expr.children[0]+1):
+            if isinstance(expr, pmbl.Product) and not isinstance(
+                expr, ParenthesisedMul
+            ):
+                if pmbl.is_zero(expr.children[0] + 1):
                     if len(expr.children) == 2:
                         # only the minus sign and the other child
-                        return '-', PREC_PRODUCT, expr.children[1]
-                    return '-', PREC_PRODUCT, expr.__class__(expr.children[1:])
-            return '+', PREC_SUM, expr
+                        return "-", PREC_PRODUCT, expr.children[1]
+                    return "-", PREC_PRODUCT, expr.__class__(expr.children[1:])
+            return "+", PREC_SUM, expr
 
         terms = []
         for ch in expr.children:
@@ -145,11 +175,13 @@ class LokiStringifyMapper(StringifyMapper):
             terms += [op, self.rec(expr, prec, *args, **kwargs)]
 
         # Remove leading '+'
-        if terms[0] == '-':
-            terms[1] = f'{terms[0]}{terms[1]}'
+        if terms[0] == "-":
+            terms[1] = f"{terms[0]}{terms[1]}"
         terms = terms[1:]
 
-        return self.parenthesize_if_needed(self.join(' ', terms), enclosing_prec, PREC_SUM)
+        return self.parenthesize_if_needed(
+            self.join(" ", terms), enclosing_prec, PREC_SUM
+        )
 
     def map_product(self, expr, enclosing_prec, *args, **kwargs):
         if len(expr.children) == 2 and expr.children[0] == -1:
@@ -157,24 +189,33 @@ class LokiStringifyMapper(StringifyMapper):
             # We replace this by a minus again
             return self.parenthesize_if_needed(
                 f'-{self.join_rec("*", expr.children[1:], PREC_PRODUCT, *args, **kwargs)}',
-                enclosing_prec, PREC_PRODUCT)
+                enclosing_prec,
+                PREC_PRODUCT,
+            )
         # Make Pymbolic's default bracketing less conservative by not enforcing
         # parenthesis around products nested in a product, which can cause
         # round-off deviations for agressively optimising compilers
-        kwargs['force_parens_around'] = (pmbl.FloorDiv, pmbl.Remainder)
+        kwargs["force_parens_around"] = (pmbl.FloorDiv, pmbl.Remainder)
         return self.parenthesize_if_needed(
-                self.join_rec("*", expr.children, PREC_PRODUCT, *args, **kwargs),
-                enclosing_prec, PREC_PRODUCT)
+            self.join_rec("*", expr.children, PREC_PRODUCT, *args, **kwargs),
+            enclosing_prec,
+            PREC_PRODUCT,
+        )
 
     def map_quotient(self, expr, enclosing_prec, *args, **kwargs):
         # Similar to products we drop the conservative parenthesis around products and
         # quotients for the numerator
-        kwargs['force_parens_around'] = (pmbl.FloorDiv, pmbl.Remainder)
-        numerator = self.rec_with_force_parens_around(expr.numerator, PREC_PRODUCT, *args, **kwargs)
-        kwargs['force_parens_around'] = self.multiplicative_primitives
-        denominator = self.rec_with_force_parens_around(expr.denominator, PREC_PRODUCT, *args, **kwargs)
-        return self.parenthesize_if_needed(self.format('%s / %s', numerator, denominator),
-                                           enclosing_prec, PREC_PRODUCT)
+        kwargs["force_parens_around"] = (pmbl.FloorDiv, pmbl.Remainder)
+        numerator = self.rec_with_force_parens_around(
+            expr.numerator, PREC_PRODUCT, *args, **kwargs
+        )
+        kwargs["force_parens_around"] = self.multiplicative_primitives
+        denominator = self.rec_with_force_parens_around(
+            expr.denominator, PREC_PRODUCT, *args, **kwargs
+        )
+        return self.parenthesize_if_needed(
+            self.format("%s / %s", numerator, denominator), enclosing_prec, PREC_PRODUCT
+        )
 
     def map_parenthesised_add(self, expr, enclosing_prec, *args, **kwargs):
         return self.parenthesize(self.map_sum(expr, PREC_NONE, *args, **kwargs))
@@ -189,25 +230,29 @@ class LokiStringifyMapper(StringifyMapper):
         return self.parenthesize(self.map_power(expr, PREC_NONE, *args, **kwargs))
 
     def map_string_concat(self, expr, enclosing_prec, *args, **kwargs):
-        return ' // '.join(self.rec(c, enclosing_prec, *args, **kwargs) for c in expr.children)
+        return " // ".join(
+            self.rec(c, enclosing_prec, *args, **kwargs) for c in expr.children
+        )
 
     def map_literal_list(self, expr, enclosing_prec, *args, **kwargs):
-        values = ', '.join(self.rec(c, PREC_NONE, *args, **kwargs) for c in expr.elements)
+        values = ", ".join(
+            self.rec(c, PREC_NONE, *args, **kwargs) for c in expr.elements
+        )
         if expr.dtype is not None:
-            return f'[ {str(expr.dtype)} :: {values} ]'
-        return f'[ {values} ]'
+            return f"[ {str(expr.dtype)} :: {values} ]"
+        return f"[ {values} ]"
 
     def map_inline_do(self, expr, enclosing_prec, *args, **kwargs):
         assert len(expr.values) == 1
         values = self.rec(expr.values[0], PREC_NONE, *args, **kwargs)
         variable = self.rec(expr.variable, PREC_NONE, *args, **kwargs)
         bounds = self.rec(expr.bounds, PREC_NONE, *args, **kwargs)
-        return f'( {values}, {variable} = {bounds} )'
+        return f"( {values}, {variable} = {bounds} )"
 
     def map_array_subscript(self, expr, enclosing_prec, *args, **kwargs):
         name_str = self.rec(expr.aggregate, PREC_NONE, *args, **kwargs)
-        index_str = self.join_rec(', ', expr.index_tuple, PREC_NONE, *args, **kwargs)
-        return f'{name_str}({index_str})'
+        index_str = self.join_rec(", ", expr.index_tuple, PREC_NONE, *args, **kwargs)
+        return f"{name_str}({index_str})"
 
     map_string_subscript = map_array_subscript
 
@@ -217,6 +262,7 @@ class LokiWalkMapper(WalkMapper):
     A mapper that traverses the expression tree and calls :meth:`visit`
     for each visited node.
     """
+
     # pylint: disable=abstract-method
 
     def map_variable_symbol(self, expr, *args, **kwargs):
@@ -318,6 +364,7 @@ class ExpressionRetriever(LokiWalkMapper):
         given and that should return `True` or `False` depending on whether
         that expression node and its children should be visited.
     """
+
     # pylint: disable=abstract-method
 
     def __init__(self, query, recurse_query=None, **kwargs):
@@ -345,11 +392,13 @@ class ExpressionDimensionsMapper(Mapper):
     """
     A visitor for an expression that determines the dimensions of the expression.
     """
+
     # pylint: disable=abstract-method
 
     def map_algebraic_leaf(self, expr, *args, **kwargs):
         # pylint: disable=import-outside-toplevel,cyclic-import
         from loki.expression.symbols import IntLiteral
+
         return as_tuple(IntLiteral(1))
 
     map_logic_literal = map_algebraic_leaf
@@ -361,7 +410,7 @@ class ExpressionDimensionsMapper(Mapper):
     map_scalar = map_algebraic_leaf
 
     def map_deferred_type_symbol(self, expr, *args, **kwargs):
-        raise ValueError(f'Symbol with deferred type encountered: {expr}')
+        raise ValueError(f"Symbol with deferred type encountered: {expr}")
 
     def map_array(self, expr, *args, **kwargs):
         if not expr.dimensions:
@@ -372,10 +421,10 @@ class ExpressionDimensionsMapper(Mapper):
 
         # Replace colon dimensions by the value from shape
         shape = expr.shape or [None] * len(dims)
-        dims = [s if d == ':' else d for d, s in zip(dims, shape)]
+        dims = [s if d == ":" else d for d, s in zip(dims, shape)]
 
         # Remove singleton dimensions
-        dims = [d for d in dims if d != '1']
+        dims = [d for d in dims if d != "1"]
         return as_tuple(dims)
 
     def map_array_subscript(self, expr, *args, **kwargs):
@@ -399,7 +448,9 @@ class ExpressionDimensionsMapper(Mapper):
             if dim == (1,):
                 dim = child_dim
             elif child_dim not in (dim, 1):
-                raise ValueError(f'Non-matching dimensions: {str(dim)} and {str(child_dim)}')
+                raise ValueError(
+                    f"Non-matching dimensions: {str(dim)} and {str(child_dim)}"
+                )
         return dim
 
     map_product = map_sum
@@ -412,6 +463,7 @@ class ExpressionCallbackMapper(CombineMapper):
     """
     A visitor for expressions that returns the combined result of a specified callback function.
     """
+
     # pylint: disable=abstract-method
 
     def __init__(self, callback, combine):
@@ -430,9 +482,9 @@ class ExpressionCallbackMapper(CombineMapper):
     map_intrinsic_literal = map_constant
 
     def map_int_literal(self, expr, *args, **kwargs):
-        rec_results = (self.callback(expr, *args, **kwargs), )
+        rec_results = (self.callback(expr, *args, **kwargs),)
         if expr.kind is not None:
-            rec_results += (self.rec(expr.kind, *args, **kwargs), )
+            rec_results += (self.rec(expr.kind, *args, **kwargs),)
         return self.combine(rec_results)
 
     map_float_literal = map_int_literal
@@ -441,16 +493,16 @@ class ExpressionCallbackMapper(CombineMapper):
     map_deferred_type_symbol = map_constant
 
     def map_meta_symbol(self, expr, *args, **kwargs):
-        rec_results = (self.callback(expr, *args, **kwargs), )
-        rec_results += (self.rec(expr._symbol, *args, **kwargs), )
+        rec_results = (self.callback(expr, *args, **kwargs),)
+        rec_results += (self.rec(expr._symbol, *args, **kwargs),)
         return self.combine(rec_results)
 
     map_scalar = map_meta_symbol
     map_array = map_meta_symbol
 
     def map_array_subscript(self, expr, *args, **kwargs):
-        rec_results = (self.rec(expr.aggregate, *args, **kwargs), )
-        rec_results += (self.rec(expr.index, *args, **kwargs), )
+        rec_results = (self.rec(expr.aggregate, *args, **kwargs),)
+        rec_results += (self.rec(expr.index, *args, **kwargs),)
         return self.combine(rec_results)
 
     map_string_subscript = map_array_subscript
@@ -458,15 +510,16 @@ class ExpressionCallbackMapper(CombineMapper):
     map_inline_call = CombineMapper.map_call_with_kwargs
 
     def map_cast(self, expr, *args, **kwargs):
-        rec_results = (self.rec(expr.function, *args, **kwargs), )
-        rec_results += (self.rec(expr.parameters[0], *args, **kwargs), )
+        rec_results = (self.rec(expr.function, *args, **kwargs),)
+        rec_results += (self.rec(expr.parameters[0], *args, **kwargs),)
         if expr.kind is not None:
-            rec_results += (self.rec(expr.kind, *args, **kwargs), )
+            rec_results += (self.rec(expr.kind, *args, **kwargs),)
         return self.combine(rec_results)
 
     def map_range(self, expr, *args, **kwargs):
-        return self.combine(tuple(self.rec(c, *args, **kwargs)
-                                  for c in expr.children if c is not None))
+        return self.combine(
+            tuple(self.rec(c, *args, **kwargs) for c in expr.children if c is not None)
+        )
 
     map_range_index = map_range
     map_loop_range = map_range
@@ -481,11 +534,13 @@ class ExpressionCallbackMapper(CombineMapper):
         return self.combine(tuple(self.rec(c, *args, **kwargs) for c in expr.elements))
 
     def map_inline_do(self, expr, *args, **kwargs):
-        return self.combine(tuple(
-            self.rec(expr.values, *args, **kwargs),
-            self.rec(expr.variable, *args, **kwargs),
-            self.rec(expr.bounds, *args, **kwargs)
-        ))
+        return self.combine(
+            tuple(
+                self.rec(expr.values, *args, **kwargs),
+                self.rec(expr.variable, *args, **kwargs),
+                self.rec(expr.bounds, *args, **kwargs),
+            )
+        )
 
     map_procedure_symbol = map_constant
 
@@ -513,9 +568,9 @@ class LokiIdentityMapper(IdentityMapper):
     def __call__(self, expr, *args, **kwargs):
         if expr is None:
             return None
-        kwargs.setdefault('recurse_to_declaration_attributes', False)
+        kwargs.setdefault("recurse_to_declaration_attributes", False)
         new_expr = super().__call__(expr, *args, **kwargs)
-        if getattr(expr, 'source', None):
+        if getattr(expr, "source", None):
             if isinstance(new_expr, tuple):
                 for e in new_expr:
                     if self.invalidate_source:
@@ -549,8 +604,10 @@ class LokiIdentityMapper(IdentityMapper):
         # we need to disable `recurse_to_declaration_attributes` to avoid infinite
         # recursion because of the various ways that Fortran allows to use the declared
         # symbol also inside the declaration expression
-        recurse_to_declaration_attributes = kwargs['recurse_to_declaration_attributes'] or expr.scope is None
-        kwargs['recurse_to_declaration_attributes'] = False
+        recurse_to_declaration_attributes = (
+            kwargs["recurse_to_declaration_attributes"] or expr.scope is None
+        )
+        kwargs["recurse_to_declaration_attributes"] = False
 
         if recurse_to_declaration_attributes:
             old_type = expr.type
@@ -563,7 +620,7 @@ class LokiIdentityMapper(IdentityMapper):
                 # (in case this traversal is part of ``AttachScopesMapper``) and thus
                 # interrupts an otherwise infinite recursion (see LOKI-52).
                 _kwargs = kwargs.copy()
-                _kwargs['scope'] = expr.scope.parent
+                _kwargs["scope"] = expr.scope.parent
                 initial = self.rec(old_type.initial, *args, **_kwargs)
             else:
                 initial = self.rec(old_type.initial, *args, **kwargs)
@@ -576,7 +633,7 @@ class LokiIdentityMapper(IdentityMapper):
                         # explicit interface is used with the same name as the
                         # type bound procedure. This hands down the correct scope.
                         _kwargs = kwargs.copy()
-                        _kwargs['scope'] = expr.scope.parent
+                        _kwargs["scope"] = expr.scope.parent
                         bind_names += (self.rec(bind_name, *args, **_kwargs),)
                     else:
                         bind_names += (self.rec(bind_name, *args, **kwargs),)
@@ -584,11 +641,19 @@ class LokiIdentityMapper(IdentityMapper):
                 bind_names = None
 
             is_type_changed = (
-                kind is not old_type.kind or initial is not old_type.initial or
-                any(new is not old for new, old in zip_longest(as_tuple(bind_names), as_tuple(old_type.bind_names)))
+                kind is not old_type.kind
+                or initial is not old_type.initial
+                or any(
+                    new is not old
+                    for new, old in zip_longest(
+                        as_tuple(bind_names), as_tuple(old_type.bind_names)
+                    )
+                )
             )
             if is_type_changed:
-                new_type = old_type.clone(kind=kind, initial=initial, bind_names=bind_names)
+                new_type = old_type.clone(
+                    kind=kind, initial=initial, bind_names=bind_names
+                )
                 if expr.scope:
                     # Update symbol table entry
                     expr.scope.symbol_attrs[expr.name] = new_type
@@ -618,7 +683,11 @@ class LokiIdentityMapper(IdentityMapper):
     map_scalar = map_meta_symbol
 
     def map_array(self, expr, *args, **kwargs):
-        from loki.expression.symbols import ProcedureSymbol, InlineCall  # pylint: disable=import-outside-toplevel
+        from loki.expression.symbols import (
+            ProcedureSymbol,
+            InlineCall,
+        )  # pylint: disable=import-outside-toplevel
+
         symbol = self.rec(expr.symbol, *args, **kwargs)
         parent = self.rec(expr.parent, *args, **kwargs) if expr.parent else None
         dimensions = self.rec(expr.dimensions, *args, **kwargs)
@@ -628,23 +697,35 @@ class LokiIdentityMapper(IdentityMapper):
             # corrected thanks to type information in the symbol table.
             # When this happens, we need to convert this to an inline call here
             # and make sure we don't loose the call parameters (aka dimensions)
-            return InlineCall(function=symbol.clone(parent=parent), parameters=dimensions)
+            return InlineCall(
+                function=symbol.clone(parent=parent), parameters=dimensions
+            )
 
-        if kwargs['recurse_to_declaration_attributes']:
+        if kwargs["recurse_to_declaration_attributes"]:
             _kwargs = kwargs.copy()
-            _kwargs['recurse_to_declaration_attributes'] = False
+            _kwargs["recurse_to_declaration_attributes"] = False
             shape = self.rec(symbol.type.shape, *args, **_kwargs)
         else:
             shape = symbol.type.shape
 
-        if (getattr(symbol, 'symbol', symbol) is expr.symbol and
-                all(d is orig_d for d, orig_d in zip_longest(dimensions or (), expr.dimensions or ())) and
-                all(d is orig_d for d, orig_d in zip_longest(shape or (), symbol.type.shape or ()))):
+        if (
+            getattr(symbol, "symbol", symbol) is expr.symbol
+            and all(
+                d is orig_d
+                for d, orig_d in zip_longest(dimensions or (), expr.dimensions or ())
+            )
+            and all(
+                d is orig_d
+                for d, orig_d in zip_longest(shape or (), symbol.type.shape or ())
+            )
+        ):
             return expr
-        return symbol.clone(dimensions=dimensions, type=symbol.type.clone(shape=shape), parent=parent)
+        return symbol.clone(
+            dimensions=dimensions, type=symbol.type.clone(shape=shape), parent=parent
+        )
 
     def map_array_subscript(self, expr, *args, **kwargs):
-        raise RuntimeError('Recursion should have ended at map_array')
+        raise RuntimeError("Recursion should have ended at map_array")
 
     def map_string_subscript(self, expr, *args, **kwargs):
         symbol = self.rec(expr.symbol, *args, **kwargs)
@@ -657,8 +738,13 @@ class LokiIdentityMapper(IdentityMapper):
         function = self.rec(expr.function, *args, **kwargs)
         parameters = self.rec(expr.parameters, *args, **kwargs)
         kind = self.rec(expr.kind, *args, **kwargs)
-        if (function is expr.function and kind is expr.kind and
-                all(p is orig_p for p, orig_p in zip_longest(parameters, expr.parameters))):
+        if (
+            function is expr.function
+            and kind is expr.kind
+            and all(
+                p is orig_p for p, orig_p in zip_longest(parameters, expr.parameters)
+            )
+        ):
             return expr
         return expr.__class__(function, parameters, kind=kind)
 
@@ -670,8 +756,10 @@ class LokiIdentityMapper(IdentityMapper):
         return expr.__class__(children)
 
     def map_quotient(self, expr, *args, **kwargs):
-        return expr.__class__(self.rec(expr.numerator, *args, **kwargs),
-                              self.rec(expr.denominator, *args, **kwargs))
+        return expr.__class__(
+            self.rec(expr.numerator, *args, **kwargs),
+            self.rec(expr.denominator, *args, **kwargs),
+        )
 
     map_parenthesised_add = map_sum
     map_product = map_sum
@@ -685,8 +773,10 @@ class LokiIdentityMapper(IdentityMapper):
     map_loop_range = IdentityMapper.map_slice
 
     def map_literal_list(self, expr, *args, **kwargs):
-        values = tuple(v if isinstance(v, str) else self.rec(v, *args, **kwargs)
-                       for v in expr.elements)
+        values = tuple(
+            v if isinstance(v, str) else self.rec(v, *args, **kwargs)
+            for v in expr.elements
+        )
         if all(v is orig_v for v, orig_v in zip_longest(values, expr.elements)):
             return expr
         return expr.__class__(values, dtype=expr.dtype)
@@ -730,6 +820,7 @@ class SubstituteExpressionsMapper(LokiIdentityMapper):
         when rebuilding the node, setting this to `False` allows to
         retain that information
     """
+
     # pylint: disable=abstract-method
 
     def __init__(self, expr_map, invalidate_source=True):
@@ -773,15 +864,17 @@ class AttachScopesMapper(LokiIdentityMapper):
         attach the new scope and return the symbol
         """
         symbol_scope = scope.get_symbol_scope(expr.name)
-        if symbol_scope is None and '%' in expr.name:
+        if symbol_scope is None and "%" in expr.name:
             symbol_scope = scope.get_symbol_scope(expr.name_parts[0])
         if symbol_scope is not None:
             if symbol_scope is not expr.scope:
                 expr = expr.rescope(symbol_scope)
         elif self.fail:
-            raise RuntimeError(f'AttachScopesMapper: {expr!s} was not found in any scope')
+            raise RuntimeError(
+                f"AttachScopesMapper: {expr!s} was not found in any scope"
+            )
         elif expr not in _intrinsic_fortran_names:
-            debug('AttachScopesMapper: %s was not found in any scopes', str(expr))
+            debug("AttachScopesMapper: %s was not found in any scopes", str(expr))
         return expr
 
     def map_variable_symbol(self, expr, *args, **kwargs):
@@ -794,11 +887,11 @@ class AttachScopesMapper(LokiIdentityMapper):
         Note: this may be a different handler as attaching the scope and therefore
         type may change a symbol's type, e.g. from :class:`DeferredTypeSymbol` to :class:`Scalar`
         """
-        new_expr = self._update_symbol_scope(expr, kwargs['scope'])
-        if new_expr.scope and new_expr.scope is not kwargs['scope']:
+        new_expr = self._update_symbol_scope(expr, kwargs["scope"])
+        if new_expr.scope and new_expr.scope is not kwargs["scope"]:
             # We call the parent handler to take care of properties like initial value, kind etc.,
             # all of which should be declared at or above the scope of the expression
-            kwargs['scope'] = new_expr.scope
+            kwargs["scope"] = new_expr.scope
         map_fn = getattr(super(), new_expr.mapper_method)
 
         # If we cannot resolve scope or type of an expression, we mark it as deferred

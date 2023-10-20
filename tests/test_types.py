@@ -11,14 +11,26 @@ import pytest
 
 from conftest import available_frontends
 from loki import (
-    OFP, OMNI, Sourcefile, Module, Subroutine, BasicType,
-    SymbolAttributes, DerivedType, TypeDef, FCodeMapper,
-    DataType, fgen, ProcedureType, FindNodes, ProcedureDeclaration
+    OFP,
+    OMNI,
+    Sourcefile,
+    Module,
+    Subroutine,
+    BasicType,
+    SymbolAttributes,
+    DerivedType,
+    TypeDef,
+    FCodeMapper,
+    DataType,
+    fgen,
+    ProcedureType,
+    FindNodes,
+    ProcedureDeclaration,
 )
 from loki.expression import symbols as sym
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
@@ -33,27 +45,46 @@ def test_basic_type():
     assert all(t == BasicType.from_name(t.name) for t in BasicType)
     assert all(t == BasicType.from_str(t.name) for t in BasicType)
 
-    fortran_type_map = {'LOGICAL': BasicType.LOGICAL, 'INTEGER': BasicType.INTEGER,
-                        'REAL': BasicType.REAL, 'CHARACTER': BasicType.CHARACTER,
-                        'COMPLEX': BasicType.COMPLEX}
+    fortran_type_map = {
+        "LOGICAL": BasicType.LOGICAL,
+        "INTEGER": BasicType.INTEGER,
+        "REAL": BasicType.REAL,
+        "CHARACTER": BasicType.CHARACTER,
+        "COMPLEX": BasicType.COMPLEX,
+    }
 
     # Randomly change case of single letters (FORTRAN is not case-sensitive)
-    test_map = {''.join(choice((str.upper, str.lower))(c) for c in s): t
-                for s, t in fortran_type_map.items()}
+    test_map = {
+        "".join(choice((str.upper, str.lower))(c) for c in s): t
+        for s, t in fortran_type_map.items()
+    }
 
     assert all(t == BasicType.from_fortran_type(s) for s, t in test_map.items())
     assert all(t == BasicType.from_str(s) for s, t in test_map.items())
 
-    c99_type_map = {'bool': BasicType.LOGICAL, '_Bool': BasicType.LOGICAL,
-                    'short': BasicType.INTEGER, 'unsigned short': BasicType.INTEGER,
-                    'signed short': BasicType.INTEGER, 'int': BasicType.INTEGER,
-                    'unsigned int': BasicType.INTEGER, 'signed int': BasicType.INTEGER,
-                    'long': BasicType.INTEGER, 'unsigned long': BasicType.INTEGER,
-                    'signed long': BasicType.INTEGER, 'long long': BasicType.INTEGER,
-                    'unsigned long long': BasicType.INTEGER, 'signed long long': BasicType.INTEGER,
-                    'float': BasicType.REAL, 'double': BasicType.REAL, 'long double': BasicType.REAL,
-                    'char': BasicType.CHARACTER, 'float _Complex': BasicType.COMPLEX,
-                    'double _Complex': BasicType.COMPLEX, 'long double _Complex': BasicType.COMPLEX}
+    c99_type_map = {
+        "bool": BasicType.LOGICAL,
+        "_Bool": BasicType.LOGICAL,
+        "short": BasicType.INTEGER,
+        "unsigned short": BasicType.INTEGER,
+        "signed short": BasicType.INTEGER,
+        "int": BasicType.INTEGER,
+        "unsigned int": BasicType.INTEGER,
+        "signed int": BasicType.INTEGER,
+        "long": BasicType.INTEGER,
+        "unsigned long": BasicType.INTEGER,
+        "signed long": BasicType.INTEGER,
+        "long long": BasicType.INTEGER,
+        "unsigned long long": BasicType.INTEGER,
+        "signed long long": BasicType.INTEGER,
+        "float": BasicType.REAL,
+        "double": BasicType.REAL,
+        "long double": BasicType.REAL,
+        "char": BasicType.CHARACTER,
+        "float _Complex": BasicType.COMPLEX,
+        "double _Complex": BasicType.COMPLEX,
+        "long double _Complex": BasicType.COMPLEX,
+    }
 
     assert all(t == BasicType.from_c99_type(s) for s, t in c99_type_map.items())
     assert all(t == BasicType.from_str(s) for s, t in c99_type_map.items())
@@ -64,17 +95,17 @@ def test_symbol_attributes():
     Tests the attachment, lookup and deletion of arbitrary attributes from
     :any:`SymbolAttributes`
     """
-    _type = SymbolAttributes('integer', a='a', b=True, c=None)
+    _type = SymbolAttributes("integer", a="a", b=True, c=None)
     assert _type.dtype == BasicType.INTEGER
-    assert _type.a == 'a'
+    assert _type.a == "a"
     assert _type.b
     assert _type.c is None
     assert _type.foofoo is None
 
-    _type.foofoo = 'bar'
-    assert _type.foofoo == 'bar'
+    _type.foofoo = "bar"
+    assert _type.foofoo == "bar"
 
-    delattr(_type, 'foofoo')
+    delattr(_type, "foofoo")
     assert _type.foofoo is None
 
 
@@ -83,20 +114,23 @@ def test_symbol_attributes_compare():
     Test dedicated `type.compare` methods that allows certain
     attributes to be excluded from comparison.
     """
-    someint = SymbolAttributes('integer', a='a', b=True, c=None)
-    another = SymbolAttributes('integer', a='a', b=False, c=None)
-    somereal = SymbolAttributes('real', a='a', b=True, c=None)
+    someint = SymbolAttributes("integer", a="a", b=True, c=None)
+    another = SymbolAttributes("integer", a="a", b=False, c=None)
+    somereal = SymbolAttributes("real", a="a", b=True, c=None)
 
     assert not someint.compare(another)
     assert not another.compare(someint)
-    assert someint.compare(another, ignore='b')
-    assert another.compare(someint, ignore=['b'])
+    assert someint.compare(another, ignore="b")
+    assert another.compare(someint, ignore=["b"])
     assert not someint.compare(somereal)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[
-  (OFP, 'OFP needs preprocessing to support contiguous keyword'
-)]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(
+        xfail=[(OFP, "OFP needs preprocessing to support contiguous keyword")]
+    ),
+)
 def test_type_declaration_attributes(frontend):
     """
     Test recognition of different declaration attributes.
@@ -112,16 +146,19 @@ subroutine test_type_declarations(b, c)
 end subroutine test_type_declarations
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    assert routine.symbol_attrs['a'].parameter
-    assert routine.symbol_attrs['b'].intent == 'in'
-    assert routine.symbol_attrs['c'].target
-    assert routine.symbol_attrs['c'].intent == 'inout'
-    assert routine.symbol_attrs['d'].allocatable
-    assert routine.symbol_attrs['e'].pointer
-    assert routine.symbol_attrs['e'].contiguous
+    assert routine.symbol_attrs["a"].parameter
+    assert routine.symbol_attrs["b"].intent == "in"
+    assert routine.symbol_attrs["c"].target
+    assert routine.symbol_attrs["c"].intent == "inout"
+    assert routine.symbol_attrs["d"].allocatable
+    assert routine.symbol_attrs["e"].pointer
+    assert routine.symbol_attrs["e"].contiguous
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'Segfault with pragmas in derived types')]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OMNI, "Segfault with pragmas in derived types")]),
+)
 def test_pragmas(frontend):
     """
     Test detection of `!$loki dimension` pragmas to indicate intended shapes.
@@ -157,14 +194,14 @@ end module types
     fsymgen = FCodeMapper()
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
-    pragma_type = source['types'].symbol_attrs['pragma_type'].dtype
+    pragma_type = source["types"].symbol_attrs["pragma_type"].dtype
 
-    assert pragma_type.typedef is source['types'].typedef_map['pragma_type']
-    assert fsymgen(pragma_type.typedef.variables[0].shape) == '(3, 3)'
-    assert fsymgen(pragma_type.typedef.variables[1].shape) == '(klon, klat, 2)'
+    assert pragma_type.typedef is source["types"].typedef_map["pragma_type"]
+    assert fsymgen(pragma_type.typedef.variables[0].shape) == "(3, 3)"
+    assert fsymgen(pragma_type.typedef.variables[1].shape) == "(klon, klat, 2)"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_type_derived_type(frontend):
     """
     Test the detection of known derived type definitions.
@@ -189,7 +226,7 @@ module test_type_derived_type_mod
 end module test_type_derived_type_mod
 """
     module = Module.from_source(fcode, frontend=frontend)
-    routine = module['test_type_derived_type']
+    routine = module["test_type_derived_type"]
 
     a, b, c = routine.variables
     assert isinstance(a, sym.Scalar)
@@ -212,15 +249,18 @@ end module test_type_derived_type_mod
     assert all(v.scope is routine for v in c.variables)
 
     # Ensure all member variable have an entry in the local symbol table
-    assert routine.symbol_attrs['a%a'].shape == (':',)
-    assert routine.symbol_attrs['a%b'].shape == (':',':')
-    assert routine.symbol_attrs['b%a'].shape == (':',)
-    assert routine.symbol_attrs['b%b'].shape == (':',':')
-    assert routine.symbol_attrs['c%a'].shape == (':',)
-    assert routine.symbol_attrs['c%b'].shape == (':',':')
+    assert routine.symbol_attrs["a%a"].shape == (":",)
+    assert routine.symbol_attrs["a%b"].shape == (":", ":")
+    assert routine.symbol_attrs["b%a"].shape == (":",)
+    assert routine.symbol_attrs["b%b"].shape == (":", ":")
+    assert routine.symbol_attrs["c%a"].shape == (":",)
+    assert routine.symbol_attrs["c%b"].shape == (":", ":")
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'OMNI cannot deal with deferred type info')]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OMNI, "OMNI cannot deal with deferred type info")]),
+)
 def test_type_module_imports(frontend):
     """
     Test the detection of known / unknown symbols types from module imports.
@@ -236,14 +276,16 @@ end subroutine test_type_module_imports
 """
     # Ensure types are deferred without a-priori context info
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    assert routine.symbol_attrs['a_kind'].dtype == BasicType.DEFERRED
-    assert routine.symbol_attrs['a_dim'].dtype == BasicType.DEFERRED
-    assert routine.symbol_attrs['a_type'].dtype == BasicType.DEFERRED
+    assert routine.symbol_attrs["a_kind"].dtype == BasicType.DEFERRED
+    assert routine.symbol_attrs["a_dim"].dtype == BasicType.DEFERRED
+    assert routine.symbol_attrs["a_type"].dtype == BasicType.DEFERRED
 
     # Ensure local variable info is correct, as far as known
     arg_a, arg_b = routine.variables
-    assert arg_a.type.kind.type.compare(routine.symbol_attrs['a_kind'], ignore=('imported',))
-    assert arg_a.dimensions[0].type.compare(routine.symbol_attrs['a_dim'])
+    assert arg_a.type.kind.type.compare(
+        routine.symbol_attrs["a_kind"], ignore=("imported",)
+    )
+    assert arg_a.dimensions[0].type.compare(routine.symbol_attrs["a_dim"])
     assert isinstance(arg_b.type.dtype, DerivedType)
     assert arg_b.type.dtype.typedef == BasicType.DEFERRED
 
@@ -263,31 +305,34 @@ end module my_types_mod
     routine = Subroutine.from_source(fcode, definitions=module, frontend=frontend)
 
     # Check that module variables and types have been imported
-    assert routine.symbol_attrs['a_kind'].dtype == BasicType.INTEGER
-    assert routine.symbol_attrs['a_kind'].parameter
-    assert routine.symbol_attrs['a_kind'].initial == 4
-    assert routine.symbol_attrs['a_dim'].dtype == BasicType.INTEGER
-    assert routine.symbol_attrs['a_dim'].kind == 'a_kind'
-    assert isinstance(routine.symbol_attrs['a_type'].dtype.typedef, TypeDef)
+    assert routine.symbol_attrs["a_kind"].dtype == BasicType.INTEGER
+    assert routine.symbol_attrs["a_kind"].parameter
+    assert routine.symbol_attrs["a_kind"].initial == 4
+    assert routine.symbol_attrs["a_dim"].dtype == BasicType.INTEGER
+    assert routine.symbol_attrs["a_dim"].kind == "a_kind"
+    assert isinstance(routine.symbol_attrs["a_type"].dtype.typedef, TypeDef)
 
     # Check that external type definition has been linked
-    assert isinstance(routine.variable_map['arg_b'].type.dtype.typedef, TypeDef)
-    assert routine.variable_map['arg_b'].type.dtype.typedef.symbol_attrs != routine.symbol_attrs
+    assert isinstance(routine.variable_map["arg_b"].type.dtype.typedef, TypeDef)
+    assert (
+        routine.variable_map["arg_b"].type.dtype.typedef.symbol_attrs
+        != routine.symbol_attrs
+    )
 
     # Check that we correctly re-scoped the member variable
-    a, b = routine.variable_map['arg_b'].variables
-    assert ','.join(str(d) for d in a.dimensions) == ':'
-    assert ','.join(str(d) for d in b.dimensions) == ':,:'
-    assert a.type.kind == b.type.kind == 'a_kind'
+    a, b = routine.variable_map["arg_b"].variables
+    assert ",".join(str(d) for d in a.dimensions) == ":"
+    assert ",".join(str(d) for d in b.dimensions) == ":,:"
+    assert a.type.kind == b.type.kind == "a_kind"
     assert a.scope is routine
     assert b.scope is routine
 
     # Ensure all member variable have an entry in the local symbol table
-    assert routine.symbol_attrs['arg_b%a'].shape == (':',)
-    assert routine.symbol_attrs['arg_b%b'].shape == (':',':')
+    assert routine.symbol_attrs["arg_b%a"].shape == (":",)
+    assert routine.symbol_attrs["arg_b%b"].shape == (":", ":")
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_type_char_length(frontend):
     """
     Test the various beautiful ways of how Fortran allows to specify
@@ -315,50 +360,50 @@ end subroutine test_type_char_length
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
-    assert routine.variable_map['kill_it_with_fire'].type.length == '80'
-    assert routine.variable_map['if_you_insist'].type.length == '60'
-    assert routine.variable_map['okay'].type.length == '21'
-    assert routine.variable_map['oh_dear'].type.length == '*'
-    assert routine.variable_map['come_on'].type.length == ':'
-    assert routine.variable_map['you_gotta_be_kidding_me'].type.length == '20'
-    assert routine.variable_map['whatever'].type.length == '*'
-    assert routine.variable_map['whatever'].shape == ('5',)
-    assert routine.variable_map['this_is_getting_silly'].type.length == '10'
+    assert routine.variable_map["kill_it_with_fire"].type.length == "80"
+    assert routine.variable_map["if_you_insist"].type.length == "60"
+    assert routine.variable_map["okay"].type.length == "21"
+    assert routine.variable_map["oh_dear"].type.length == "*"
+    assert routine.variable_map["come_on"].type.length == ":"
+    assert routine.variable_map["you_gotta_be_kidding_me"].type.length == "20"
+    assert routine.variable_map["whatever"].type.length == "*"
+    assert routine.variable_map["whatever"].shape == ("5",)
+    assert routine.variable_map["this_is_getting_silly"].type.length == "10"
     if frontend != OMNI:
         # OMNI swallows this one
-        assert routine.variable_map['this_is_getting_silly'].type.kind == '1'
+        assert routine.variable_map["this_is_getting_silly"].type.kind == "1"
     if frontend != OMNI:
         # OMNI fails with syntax error on this one
-        assert routine.variable_map['i_mean'].type.length == '11'
-        assert routine.variable_map['i_mean'].type.kind == '1'
-    assert routine.variable_map['what'].type.length == '12'
-    assert routine.variable_map['what'].type.kind == '1'
-    assert routine.variable_map['do_you_want'].type.length is None
+        assert routine.variable_map["i_mean"].type.length == "11"
+        assert routine.variable_map["i_mean"].type.kind == "1"
+    assert routine.variable_map["what"].type.length == "12"
+    assert routine.variable_map["what"].type.kind == "1"
+    assert routine.variable_map["do_you_want"].type.length is None
     if frontend != OMNI:
         # OMNI swallows that one, too
-        assert routine.variable_map['do_you_want'].type.kind == '1'
-    assert routine.variable_map['from_me'].type.length == '13'
+        assert routine.variable_map["do_you_want"].type.kind == "1"
+    assert routine.variable_map["from_me"].type.length == "13"
     if frontend != OMNI:
         # And that one
-        assert routine.variable_map['from_me'].type.kind == '1'
-    assert routine.variable_map['and_how_does_it_end'].type.length == '*'
+        assert routine.variable_map["from_me"].type.kind == "1"
+    assert routine.variable_map["and_how_does_it_end"].type.length == "*"
 
     code = routine.to_fortran()
-    for length in ('80', '60', '21', '*', ':', '20'):
-        assert f'CHARACTER(LEN={length}) ::' in code
+    for length in ("80", "60", "21", "*", ":", "20"):
+        assert f"CHARACTER(LEN={length}) ::" in code
 
     if frontend == OMNI:
         for length in (10, 13):
-            assert f'CHARACTER(LEN={length!s}) :: ' in code
-        assert 'CHARACTER(LEN=12, KIND=1) :: ' in code
+            assert f"CHARACTER(LEN={length!s}) :: " in code
+        assert "CHARACTER(LEN=12, KIND=1) :: " in code
 
     else:
         for length in range(10, 14):
-            assert f'CHARACTER(LEN={length!s}, KIND=1) :: ' in code
-        assert 'CHARACTER(KIND=1) :: ' in code
+            assert f"CHARACTER(LEN={length!s}, KIND=1) :: " in code
+        assert "CHARACTER(KIND=1) :: " in code
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_type_kind_value(frontend):
     """
     Test the various way how kind parameters can be specified
@@ -389,24 +434,30 @@ end subroutine test_type_kind_value
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
     if frontend == OMNI:
-        int_kinds = ('8', 'selected_int_kind(9)')
-        real_kinds = ('16', 'selected_real_kind(13, 300)')
+        int_kinds = ("8", "selected_int_kind(9)")
+        real_kinds = ("16", "selected_real_kind(13, 300)")
     else:
-        int_kinds = ('8', 'jpim')
-        real_kinds = ('16', 'jprb')
+        int_kinds = ("8", "jpim")
+        real_kinds = ("16", "jprb")
 
     for kind in int_kinds:
         for var in routine.variables:
-            if var.name.lower().startswith(f'int_{kind}'):
-                assert var.type.kind == kind and f'INTEGER(KIND={kind.upper()})' in str(fgen(var.type)).upper()
+            if var.name.lower().startswith(f"int_{kind}"):
+                assert (
+                    var.type.kind == kind
+                    and f"INTEGER(KIND={kind.upper()})" in str(fgen(var.type)).upper()
+                )
 
     for kind in real_kinds:
         for var in routine.variables:
-            if var.name.lower().startswith(f'real_{kind}'):
-                assert var.type.kind == kind and f'REAL(KIND={kind.upper()})' in str(fgen(var.type)).upper()
+            if var.name.lower().startswith(f"real_{kind}"):
+                assert (
+                    var.type.kind == kind
+                    and f"REAL(KIND={kind.upper()})" in str(fgen(var.type)).upper()
+                )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_type_contiguous(here, frontend):
     """
     Test pointer arguments with contiguous attribute (a F2008-feature, which is not supported by
@@ -421,16 +472,18 @@ subroutine routine_contiguous(vec)
 end subroutine routine_contiguous
     """
     # We need to write this one to file as OFP has to preprocess the file
-    filepath = here/(f'routine_contiguous_{frontend}.f90')
+    filepath = here / (f"routine_contiguous_{frontend}.f90")
     Sourcefile.to_file(fcode, filepath)
 
-    routine = Sourcefile.from_file(filepath, frontend=frontend, preprocess=True)['routine_contiguous']
+    routine = Sourcefile.from_file(filepath, frontend=frontend, preprocess=True)[
+        "routine_contiguous"
+    ]
     assert len(routine.arguments) == 1
     assert routine.arguments[0].type.contiguous and routine.arguments[0].type.pointer
     filepath.unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_type_procedure_pointer_declaration(frontend):
     # Example code from F2008 standard, Note 12.15
     fcode = """
@@ -475,14 +528,27 @@ END MODULE some_mod
 
     # FIXME: Because of our broken way of capturing function return types this gets the wrong
     #        variable type currently...
-    assert isinstance(module.symbol_map['real_func'], (sym.Scalar, sym.ProcedureSymbol))
+    assert isinstance(module.symbol_map["real_func"], (sym.Scalar, sym.ProcedureSymbol))
 
-    decl_map = {s.name.lower(): d for d in FindNodes(ProcedureDeclaration).visit(module.spec) for s in d.symbols}
+    decl_map = {
+        s.name.lower(): d
+        for d in FindNodes(ProcedureDeclaration).visit(module.spec)
+        for s in d.symbols
+    }
 
     # Check symbols are declared and have the right type
-    procedure_names = ('sub', 'bessel', 'gfun', 'print_real', 'p', 'r', 'ptr_to_gfun', 'psi')  # 'real_func'
-    pointer_names = ('p', 'r', 'ptr_to_gfun')
-    null_init_names = ('r',)
+    procedure_names = (
+        "sub",
+        "bessel",
+        "gfun",
+        "print_real",
+        "p",
+        "r",
+        "ptr_to_gfun",
+        "psi",
+    )  # 'real_func'
+    pointer_names = ("p", "r", "ptr_to_gfun")
+    null_init_names = ("r",)
     for name in procedure_names:
         assert name in module.symbols
         symbol = module.symbol_map[name]
@@ -490,60 +556,60 @@ END MODULE some_mod
         assert isinstance(symbol.type.dtype, ProcedureType)
         if name in pointer_names:
             assert symbol.type.pointer is True
-            assert ', POINTER' in fgen(decl_map[name])
+            assert ", POINTER" in fgen(decl_map[name])
         else:
             assert symbol.type.pointer is None
         if name in null_init_names:
-            assert fgen(symbol.type.initial).upper() == 'NULL()'
+            assert fgen(symbol.type.initial).upper() == "NULL()"
         else:
             assert symbol.type.initial is None
 
     # Assert symbols have the right procedure type associated
-    real_funcs = ('bessel', 'gfun', 'p', 'r', 'ptr_to_gfun')  # 'real_func'
+    real_funcs = ("bessel", "gfun", "p", "r", "ptr_to_gfun")  # 'real_func'
     for name in real_funcs:
         symbol = module.symbol_map[name]
-        assert symbol.type.dtype.name.upper() == 'REAL_FUNC'
+        assert symbol.type.dtype.name.upper() == "REAL_FUNC"
         assert symbol.type.dtype.is_function is True
         if name in decl_map:
-            assert decl_map[name].interface == 'REAL_FUNC'
-            assert 'PROCEDURE(REAL_FUNC)' in fgen(decl_map[name]).upper()
+            assert decl_map[name].interface == "REAL_FUNC"
+            assert "PROCEDURE(REAL_FUNC)" in fgen(decl_map[name]).upper()
         if name in null_init_names:
-            assert f'{name.upper()} => NULL()' in fgen(decl_map[name]).upper()
+            assert f"{name.upper()} => NULL()" in fgen(decl_map[name]).upper()
 
-    sub_funcs = ('print_real', 'sub')
+    sub_funcs = ("print_real", "sub")
     for name in sub_funcs:
         symbol = module.symbol_map[name]
-        assert symbol.type.dtype.name.upper() == 'SUB'
+        assert symbol.type.dtype.name.upper() == "SUB"
         assert symbol.type.dtype.is_function is False
         if name in decl_map:
-            assert decl_map[name].interface == 'SUB'
-            assert 'PROCEDURE(SUB)' in fgen(decl_map[name]).upper()
+            assert decl_map[name].interface == "SUB"
+            assert "PROCEDURE(SUB)" in fgen(decl_map[name]).upper()
 
     # Assert procedure pointer component in the derived_type is sane
-    struct_type = module.typedef_map['struct_type']
+    struct_type = module.typedef_map["struct_type"]
     decls = FindNodes(ProcedureDeclaration).visit(struct_type.body)
     assert len(decls) == 1
-    assert decls[0].symbols == ('component',)
-    assert decls[0].symbols[0].type.dtype.name.upper() == 'REAL_FUNC'
+    assert decls[0].symbols == ("component",)
+    assert decls[0].symbols[0].type.dtype.name.upper() == "REAL_FUNC"
     assert decls[0].symbols[0].type.pointer is True
-    assert decls[0].interface == 'real_func'
+    assert decls[0].interface == "real_func"
 
     # Assert the variable of that type is sane
-    struct = module.symbol_map['struct']
-    assert struct.type.dtype.name.upper() == 'STRUCT_TYPE'
+    struct = module.symbol_map["struct"]
+    assert struct.type.dtype.name.upper() == "STRUCT_TYPE"
     assert struct.type.dtype.typedef is struct_type
 
     # Assert the external procedure with implicit interface is sane
-    psi = module.symbol_map['psi']
+    psi = module.symbol_map["psi"]
     assert isinstance(psi, sym.ProcedureSymbol)
     assert isinstance(psi.type.dtype, ProcedureType)
-    assert psi.type.dtype.name.upper() == 'PSI'
+    assert psi.type.dtype.name.upper() == "PSI"
     assert psi.type.dtype.return_type.compare(SymbolAttributes(BasicType.REAL))
-    assert decl_map['psi'].interface == BasicType.REAL
-    assert 'PROCEDURE(REAL)' in fgen(decl_map['psi']).upper()
+    assert decl_map["psi"].interface == BasicType.REAL
+    assert "PROCEDURE(REAL)" in fgen(decl_map["psi"]).upper()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_type_attach_scope_kind(frontend):
     """
     Validate scopes for nested variables (such as initial values for kind parameters
@@ -572,14 +638,14 @@ end module phys_mod
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    routine = module['phys_kernel_lu_solver_compact']
-    assert routine.variable_map['temp_out'].scope is routine
-    assert module.variable_map['dp'].scope is module
-    assert routine.variable_map['dp'].scope is routine
+    routine = module["phys_kernel_lu_solver_compact"]
+    assert routine.variable_map["temp_out"].scope is routine
+    assert module.variable_map["dp"].scope is module
+    assert routine.variable_map["dp"].scope is routine
 
     if frontend != OMNI:
-        assert routine.variable_map['temp_out'].type.kind == 'lp'
-        assert routine.variable_map['temp_out'].type.kind.scope is module
+        assert routine.variable_map["temp_out"].type.kind == "lp"
+        assert routine.variable_map["temp_out"].type.kind.scope is module
 
-        assert routine.variable_map['temp_out'].type.kind.initial == 'dp'
-        assert routine.variable_map['temp_out'].type.kind.initial.scope is module
+        assert routine.variable_map["temp_out"].type.kind.initial == "dp"
+        assert routine.variable_map["temp_out"].type.kind.initial.scope is module

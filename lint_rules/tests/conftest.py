@@ -9,13 +9,15 @@ from loki import HAVE_FP, FP
 from loki.lint import Reporter, Linter
 
 
-__all__ = ['available_frontends', 'run_linter']
+__all__ = ["available_frontends", "run_linter"]
 
 
 def available_frontends():
     """Choose frontend to use (Linter currently relies exclusively on Fparser)"""
     if HAVE_FP:
-        return [FP,]
+        return [
+            FP,
+        ]
     return []
 
 
@@ -27,6 +29,6 @@ def run_linter(sourcefile, rule_list, config=None, handlers=None, targets=None):
     linter = Linter(reporter, rules=rule_list, config=config)
     report = linter.check(sourcefile, targets=targets)
     if config:
-        if config.get('fix', None):
+        if config.get("fix", None):
             linter.fix(sourcefile, report)
     return linter

@@ -12,12 +12,14 @@ from conftest import available_frontends
 from transformations import ExtractSCATransformation
 
 
-@pytest.fixture(scope='module', name='horizontal')
+@pytest.fixture(scope="module", name="horizontal")
 def fixture_horizontal():
-    return Dimension(name='horizontal', size='nlon', index='jl', bounds=('jstart', 'jend'))
+    return Dimension(
+        name="horizontal", size="nlon", index="jl", bounds=("jstart", "jend")
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_extract_sca_horizontal(frontend, horizontal):
     """
     Test removal of loops that traverse the full horizontal dimension.
@@ -47,7 +49,7 @@ def test_extract_sca_horizontal(frontend, horizontal):
 """
     source = Sourcefile.from_source(fcode, frontend=frontend)
     sca_transform = ExtractSCATransformation(horizontal=horizontal)
-    source['compute_column'].apply(sca_transform, role='kernel')
+    source["compute_column"].apply(sca_transform, role="kernel")
 
     exp_loop_nest = """
   c = 5.345
@@ -61,7 +63,7 @@ def test_extract_sca_horizontal(frontend, horizontal):
     assert "q(nz) = q(nz)*c" in source.to_fortran().lower()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_extract_sca_iteration(frontend, horizontal):
     """
     Test removal of loops that traverse a defined iterations space.
@@ -92,7 +94,7 @@ def test_extract_sca_iteration(frontend, horizontal):
 """
     source = Sourcefile.from_source(fcode, frontend=frontend)
     sca_transform = ExtractSCATransformation(horizontal=horizontal)
-    source['compute_column'].apply(sca_transform, role='kernel')
+    source["compute_column"].apply(sca_transform, role="kernel")
 
     exp_loop_nest = """
   c = 5.345
@@ -106,12 +108,13 @@ def test_extract_sca_iteration(frontend, horizontal):
     assert "q(nz) = q(nz)*c" in source.to_fortran().lower()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_extract_sca_nested_level_zero(frontend, horizontal):
     """
     Test nested subroutine call outside the vertical loop.
     """
-    source = Sourcefile.from_source(source="""
+    source = Sourcefile.from_source(
+        source="""
   SUBROUTINE compute_column(jstart, jend, nlon, nz, q, t)
     INTEGER, INTENT(IN)   :: jstart, jend  ! Explicit iteration bounds of the kernel
     INTEGER, INTENT(IN)   :: nlon, nz      ! Size of the horizontal and vertical
@@ -127,9 +130,12 @@ def test_extract_sca_nested_level_zero(frontend, horizontal):
       Q(JL, NZ) = Q(JL, NZ) * C
     END DO
   END SUBROUTINE compute_column
-""", frontend=frontend)
+""",
+        frontend=frontend,
+    )
 
-    level_zero = Sourcefile.from_source(source="""
+    level_zero = Sourcefile.from_source(
+        source="""
   SUBROUTINE compute_level_zero(jstart, jend, nlon, nz, c, q, t)
     INTEGER, INTENT(IN)   :: jstart, jend
     INTEGER, INTENT(IN)   :: nlon, nz
@@ -145,14 +151,18 @@ def test_extract_sca_nested_level_zero(frontend, horizontal):
       END DO
     END DO
   END SUBROUTINE compute_level_zero
-""", frontend=frontend)
+""",
+        frontend=frontend,
+    )
 
-    source['compute_column'].enrich_calls(routines=level_zero.all_subroutines)
+    source["compute_column"].enrich_calls(routines=level_zero.all_subroutines)
 
     # Apply single-column extraction trasnformation in topological order
     sca_transform = ExtractSCATransformation(horizontal=horizontal)
-    source['compute_column'].apply(sca_transform, role='kernel', targets=['compute_utility'])
-    level_zero['compute_level_zero'].apply(sca_transform, role='kernel')
+    source["compute_column"].apply(
+        sca_transform, role="kernel", targets=["compute_utility"]
+    )
+    level_zero["compute_level_zero"].apply(sca_transform, role="kernel")
 
     exp_loop_nest = """
   DO jk=2,nz
@@ -167,12 +177,13 @@ def test_extract_sca_nested_level_zero(frontend, horizontal):
     assert "q(nz) = q(nz)*c" in source.to_fortran().lower()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_extract_sca_nested_level_one(frontend, horizontal):
     """
     Test nested subroutine call inside vertical loop.
     """
-    source = Sourcefile.from_source(source="""
+    source = Sourcefile.from_source(
+        source="""
   SUBROUTINE compute_column(jstart, jend, nlon, nz, q, t)
     INTEGER, INTENT(IN)   :: jstart, jend  ! Explicit iteration bounds of the kernel
     INTEGER, INTENT(IN)   :: nlon, nz      ! Size of the horizontal and vertical
@@ -190,9 +201,12 @@ def test_extract_sca_nested_level_one(frontend, horizontal):
       Q(JL, NZ) = Q(JL, NZ) * C
     END DO
   END SUBROUTINE compute_column
-""", frontend=frontend)
+""",
+        frontend=frontend,
+    )
 
-    level_one = Sourcefile.from_source(source="""
+    level_one = Sourcefile.from_source(
+        source="""
   SUBROUTINE compute_level_one(jstart, jend, nlon, jk, c, q, t)
     INTEGER, INTENT(IN)   :: jstart, jend
     INTEGER, INTENT(IN)   :: nlon, jk
@@ -206,14 +220,18 @@ def test_extract_sca_nested_level_one(frontend, horizontal):
       q(jl, jk) = q(jl, jk-1)  + t(jl, jk) * c
     END DO
   END SUBROUTINE compute_level_one
-""", frontend=frontend)
+""",
+        frontend=frontend,
+    )
 
-    source['compute_column'].enrich_calls(routines=level_one.all_subroutines)
+    source["compute_column"].enrich_calls(routines=level_one.all_subroutines)
 
     # Apply single-column extraction trasnformation in topological order
     sca_transform = ExtractSCATransformation(horizontal=horizontal)
-    source['compute_column'].apply(sca_transform, role='kernel', targets=['compute_utility'])
-    level_one['compute_level_one'].apply(sca_transform, role='kernel')
+    source["compute_column"].apply(
+        sca_transform, role="kernel", targets=["compute_utility"]
+    )
+    level_one["compute_level_one"].apply(sca_transform, role="kernel")
 
     exp_loop_nest = """
   t(jk) = c*jk

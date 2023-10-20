@@ -14,7 +14,7 @@ from loki import ir
 from loki.expression import symbols as sym
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_cufgen(frontend):
     """
     A simple test routine to test the Cuda Fortran (CUF) backend
@@ -57,9 +57,9 @@ end module transformation_module_cufgen
 
     module = Module.from_source(fcode, frontend=frontend)
 
-    driver = module['driver']
-    kernel = module['kernel']
-    device_subroutine = module['device']
+    driver = module["driver"]
+    kernel = module["kernel"]
+    device_subroutine = module["device"]
 
     assert driver
     assert module.to_fortran(cuf=True) == module.to_fortran()
@@ -82,15 +82,28 @@ end module transformation_module_cufgen
     for call in FindNodes(ir.CallStatement).visit(driver.body):
         if "kernel" in str(call.name):
             with pytest.raises(AssertionError):
-                _ = call.clone(chevron=(sym.IntLiteral(1), sym.IntLiteral(1), sym.IntLiteral(1), sym.IntLiteral(1),
-                                        sym.IntLiteral(1)))
+                _ = call.clone(
+                    chevron=(
+                        sym.IntLiteral(1),
+                        sym.IntLiteral(1),
+                        sym.IntLiteral(1),
+                        sym.IntLiteral(1),
+                        sym.IntLiteral(1),
+                    )
+                )
             with pytest.raises(ValidationError):
                 _ = call.clone(chevron=(1, 1))
             with pytest.raises(ValidationError):
                 _ = call.clone(chevron=2)
 
-            call_map[call] = call.clone(chevron=(sym.IntLiteral(1), sym.IntLiteral(1),
-                                                 sym.IntLiteral(1), sym.IntLiteral(1)))
+            call_map[call] = call.clone(
+                chevron=(
+                    sym.IntLiteral(1),
+                    sym.IntLiteral(1),
+                    sym.IntLiteral(1),
+                    sym.IntLiteral(1),
+                )
+            )
 
     driver.body = Transformer(call_map).visit(driver.body)
 

@@ -12,13 +12,10 @@ Various tests for interprocedural analysis features in Loki
 import pytest
 
 from conftest import available_frontends
-from loki import (
-    Sourcefile, FindNodes, FindInlineCalls,
-    CallStatement, IntLiteral
-)
+from loki import Sourcefile, FindNodes, FindInlineCalls, CallStatement, IntLiteral
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_ipa_call_statement_arg_iter(frontend):
     """
     Test that :any:`CallStatement.arg_iter` works as expected
@@ -47,16 +44,21 @@ end module some_mod
     """.strip()
 
     callee_source = Sourcefile.from_source(fcode_callee, frontend=frontend)
-    caller_source = Sourcefile.from_source(fcode_caller, frontend=frontend, definitions=callee_source.definitions)
+    caller_source = Sourcefile.from_source(
+        fcode_caller, frontend=frontend, definitions=callee_source.definitions
+    )
 
-    callee = callee_source['callee']
-    caller = caller_source['caller']
+    callee = callee_source["callee"]
+    caller = caller_source["caller"]
 
     calls = FindNodes(CallStatement).visit(caller.body)
     assert len(calls) == 1
     arg_iter = list(calls[0].arg_iter())
     assert arg_iter == [
-        ('var', 'arg1'), ('var2', 'arg2'), ('arr(:)', 'arg3'), ('val', '4')
+        ("var", "arg1"),
+        ("var2", "arg2"),
+        ("arr(:)", "arg3"),
+        ("val", "4"),
     ]
 
     for kernel_arg, caller_arg in calls[0].arg_iter():
@@ -64,7 +66,7 @@ end module some_mod
         assert isinstance(caller_arg, IntLiteral) or caller_arg.scope is caller
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_ipa_call_statement_arg_iter_optional(frontend):
     """
     Test that :any:`CallStatement.arg_iter` works as expected with optional arguments
@@ -96,24 +98,38 @@ end module some_mod
     """.strip()
 
     callee_source = Sourcefile.from_source(fcode_callee, frontend=frontend)
-    caller_source = Sourcefile.from_source(fcode_caller, frontend=frontend, definitions=callee_source.definitions)
+    caller_source = Sourcefile.from_source(
+        fcode_caller, frontend=frontend, definitions=callee_source.definitions
+    )
 
-    callee = callee_source['callee']
-    caller = caller_source['caller']
+    callee = callee_source["callee"]
+    caller = caller_source["caller"]
 
     calls = FindNodes(CallStatement).visit(caller.body)
     assert len(calls) == 3
     arg_iter = list(calls[0].arg_iter())
     assert arg_iter == [
-        ('var', 'arg1'), ('var2', 'arg2'), ('arr(:)', 'arg3'), ('val', '4')
+        ("var", "arg1"),
+        ("var2", "arg2"),
+        ("arr(:)", "arg3"),
+        ("val", "4"),
     ]
     arg_iter = list(calls[1].arg_iter())
     assert arg_iter == [
-        ('var', 'arg1'), ('var2', 'arg2'), ('val', '4'), ('arr(:)', 'arg3'), ('opt2', '1')
+        ("var", "arg1"),
+        ("var2", "arg2"),
+        ("val", "4"),
+        ("arr(:)", "arg3"),
+        ("opt2", "1"),
     ]
     arg_iter = list(calls[2].arg_iter())
     assert arg_iter == [
-        ('var', 'arg1'), ('var2', 'arg2'), ('arr(:)', 'arg3'), ('val', '4'), ('opt1', '1'), ('opt2', '2')
+        ("var", "arg1"),
+        ("var2", "arg2"),
+        ("arr(:)", "arg3"),
+        ("val", "4"),
+        ("opt1", "1"),
+        ("opt2", "2"),
     ]
 
     for call in calls:
@@ -122,7 +138,7 @@ end module some_mod
             assert isinstance(caller_arg, IntLiteral) or caller_arg.scope is caller
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_ipa_inline_call_arg_iter(frontend):
     """
     Test that :any:`InlineCall.arg_iter` works as expected
@@ -152,16 +168,21 @@ end module some_mod
     """.strip()
 
     callee_source = Sourcefile.from_source(fcode_callee, frontend=frontend)
-    caller_source = Sourcefile.from_source(fcode_caller, frontend=frontend, definitions=callee_source.definitions)
+    caller_source = Sourcefile.from_source(
+        fcode_caller, frontend=frontend, definitions=callee_source.definitions
+    )
 
-    callee = callee_source['callee']
-    caller = caller_source['caller']
+    callee = callee_source["callee"]
+    caller = caller_source["caller"]
 
     calls = list(FindInlineCalls().visit(caller.body))
     assert len(calls) == 1
     arg_iter = list(calls[0].arg_iter())
     assert arg_iter == [
-        ('var', 'arg1'), ('var2', 'arg2'), ('arr(:)', 'arg3'), ('val', '4')
+        ("var", "arg1"),
+        ("var2", "arg2"),
+        ("arr(:)", "arg3"),
+        ("val", "4"),
     ]
 
     for kernel_arg, caller_arg in calls[0].arg_iter():
@@ -169,7 +190,7 @@ end module some_mod
         assert isinstance(caller_arg, IntLiteral) or caller_arg.scope is caller
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_ipa_inline_call_arg_iter_optional(frontend):
     """
     Test that :any:`InlineCall.arg_iter` works as expected
@@ -202,24 +223,38 @@ end module some_mod
     """.strip()
 
     callee_source = Sourcefile.from_source(fcode_callee, frontend=frontend)
-    caller_source = Sourcefile.from_source(fcode_caller, frontend=frontend, definitions=callee_source.definitions)
+    caller_source = Sourcefile.from_source(
+        fcode_caller, frontend=frontend, definitions=callee_source.definitions
+    )
 
-    callee = callee_source['callee']
-    caller = caller_source['caller']
+    callee = callee_source["callee"]
+    caller = caller_source["caller"]
 
     calls = list(FindInlineCalls(unique=False).visit(caller.body))
     assert len(calls) == 3
     arg_iter = list(calls[0].arg_iter())
     assert arg_iter == [
-        ('var', 'arg1'), ('var2', 'arg2'), ('arr(:)', 'arg3'), ('val', '4')
+        ("var", "arg1"),
+        ("var2", "arg2"),
+        ("arr(:)", "arg3"),
+        ("val", "4"),
     ]
     arg_iter = list(calls[1].arg_iter())
     assert arg_iter == [
-        ('var', 'arg1'), ('arr(:)', 'arg3'), ('var2', 'arg2'), ('opt2', '2'), ('val', '4')
+        ("var", "arg1"),
+        ("arr(:)", "arg3"),
+        ("var2", "arg2"),
+        ("opt2", "2"),
+        ("val", "4"),
     ]
     arg_iter = list(calls[2].arg_iter())
     assert arg_iter == [
-        ('var', 'arg1'), ('var2', 'arg2'), ('arr(:)', 'arg3'), ('val', '4'), ('opt1', '1'), ('opt2', '2')
+        ("var", "arg1"),
+        ("var2", "arg2"),
+        ("arr(:)", "arg3"),
+        ("val", "4"),
+        ("opt1", "1"),
+        ("opt2", "2"),
     ]
 
     for call in calls:

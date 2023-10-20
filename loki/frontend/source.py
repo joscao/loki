@@ -21,8 +21,12 @@ except ImportError:
 from loki.logging import debug, warning
 
 __all__ = [
-    'Source', 'FortranReader', 'extract_source', 'extract_source_from_range', 'source_to_lines',
-    'join_source_list'
+    "Source",
+    "FortranReader",
+    "extract_source",
+    "extract_source_from_range",
+    "source_to_lines",
+    "join_source_list",
 ]
 
 
@@ -47,8 +51,8 @@ class Source:
         self.file = file
 
     def __repr__(self):
-        line_end = f'-{self.lines[1]}' if self.lines[1] else ''
-        return f'Source<line {self.lines[0]}{line_end}>'
+        line_end = f"-{self.lines[1]}" if self.lines[1] else ""
+        return f"Source<line {self.lines[0]}{line_end}>"
 
     def __eq__(self, o):
         if isinstance(o, Source):
@@ -78,8 +82,10 @@ class Source:
             strings = string.strip().split()
             if strings[0] in self_string:
                 if all(substr in self_string for substr in strings):
-                    return (self_string.find(strings[0]),
-                            self_string.find(strings[-1]) + len(strings[-1]))
+                    return (
+                        self_string.find(strings[0]),
+                        self_string.find(strings[-1]) + len(strings[-1]),
+                    )
         return None, None
 
     def clone_with_string(self, string, ignore_case=True, ignore_space=True):
@@ -87,11 +93,13 @@ class Source:
         Clone the source object and extract the given string from the original source string
         or use the provided string.
         """
-        cstart, cend = self.find(string, ignore_case=ignore_case, ignore_space=ignore_space)
+        cstart, cend = self.find(
+            string, ignore_case=ignore_case, ignore_space=ignore_space
+        )
         if None not in (cstart, cend):
             string = self.string[cstart:cend]
-            lstart = self.lines[0] + self.string[:cstart].count('\n')
-            lend = lstart + string.count('\n')
+            lstart = self.lines[0] + self.string[:cstart].count("\n")
+            lend = lstart + string.count("\n")
             lines = (lstart, lend)
         else:
             lines = self.lines
@@ -102,9 +110,9 @@ class Source:
         Clone the source object and extract the given line span from the original source
         string (relative to the string length).
         """
-        string = self.string[span[0]:span[1]]
-        lstart = self.lines[0] + self.string[:span[0]].count('\n')
-        lend = lstart + string.count('\n')
+        string = self.string[span[0] : span[1]]
+        lstart = self.lines[0] + self.string[: span[0]].count("\n")
+        lend = lstart + string.count("\n")
         return Source(lines=(lstart, lend), string=string, file=self.file)
 
     def clone_lines(self, span=None):
@@ -114,7 +122,7 @@ class Source:
         if span is not None:
             return self.clone_with_span(span).clone_lines()
         return [
-            Source(lines=(self.lines[0]+idx,)*2, string=line, file=self.file)
+            Source(lines=(self.lines[0] + idx,) * 2, string=line, file=self.file)
             for idx, line in enumerate(self.string.splitlines())
         ]
 
@@ -156,18 +164,23 @@ class FortranReader:
         self.source_lines = raw_source.splitlines()
         self._sanitize_raw_source(raw_source)
 
-    @Timer(logger=debug, text=lambda s: f'[Loki::Frontend] Executed _sanitize_raw_source in {s:.2f}s')
+    @Timer(
+        logger=debug,
+        text=lambda s: f"[Loki::Frontend] Executed _sanitize_raw_source in {s:.2f}s",
+    )
     def _sanitize_raw_source(self, raw_source):
         """
         Helper routine to create a sanitized Fortran source string
         with comments removed and whitespace stripped from line beginning and end
         """
         if FortranStringReader is None:
-            raise RuntimeError('FortranReader needs fparser2')
+            raise RuntimeError("FortranReader needs fparser2")
         reader = FortranStringReader(raw_source)
         self.sanitized_lines = tuple(item for item in reader)
-        self.sanitized_spans = (0,) + tuple(accumulate(len(item.line)+1 for item in self.sanitized_lines))
-        self.sanitized_string = '\n'.join(item.line for item in self.sanitized_lines)
+        self.sanitized_spans = (0,) + tuple(
+            accumulate(len(item.line) + 1 for item in self.sanitized_lines)
+        )
+        self.sanitized_string = "\n".join(item.line for item in self.sanitized_lines)
 
     def get_line_index(self, line_number):
         """
@@ -202,7 +215,9 @@ class FortranReader:
         if span[1] is None:
             sanitized_end = len(self.sanitized_lines)
         else:
-            sanitized_end = bisect_left(self.sanitized_spans, span[1], lo=sanitized_start)
+            sanitized_end = bisect_left(
+                self.sanitized_spans, span[1], lo=sanitized_start
+            )
             sanitized_end = min(len(self.sanitized_lines), sanitized_end)
 
         # Next, find the corresponding line indices in the original string
@@ -214,12 +229,20 @@ class FortranReader:
             elif sanitized_start >= len(self.sanitized_lines):
                 # Span starts after the sanitized string: include only lines after it
                 source_start = self.get_line_index(self.sanitized_lines[-1].span[1] + 1)
-            elif self.sanitized_lines[sanitized_start].span[0] - self.sanitized_lines[sanitized_start-1].span[1] > 1:
+            elif (
+                self.sanitized_lines[sanitized_start].span[0]
+                - self.sanitized_lines[sanitized_start - 1].span[1]
+                > 1
+            ):
                 # There are lines in the original string that are missing in the sanitized string
                 # between the previous and the start line
-                source_start = self.get_line_index(self.sanitized_lines[sanitized_start-1].span[1] + 1)
+                source_start = self.get_line_index(
+                    self.sanitized_lines[sanitized_start - 1].span[1] + 1
+                )
             else:
-                source_start = self.get_line_index(self.sanitized_lines[sanitized_start].span[0])
+                source_start = self.get_line_index(
+                    self.sanitized_lines[sanitized_start].span[0]
+                )
 
             if sanitized_end == len(self.sanitized_lines):
                 # Span reaches until the end of the sanitized_string: include everything
@@ -228,14 +251,20 @@ class FortranReader:
             else:
                 # Include everything until (but not including) the line corresponding to the
                 # first line after the span in the sanitized string
-                source_end = self.get_line_index(self.sanitized_lines[sanitized_end].span[0])
+                source_end = self.get_line_index(
+                    self.sanitized_lines[sanitized_end].span[0]
+                )
         elif sanitized_start >= len(self.sanitized_lines):
             # Span starts after the sanitized string: Point to the first line after it
             source_start = self.get_line_index(self.sanitized_lines[-1].span[1] + 1)
             source_end = source_start
         else:
-            source_start = self.get_line_index(self.sanitized_lines[sanitized_start].span[0])
-            source_end = self.get_line_index(self.sanitized_lines[sanitized_end-1].span[1] + 1)
+            source_start = self.get_line_index(
+                self.sanitized_lines[sanitized_start].span[0]
+            )
+            source_end = self.get_line_index(
+                self.sanitized_lines[sanitized_end - 1].span[1] + 1
+            )
 
         return sanitized_start, sanitized_end, source_start, source_end
 
@@ -244,12 +273,12 @@ class FortranReader:
         Create a :any:`Source` object with the content of the reader
         """
         if include_padding:
-            string = '\n'.join(self.source_lines)
+            string = "\n".join(self.source_lines)
             lines = (self.line_offset + 1, self.line_offset + len(self.source_lines))
         else:
             lines = (self.sanitized_lines[0].span[0], self.sanitized_lines[-1].span[1])
             index = (lines[0] - self.line_offset - 1, lines[1] - self.line_offset)
-            string = '\n'.join(self.source_lines[index[0]:index[1]])
+            string = "\n".join(self.source_lines[index[0] : index[1]])
         return Source(lines=lines, string=string)
 
     def source_from_head(self):
@@ -264,7 +293,7 @@ class FortranReader:
             return None
 
         if not self.sanitized_lines:
-            string = '\n'.join(self.source_lines)
+            string = "\n".join(self.source_lines)
             lines = (self.line_offset + 1, self.line_offset + len(self.source_lines))
             return Source(lines=lines, string=string)
 
@@ -273,7 +302,7 @@ class FortranReader:
             return None
         assert line_diff > 0
 
-        string = '\n'.join(self.source_lines[:line_diff - 1])
+        string = "\n".join(self.source_lines[: line_diff - 1])
         lines = (self.line_offset + 1, self.sanitized_lines[0].span[0] - 1)
         return Source(lines=lines, string=string)
 
@@ -288,13 +317,15 @@ class FortranReader:
         if not self.sanitized_lines:
             return None
 
-        line_diff = len(self.source_lines) + self.line_offset - self.sanitized_lines[-1].span[1]
+        line_diff = (
+            len(self.source_lines) + self.line_offset - self.sanitized_lines[-1].span[1]
+        )
         if line_diff == 0:
             return None
         assert line_diff > 0
 
         start = self.sanitized_lines[-1].span[1] + 1
-        string = '\n'.join(self.source_lines[self.get_line_index(start):])
+        string = "\n".join(self.source_lines[self.get_line_index(start) :])
         lines = (start, start + line_diff - 1)
         return Source(lines=lines, string=string)
 
@@ -303,8 +334,10 @@ class FortranReader:
         Create a :any:`Source` object containing the original source string corresponding
         to the given span in the sanitized string
         """
-        *_, source_start, source_end = self.get_line_indices_from_span(span, include_padding)
-        string = '\n'.join(self.source_lines[source_start:source_end])
+        *_, source_start, source_end = self.get_line_indices_from_span(
+            span, include_padding
+        )
+        string = "\n".join(self.source_lines[source_start:source_end])
         if not string:
             return None
         lines = (self.line_offset + source_start + 1, self.line_offset + source_end)
@@ -315,7 +348,12 @@ class FortranReader:
         Create a new :any:`FortranReader` object covering only the source code section corresponding
         to the given span in the sanitized string
         """
-        sanit_start, sanit_end, source_start, source_end = self.get_line_indices_from_span(span, include_padding)
+        (
+            sanit_start,
+            sanit_end,
+            source_start,
+            source_end,
+        ) = self.get_line_indices_from_span(span, include_padding)
         if sanit_start >= len(self.sanitized_lines):
             return None
 
@@ -324,13 +362,21 @@ class FortranReader:
         new_reader.source_lines = self.source_lines[source_start:source_end]
         new_reader.sanitized_lines = self.sanitized_lines[sanit_start:sanit_end]
         span_offset = self.sanitized_spans[sanit_start]
-        new_reader.sanitized_spans = tuple(span - span_offset for span in self.sanitized_spans[sanit_start:sanit_end+1])
+        new_reader.sanitized_spans = tuple(
+            span - span_offset
+            for span in self.sanitized_spans[sanit_start : sanit_end + 1]
+        )
 
         if sanit_end + 1 < len(self.sanitized_spans):
-            sanitized_span = [self.sanitized_spans[sanit_start], self.sanitized_spans[sanit_end + 1]]
+            sanitized_span = [
+                self.sanitized_spans[sanit_start],
+                self.sanitized_spans[sanit_end + 1],
+            ]
         else:
             sanitized_span = [self.sanitized_spans[sanit_start], None]
-        new_reader.sanitized_string = self.sanitized_string[sanitized_span[0]:sanitized_span[1]]
+        new_reader.sanitized_string = self.sanitized_string[
+            sanitized_span[0] : sanitized_span[1]
+        ]
 
         return new_reader
 
@@ -350,7 +396,7 @@ class FortranReader:
         """
         Return the current line of the iterator or `None` if outside of iteration range
         """
-        _current_index = getattr(self, '_current_index', 0)
+        _current_index = getattr(self, "_current_index", 0)
         if _current_index <= 0 or _current_index > len(self.sanitized_lines):
             return None
         return self.sanitized_lines[_current_index - 1]
@@ -362,19 +408,23 @@ class FortranReader:
         line = self.current_line
         start = self.get_line_index(line.span[0])
         end = self.get_line_index(line.span[1])
-        return Source(lines=line.span, string='\n'.join(self.source_lines[start:end+1]))
+        return Source(
+            lines=line.span, string="\n".join(self.source_lines[start : end + 1])
+        )
 
 
 def extract_source(ast, text, label=None, full_lines=False):
     """
     Extract the marked string from source text.
     """
-    attrib = getattr(ast, 'attrib', ast)
-    lstart = int(attrib['line_begin'])
-    lend = int(attrib['line_end'])
-    cstart = int(attrib['col_begin'])
-    cend = int(attrib['col_end'])
-    return extract_source_from_range((lstart, lend), (cstart, cend), text, label=label, full_lines=full_lines)
+    attrib = getattr(ast, "attrib", ast)
+    lstart = int(attrib["line_begin"])
+    lend = int(attrib["line_end"])
+    cstart = int(attrib["col_begin"])
+    cend = int(attrib["col_end"])
+    return extract_source_from_range(
+        (lstart, lend), (cstart, cend), text, label=label, full_lines=full_lines
+    )
 
 
 def extract_source_from_range(lines, columns, text, label=None, full_lines=False):
@@ -386,26 +436,26 @@ def extract_source_from_range(lines, columns, text, label=None, full_lines=False
     cstart, cend = columns
 
     if full_lines:
-        return Source(string=''.join(text[lstart-1:lend]).strip('\n'), lines=lines)
+        return Source(string="".join(text[lstart - 1 : lend]).strip("\n"), lines=lines)
 
-    lines = text[lstart-1:lend]
+    lines = text[lstart - 1 : lend]
 
     # Scan for line continuations and honour inline
     # comments in between continued lines
     def continued(line):
-        if '!' in line:
-            line = line.split('!')[0]
-        return line.strip().endswith('&')
+        if "!" in line:
+            line = line.split("!")[0]
+        return line.strip().endswith("&")
 
     def is_comment(line):
-        return line.strip().startswith('!')
+        return line.strip().startswith("!")
 
     # We only honour line continuation if we're not parsing a comment
     if not is_comment(lines[-1]):
         while continued(lines[-1]) or is_comment(lines[-1]):
             lend += 1
             # TODO: Strip the leading empty space before the '&'
-            lines.append(text[lend-1])
+            lines.append(text[lend - 1])
 
     # If line continuation is used, move column index to the relevant parts
     while cstart >= len(lines[0]):
@@ -421,7 +471,7 @@ def extract_source_from_range(lines, columns, text, label=None, full_lines=False
         cend += len(label)
 
     # Avoid stripping indentation
-    if lines[0][:cstart].strip() == '':
+    if lines[0][:cstart].strip() == "":
         cstart = 0
 
     # TODO: The column indexes are still not right, so source strings
@@ -432,7 +482,7 @@ def extract_source_from_range(lines, columns, text, label=None, full_lines=False
         lines[0] = lines[0][cstart:]
         lines[-1] = lines[-1][:cend]
 
-    return Source(string=''.join(lines).strip('\n'), lines=(lstart, lend))
+    return Source(string="".join(lines).strip("\n"), lines=(lstart, lend))
 
 
 def _merge_source_match_source(pre, match, post):
@@ -462,12 +512,18 @@ def _create_lines_and_merge(source_lines, source, span, lineno=None):
     if lineno is None:
         new_lines = source.clone_lines(span)
     else:
-        new_lines = Source((lineno, None), source.string[span[0]:span[1]], source.file).clone_lines()
+        new_lines = Source(
+            (lineno, None), source.string[span[0] : span[1]], source.file
+        ).clone_lines()
 
     if len(source_lines) >= 2 and isinstance(source_lines[-1], re.Match):
         source_lines = (
             source_lines[:-2]
-            + [_merge_source_match_source(source_lines[-2], source_lines[-1], new_lines[0])]
+            + [
+                _merge_source_match_source(
+                    source_lines[-2], source_lines[-1], new_lines[0]
+                )
+            ]
             + new_lines[1:]
         )
     else:
@@ -475,7 +531,7 @@ def _create_lines_and_merge(source_lines, source, span, lineno=None):
     return source_lines
 
 
-_re_line_cont = re.compile(r'&([ \t]*)\n([ \t]*)(?:&|(?!\!)(?=\S))')
+_re_line_cont = re.compile(r"&([ \t]*)\n([ \t]*)(?:&|(?!\!)(?=\S))")
 """Pattern to match Fortran line continuation."""
 
 
@@ -487,12 +543,16 @@ def source_to_lines(source):
     ptr = 0
     lineno = source.lines[0]
     for match in _re_line_cont.finditer(source.string):
-        source_lines = _create_lines_and_merge(source_lines, source, (ptr, match.span()[0]), lineno=lineno)
+        source_lines = _create_lines_and_merge(
+            source_lines, source, (ptr, match.span()[0]), lineno=lineno
+        )
         lineno = source_lines[-1].lines[1] + 1
         source_lines += [match]
         ptr = match.span()[1]
     if ptr < len(source.string):
-        source_lines = _create_lines_and_merge(source_lines, source, (ptr, len(source.string)), lineno=lineno)
+        source_lines = _create_lines_and_merge(
+            source_lines, source, (ptr, len(source.string)), lineno=lineno
+        )
     return source_lines
 
 
@@ -508,12 +568,19 @@ def join_source_list(source_list):
     if not source_list:
         return None
     string = source_list[0].string
-    lines = [source_list[0].lines[0], source_list[0].lines[1] or source_list[0].lines[0]]
+    lines = [
+        source_list[0].lines[0],
+        source_list[0].lines[1] or source_list[0].lines[0],
+    ]
     for source in source_list[1:]:
         newlines = source.lines[0] - lines[1]
         if newlines < 0:
-            warning('join_source_list: overlapping line range')
+            warning("join_source_list: overlapping line range")
             newlines = 0
-        string += '\n' * newlines + source.string
-        lines[1] = source.lines[1] if source.lines[1] else lines[1] + newlines + source.string.count('\n')
+        string += "\n" * newlines + source.string
+        lines[1] = (
+            source.lines[1]
+            if source.lines[1]
+            else lines[1] + newlines + source.string.count("\n")
+        )
     return Source(lines, string, source_list[0].file)

@@ -20,29 +20,29 @@ class RapsDependencyFile:
 
     @classmethod
     def from_file(cls, path):
-        re_deps = re.compile(r'(?P<target>.*):\s(?P<deps>[\s\S]*)', re.MULTILINE)
-        re_assign = re.compile(r'(?P<target>.*)\s=\s(?P<objs>[\s\S]*)', re.MULTILINE)
+        re_deps = re.compile(r"(?P<target>.*):\s(?P<deps>[\s\S]*)", re.MULTILINE)
+        re_assign = re.compile(r"(?P<target>.*)\s=\s(?P<objs>[\s\S]*)", re.MULTILINE)
 
         path = Path(path)
-        with path.open('r') as f:
+        with path.open("r") as f:
             source = f.read()
 
         content = []
-        for block in source.split('\n\n'):
+        for block in source.split("\n\n"):
             deps = re_deps.search(block)
             if deps is not None:
                 groups = deps.groupdict()
-                deps = groups['deps'].split(' \\\n\t')
+                deps = groups["deps"].split(" \\\n\t")
                 deps = [d.strip() for d in deps]
-                content.append(Dependency(target=groups['target'], deps=deps))
+                content.append(Dependency(target=groups["target"], deps=deps))
 
             assign = re_assign.search(block)
             if assign is not None:
                 groups = assign.groupdict()
-                objects = groups['objs']
-                objects = objects.split('#')[0] if '#' in objects else objects
-                objects = [o.strip() for o in objects.split(' \\\n\t')]
-                content.append(Assignment(target=groups['target'], objects=objects))
+                objects = groups["objs"]
+                objects = objects.split("#")[0] if "#" in objects else objects
+                objects = [o.strip() for o in objects.split(" \\\n\t")]
+                content.append(Assignment(target=groups["target"], objects=objects))
 
         return cls(content=content, path=path)
 
@@ -58,8 +58,8 @@ class RapsDependencyFile:
 #
 
 """
-        content += '\n\n'.join(str(c) for c in self.content)
-        with Path(path).open('w') as f:
+        content += "\n\n".join(str(c) for c in self.content)
+        with Path(path).open("w") as f:
             f.write(content)
 
     def replace(self, key, replacement):
@@ -73,14 +73,13 @@ class RapsDependencyFile:
 
 
 class Dependency:
-
     def __init__(self, target, deps):
         self.target = target
         self.deps = deps
 
     def __repr__(self):
-        deps = ' \\\n\t'.join(self.deps)
-        return f'{self.target}: {deps}'
+        deps = " \\\n\t".join(self.deps)
+        return f"{self.target}: {deps}"
 
     def find(self, name):
         hits = [d for d in self.deps if name == Path(d).name]
@@ -97,14 +96,13 @@ class Dependency:
 
 
 class Assignment:
-
     def __init__(self, target, objects):
         self.target = target
         self.objects = objects
 
     def __repr__(self):
-        objects = ' \\\n\t'.join(self.objects)
-        return f'{self.target} = {objects}'
+        objects = " \\\n\t".join(self.objects)
+        return f"{self.target} = {objects}"
 
     def replace(self, target, replacement):
         if target in self.target:
@@ -117,17 +115,16 @@ class Assignment:
         for i, obj in enumerate(self.objects):
             if target in obj:
                 new = obj.replace(target, replacement)
-                self.objects[i:i+1] = [obj, new]
+                self.objects[i : i + 1] = [obj, new]
 
 
 class Rule:
-
     def __init__(self, target, deps, cmds):
         self.target = target
         self.deps = deps
         self.cmds = cmds
 
     def __repr__(self):
-        deps = ' '.join(self.deps)
-        cmds = ' \n\t'.join(self.cmds)
-        return f'{self.target}: {deps} \n\t{cmds}'
+        deps = " ".join(self.deps)
+        cmds = " \n\t".join(self.cmds)
+        return f"{self.target}: {deps} \n\t{cmds}"

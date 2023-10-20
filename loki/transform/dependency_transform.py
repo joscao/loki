@@ -17,7 +17,7 @@ from loki.backend import fgen
 from loki.tools import as_tuple
 
 
-__all__ = ['DependencyTransformation']
+__all__ = ["DependencyTransformation"]
 
 
 class DependencyTransformation(Transformation):
@@ -62,10 +62,16 @@ class DependencyTransformation(Transformation):
         in the ``ignore``. Default is ``True``.
     """
 
-    def __init__(self, suffix, mode='module', module_suffix=None, include_path=None,
-                 replace_ignore_items=True):
+    def __init__(
+        self,
+        suffix,
+        mode="module",
+        module_suffix=None,
+        include_path=None,
+        replace_ignore_items=True,
+    ):
         self.suffix = suffix
-        assert mode in ['strict', 'module']
+        assert mode in ["strict", "module"]
         self.mode = mode
         self.replace_ignore_items = replace_ignore_items
 
@@ -77,9 +83,9 @@ class DependencyTransformation(Transformation):
         Rename driver subroutine and all calls to target routines. In
         'strict' mode, also  re-generate the kernel interface headers.
         """
-        role = kwargs.get('role')
+        role = kwargs.get("role")
 
-        if role == 'kernel':
+        if role == "kernel":
             if routine.name.endswith(self.suffix):
                 # This is to ensure that the transformation is idempotent if
                 # applied more than once to a routine
@@ -99,7 +105,7 @@ class DependencyTransformation(Transformation):
         intfs = FindNodes(Interface).visit(routine.spec)
         self.rename_interfaces(routine, intfs=intfs, **kwargs)
 
-        if role == 'kernel' and self.mode == 'strict':
+        if role == "kernel" and self.mode == "strict":
             # Re-generate C-style interface header
             self.generate_interfaces(routine)
 
@@ -122,9 +128,9 @@ class DependencyTransformation(Transformation):
         """
         Rename kernel modules and re-point module-level imports.
         """
-        role = kwargs.get('role')
+        role = kwargs.get("role")
 
-        if role == 'kernel':
+        if role == "kernel":
             # Change the name of kernel modules
             module.name = self.derive_module_name(module.name)
 
@@ -135,20 +141,20 @@ class DependencyTransformation(Transformation):
         """
         In 'module' mode perform module-wrapping for dependency injection.
         """
-        items = kwargs.get('items')
-        role = kwargs.pop('role', None)
-        targets = kwargs.pop('targets', None)
+        items = kwargs.get("items")
+        role = kwargs.pop("role", None)
+        targets = kwargs.pop("targets", None)
 
         if not role and items:
             # We consider the sourcefile to be a "kernel" file if all items are kernels
-            if all(item.role == 'kernel' for item in items):
-                role = 'kernel'
+            if all(item.role == "kernel" for item in items):
+                role = "kernel"
 
         if targets is None and items:
             # We collect the targets for file/module-level imports from all items
             targets = [target for item in items for target in item.targets]
 
-        if role == 'kernel' and self.mode == 'module':
+        if role == "kernel" and self.mode == "module":
             self.module_wrap(sourcefile, **kwargs)
 
         for module in sourcefile.modules:
@@ -158,7 +164,13 @@ class DependencyTransformation(Transformation):
         if items:
             # Recursion into all subroutine items in the current file
             for item in items:
-                self.transform_subroutine(item.routine, item=item, role=item.role, targets=item.targets, **kwargs)
+                self.transform_subroutine(
+                    item.routine,
+                    item=item,
+                    role=item.role,
+                    targets=item.targets,
+                    **kwargs,
+                )
         else:
             for routine in sourcefile.all_subroutines:
                 self.transform_subroutine(routine, role=role, targets=targets, **kwargs)
@@ -170,25 +182,25 @@ class DependencyTransformation(Transformation):
         :param targets: Optional list of subroutine names for which to
                         modify the corresponding calls.
         """
-        targets = as_tuple(kwargs.get('targets'))
+        targets = as_tuple(kwargs.get("targets"))
         targets = as_tuple(str(t).upper() for t in targets)
         members = [r.name.upper() for r in routine.subroutines]
 
         if self.replace_ignore_items:
-            item = kwargs.get('item', None)
+            item = kwargs.get("item", None)
             targets += as_tuple(str(i).upper() for i in item.ignore) if item else ()
 
         for call in FindNodes(CallStatement).visit(routine.body):
             if call.name in members:
                 continue
             if targets is None or call.name in targets:
-                call._update(name=call.name.clone(name=f'{call.name}{self.suffix}'))
+                call._update(name=call.name.clone(name=f"{call.name}{self.suffix}"))
 
         for call in FindInlineCalls(unique=False).visit(routine.body):
             if call.name.upper() in members:
                 continue
             if targets is None or call.name.upper() in targets:
-                call.function = call.function.clone(name=f'{call.name}{self.suffix}')
+                call.function = call.function.clone(name=f"{call.name}{self.suffix}")
 
     def rename_imports(self, source, imports, **kwargs):
         """
@@ -197,7 +209,7 @@ class DependencyTransformation(Transformation):
         :param targets: Optional list of subroutine names for which to
                         modify the corresponding calls.
         """
-        targets = as_tuple(kwargs.get('targets', None))
+        targets = as_tuple(kwargs.get("targets", None))
         targets = as_tuple(str(t).upper() for t in targets)
 
         # We don't want to rename module variable imports, so we build
@@ -205,17 +217,26 @@ class DependencyTransformation(Transformation):
         if isinstance(source, Module):
             calls = ()
             for routine in source.subroutines:
-                calls += as_tuple(str(c.name).upper() for c in FindNodes(CallStatement).visit(routine.body))
-                calls += as_tuple(str(c.name).upper() for c in FindInlineCalls().visit(routine.body))
+                calls += as_tuple(
+                    str(c.name).upper()
+                    for c in FindNodes(CallStatement).visit(routine.body)
+                )
+                calls += as_tuple(
+                    str(c.name).upper() for c in FindInlineCalls().visit(routine.body)
+                )
         else:
-            calls = as_tuple(str(c.name).upper() for c in FindNodes(CallStatement).visit(source.body))
-            calls += as_tuple(str(c.name).upper() for c in FindInlineCalls().visit(source.body))
+            calls = as_tuple(
+                str(c.name).upper() for c in FindNodes(CallStatement).visit(source.body)
+            )
+            calls += as_tuple(
+                str(c.name).upper() for c in FindInlineCalls().visit(source.body)
+            )
 
         # Import statements still point to unmodified call names
-        calls = [call.replace(f'{self.suffix.upper()}', '') for call in calls]
+        calls = [call.replace(f"{self.suffix.upper()}", "") for call in calls]
 
         if self.replace_ignore_items:
-            item = kwargs.get('item', None)
+            item = kwargs.get("item", None)
             targets += as_tuple(str(i).upper() for i in item.ignore) if item else ()
 
         # Transformer map to remove any outdated imports
@@ -224,18 +245,22 @@ class DependencyTransformation(Transformation):
         # We go through the IR, as C-imports can be attributed to the body
         for im in imports:
             if im.c_import:
-                target_symbol = im.module.split('.')[0].lower()
+                target_symbol = im.module.split(".")[0].lower()
                 if targets is not None and target_symbol.upper() in targets:
-                    if self.mode == 'strict':
+                    if self.mode == "strict":
                         # Modify the the basename of the C-style header import
-                        s = '.'.join(im.module.split('.')[1:])
-                        im._update(module=f'{target_symbol}{self.suffix}.{s}')
+                        s = ".".join(im.module.split(".")[1:])
+                        im._update(module=f"{target_symbol}{self.suffix}.{s}")
 
                     else:
                         # Create a new module import with explicitly qualified symbol
-                        new_module = self.derive_module_name(im.module.split('.')[0])
-                        new_symbol = Variable(name=f'{target_symbol}{self.suffix}', scope=source)
-                        new_import = im.clone(module=new_module, c_import=False, symbols=(new_symbol,))
+                        new_module = self.derive_module_name(im.module.split(".")[0])
+                        new_symbol = Variable(
+                            name=f"{target_symbol}{self.suffix}", scope=source
+                        )
+                        new_import = im.clone(
+                            module=new_module, c_import=False, symbols=(new_symbol,)
+                        )
                         source.spec.prepend(new_import)
 
                         # Mark current import for removal
@@ -243,10 +268,14 @@ class DependencyTransformation(Transformation):
 
             else:
                 # Modify module import if it imports any targets
-                if targets is not None and any(s in targets and s in calls for s in im.symbols):
+                if targets is not None and any(
+                    s in targets and s in calls for s in im.symbols
+                ):
                     # Append suffix to all target symbols
-                    symbols = as_tuple(s.clone(name=f'{s.name}{self.suffix}')
-                                       if s in targets else s for s in im.symbols)
+                    symbols = as_tuple(
+                        s.clone(name=f"{s.name}{self.suffix}") if s in targets else s
+                        for s in im.symbols
+                    )
                     module_name = self.derive_module_name(im.module)
                     im._update(module=module_name, symbols=symbols)
 
@@ -261,10 +290,10 @@ class DependencyTransformation(Transformation):
         """
         Update explicit interfaces to actively transformed subroutines.
         """
-        targets = as_tuple(kwargs.get('targets', None))
+        targets = as_tuple(kwargs.get("targets", None))
         targets = as_tuple(str(t).lower() for t in targets)
 
-        if self.replace_ignore_items and (item := kwargs.get('item', None)):
+        if self.replace_ignore_items and (item := kwargs.get("item", None)):
             targets += as_tuple(str(i).lower() for i in item.ignore)
 
         # Transformer map to remove any outdated interfaces
@@ -276,8 +305,12 @@ class DependencyTransformation(Transformation):
                     if targets is not None and b.name.lower() in targets:
                         # Create a new module import with explicitly qualified symbol
                         new_module = self.derive_module_name(b.name)
-                        new_symbol = Variable(name=f'{b.name}{self.suffix}', scope=source)
-                        new_import = Import(module=new_module, c_import=False, symbols=(new_symbol,))
+                        new_symbol = Variable(
+                            name=f"{b.name}{self.suffix}", scope=source
+                        )
+                        new_import = Import(
+                            module=new_module, c_import=False, symbols=(new_symbol,)
+                        )
                         source.spec.prepend(new_import)
 
                         # Mark current import for removal
@@ -293,8 +326,10 @@ class DependencyTransformation(Transformation):
         """
 
         # First step through known suffix variants to determine canonical basename
-        if modname.lower().endswith(self.suffix.lower()+self.module_suffix.lower()):
-            idx = modname.lower().rindex(self.suffix.lower()+self.module_suffix.lower())
+        if modname.lower().endswith(self.suffix.lower() + self.module_suffix.lower()):
+            idx = modname.lower().rindex(
+                self.suffix.lower() + self.module_suffix.lower()
+            )
         elif modname.lower().endswith(self.suffix.lower()):
             idx = modname.lower().rindex(self.suffix.lower())
         elif modname.lower().endswith(self.module_suffix.lower()):
@@ -305,8 +340,8 @@ class DependencyTransformation(Transformation):
 
         # Suffix combination to canonical basename
         if self.module_suffix:
-            return f'{base}{self.suffix}{self.module_suffix}'
-        return f'{base}{self.suffix}'
+            return f"{base}{self.suffix}{self.module_suffix}"
+        return f"{base}{self.suffix}"
 
     def generate_interfaces(self, source):
         """
@@ -314,20 +349,21 @@ class DependencyTransformation(Transformation):
         """
         if isinstance(source, Subroutine):
             # No need to rename here, as this has already happened before
-            intfb_path = self.include_path/f'{source.name.lower()}.intfb.h'
-            with intfb_path.open('w') as f:
+            intfb_path = self.include_path / f"{source.name.lower()}.intfb.h"
+            with intfb_path.open("w") as f:
                 f.write(fgen(source.interface))
 
     def module_wrap(self, sourcefile, **kwargs):
         """
         Wrap target subroutines in modules and replace in source file.
         """
-        targets = as_tuple(kwargs.get('targets', None))
+        targets = as_tuple(kwargs.get("targets", None))
         targets = as_tuple(str(t).upper() for t in targets)
-        item = kwargs.get('item', None)
+        item = kwargs.get("item", None)
 
-        module_routines = [r for r in sourcefile.all_subroutines
-                           if r not in sourcefile.subroutines]
+        module_routines = [
+            r for r in sourcefile.all_subroutines if r not in sourcefile.subroutines
+        ]
 
         for routine in sourcefile.subroutines:
             if routine not in module_routines:
@@ -341,8 +377,10 @@ class DependencyTransformation(Transformation):
 
                 # Create wrapper module and insert into file, replacing the old
                 # standalone routine
-                modname = f'{routine.name}{self.module_suffix}'
+                modname = f"{routine.name}{self.module_suffix}"
                 module = Module(name=modname, contains=Section(body=as_tuple(routine)))
-                sourcefile.ir._update(body=as_tuple(
-                    module if c is routine else c for c in sourcefile.ir.body
-                ))
+                sourcefile.ir._update(
+                    body=as_tuple(
+                        module if c is routine else c for c in sourcefile.ir.body
+                    )
+                )

@@ -11,12 +11,20 @@ utility routines
 """
 
 from loki import (
-    FindNodes, Transformer, Transformation, CallStatement,
-    Conditional, as_tuple, Literal, Intrinsic, Import
+    FindNodes,
+    Transformer,
+    Transformation,
+    CallStatement,
+    Conditional,
+    as_tuple,
+    Literal,
+    Intrinsic,
+    Import,
 )
 
 
-__all__ = ['DrHookTransformation', 'RemoveCallsTransformation']
+__all__ = ["DrHookTransformation", "RemoveCallsTransformation"]
+
 
 def remove_unused_drhook_import(routine):
     """
@@ -30,14 +38,15 @@ def remove_unused_drhook_import(routine):
 
     mapper = {}
     for imp in FindNodes(Import).visit(routine.spec):
-        if imp.module.lower() == 'yomhook':
+        if imp.module.lower() == "yomhook":
             mapper[imp] = None
 
     if mapper:
         routine.spec = Transformer(mapper).visit(routine.spec)
 
-    #Remove unused zhook_handle
-    routine.variables = as_tuple(v for v in routine.variables if v != 'zhook_handle')
+    # Remove unused zhook_handle
+    routine.variables = as_tuple(v for v in routine.variables if v != "zhook_handle")
+
 
 class DrHookTransformation(Transformation):
     """
@@ -51,6 +60,7 @@ class DrHookTransformation(Transformation):
     mode : str
         Transformation mode to insert into DrHook labels
     """
+
     def __init__(self, remove=False, mode=None, **kwargs):
         self.remove = remove
         self.mode = mode
@@ -60,10 +70,10 @@ class DrHookTransformation(Transformation):
         """
         Apply transformation to subroutine object
         """
-        role = kwargs['item'].role
+        role = kwargs["item"].role
 
         # Leave DR_HOOK annotations in driver routine
-        if role == 'driver':
+        if role == "driver":
             return
 
         for r in routine.members:
@@ -72,22 +82,24 @@ class DrHookTransformation(Transformation):
         mapper = {}
         for call in FindNodes(CallStatement).visit(routine.body):
             # Lazily changing the DrHook label in-place
-            if call.name == 'DR_HOOK':
+            if call.name == "DR_HOOK":
                 if self.remove:
                     mapper[call] = None
                 else:
-                    new_label = f'{call.arguments[0].value.upper()}_{str(self.mode).upper()}'
+                    new_label = (
+                        f"{call.arguments[0].value.upper()}_{str(self.mode).upper()}"
+                    )
                     new_args = (Literal(value=new_label),) + call.arguments[1:]
                     mapper[call] = call.clone(arguments=new_args)
 
         if self.remove:
             for cond in FindNodes(Conditional).visit(routine.body):
-                if cond.inline and 'LHOOK' in as_tuple(cond.condition):
+                if cond.inline and "LHOOK" in as_tuple(cond.condition):
                     mapper[cond] = None
 
         routine.body = Transformer(mapper).visit(routine.body)
 
-        #Get rid of unused import and variable
+        # Get rid of unused import and variable
         if self.remove:
             remove_unused_drhook_import(routine)
 
@@ -109,6 +121,7 @@ class RemoveCallsTransformation(Transformation):
     kernel_only : bool
         Option to only remove calls in routines marked as "kernel"; default: ``False``
     """
+
     def __init__(self, routines, include_intrinsics=False, kernel_only=False, **kwargs):
         self.routines = as_tuple(routines)
         self.include_intrinsics = include_intrinsics
@@ -121,8 +134,8 @@ class RemoveCallsTransformation(Transformation):
         """
 
         # Skip driver layer if requested
-        role = kwargs.get('role', None)
-        if role and role == 'driver' and self.kernel_only:
+        role = kwargs.get("role", None)
+        if role and role == "driver" and self.kernel_only:
             return
 
         for r in routine.members:
@@ -142,7 +155,10 @@ class RemoveCallsTransformation(Transformation):
 
             if self.include_intrinsics:
                 if len(cond.body) == 1 and isinstance(cond.body[0], Intrinsic):
-                    if any(str(r).lower() in cond.body[0].text.lower() for r in self.routines):
+                    if any(
+                        str(r).lower() in cond.body[0].text.lower()
+                        for r in self.routines
+                    ):
                         mapper[cond] = None
 
         # Find direct calls to specified routines
@@ -158,6 +174,6 @@ class RemoveCallsTransformation(Transformation):
 
         routine.body = Transformer(mapper).visit(routine.body)
 
-        #Get rid of unused DRHOOK import and handle
-        if 'dr_hook' in [r.lower() for r in self.routines]:
+        # Get rid of unused DRHOOK import and handle
+        if "dr_hook" in [r.lower() for r in self.routines]:
             remove_unused_drhook_import(routine)

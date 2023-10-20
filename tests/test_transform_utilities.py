@@ -9,16 +9,27 @@ import pytest
 
 from conftest import available_frontends
 from loki.transform import (
-    single_variable_declaration, recursive_expression_map_update, convert_to_lower_case
+    single_variable_declaration,
+    recursive_expression_map_update,
+    convert_to_lower_case,
 )
 from loki import (
-    Module, Subroutine, OMNI, FindNodes, VariableDeclaration, FindVariables,
-    SubstituteExpressions, fgen
+    Module,
+    Subroutine,
+    OMNI,
+    FindNodes,
+    VariableDeclaration,
+    FindVariables,
+    SubstituteExpressions,
+    fgen,
 )
 from loki.expression import symbols as sym
 
 
-@pytest.mark.parametrize('frontend', available_frontends(skip=[(OMNI, 'Makes variable declaration already unique')]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(skip=[(OMNI, "Makes variable declaration already unique")]),
+)
 def test_transform_utilities_single_variable_declaration(frontend):
     """
     Test correct inlining of elemental functions.
@@ -35,22 +46,27 @@ end subroutine foo
 """
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    single_variable_declaration(routine=routine, variables=('y', 'i1', 'i3', 'r1', 'r2', 'r3', 'r4'))
+    single_variable_declaration(
+        routine=routine, variables=("y", "i1", "i3", "r1", "r2", "r3", "r4")
+    )
 
     declarations = FindNodes(VariableDeclaration).visit(routine.spec)
-    assert declarations[0].symbols == ('a',)
-    assert [smbl.name for smbl in declarations[1].symbols] == ['x']
-    assert [smbl.name for smbl in declarations[2].symbols] == ['y']
-    assert declarations[3].symbols == ('i2', 'i4')
-    assert declarations[4].symbols == ('i1',)
-    assert declarations[5].symbols == ('i3',)
-    assert declarations[6].symbols == ('r1',)
-    assert declarations[7].symbols == ('r2',)
-    assert declarations[8].symbols == ('r3',)
-    assert declarations[9].symbols == ('r4',)
+    assert declarations[0].symbols == ("a",)
+    assert [smbl.name for smbl in declarations[1].symbols] == ["x"]
+    assert [smbl.name for smbl in declarations[2].symbols] == ["y"]
+    assert declarations[3].symbols == ("i2", "i4")
+    assert declarations[4].symbols == ("i1",)
+    assert declarations[5].symbols == ("i3",)
+    assert declarations[6].symbols == ("r1",)
+    assert declarations[7].symbols == ("r2",)
+    assert declarations[8].symbols == ("r3",)
+    assert declarations[9].symbols == ("r4",)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(skip=[(OMNI, 'Makes variable declaration already unique')]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(skip=[(OMNI, "Makes variable declaration already unique")]),
+)
 def test_transform_utilities_single_variable_declarations(frontend):
     """
     Test correct inlining of elemental functions.
@@ -92,12 +108,14 @@ end subroutine foo
 
     # group_by_shape = False and variables=('x2', 'r3'), meaning only non-similar variable declarations unique
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    single_variable_declaration(routine=routine, variables=('x2', 'r3'), group_by_shape=True)
+    single_variable_declaration(
+        routine=routine, variables=("x2", "r3"), group_by_shape=True
+    )
 
     declarations = FindNodes(VariableDeclaration).visit(routine.spec)
     assert len(declarations) == 10
-    assert declarations[5].symbols == ('r3',)
-    assert [smbl.name for smbl in declarations[8].symbols] == ['x2']
+    assert declarations[5].symbols == ("r3",)
+    assert [smbl.name for smbl in declarations[8].symbols] == ["x2"]
     for decl in declarations:
         types = [smbl.type for smbl in decl.symbols]
         _ = [type == types[0] for type in types]
@@ -108,7 +126,7 @@ end subroutine foo
             assert all(_)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_convert_to_lower_case(frontend):
     fcode = """
 subroutine my_NOT_ALL_lowercase_ROUTINE(VAR1, another_VAR, lower_case, MiXeD_CasE)
@@ -131,10 +149,13 @@ end subroutine my_NOT_ALL_lowercase_ROUTINE
     """.strip()
     routine = Subroutine.from_source(fcode, frontend=frontend)
     convert_to_lower_case(routine)
-    assert all(var.name.islower() and str(var).islower() for var in FindVariables(unique=False).visit(routine.ir))
+    assert all(
+        var.name.islower() and str(var).islower()
+        for var in FindVariables(unique=False).visit(routine.ir)
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_utilities_recursive_expression_map_update(frontend):
     fcode = """
 module some_mod
@@ -163,33 +184,47 @@ end module some_mod
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    routine = module['do']
+    routine = module["do"]
 
     expr_map = {}
-    expr_map[routine.variable_map['my_obj']] = routine.variable_map['my_obj'].clone(name='obj')
+    expr_map[routine.variable_map["my_obj"]] = routine.variable_map["my_obj"].clone(
+        name="obj"
+    )
     for var in FindVariables().visit(routine.body):
-        if var.parent == 'my_obj':
-            expr_map[var] = var.clone(name=f'obj%{var.basename}', parent=var.parent.clone(name='obj'))
+        if var.parent == "my_obj":
+            expr_map[var] = var.clone(
+                name=f"obj%{var.basename}", parent=var.parent.clone(name="obj")
+            )
 
     # There are "my_obj" nodes still around...
     assert any(
-        var == 'my_obj' or var.parent == 'my_obj' for var in FindVariables().visit(list(expr_map.values()))
+        var == "my_obj" or var.parent == "my_obj"
+        for var in FindVariables().visit(list(expr_map.values()))
     )
 
     # ...and application performs only a partial substitution
     cloned = routine.clone()
     cloned.body = SubstituteExpressions(expr_map).visit(cloned.body)
-    assert fgen(cloned.body.body[0]).lower() == 'obj%a = obj%my_add(obj%a(1:my_obj%m, 1:my_obj%n), 1.)'
+    assert (
+        fgen(cloned.body.body[0]).lower()
+        == "obj%a = obj%my_add(obj%a(1:my_obj%m, 1:my_obj%n), 1.)"
+    )
 
     # Apply recursive update
     expr_map = recursive_expression_map_update(expr_map)
 
     # No more "my_obj" nodes...
     assert all(
-        var != 'my_obj' and var.parent != 'my_obj' for var in FindVariables().visit(list(expr_map.values()))
+        var != "my_obj" and var.parent != "my_obj"
+        for var in FindVariables().visit(list(expr_map.values()))
     )
 
     # ...and full substitution
-    assert fgen(routine.body.body[0]).lower() == 'my_obj%a = my_obj%my_add(my_obj%a(1:my_obj%m, 1:my_obj%n), 1.)'
+    assert (
+        fgen(routine.body.body[0]).lower()
+        == "my_obj%a = my_obj%my_add(my_obj%a(1:my_obj%m, 1:my_obj%n), 1.)"
+    )
     routine.body = SubstituteExpressions(expr_map).visit(routine.body)
-    assert fgen(routine.body.body[0]) == 'obj%a = obj%my_add(obj%a(1:obj%m, 1:obj%n), 1.)'
+    assert (
+        fgen(routine.body.body[0]) == "obj%a = obj%my_add(obj%a(1:obj%m, 1:obj%n), 1.)"
+    )

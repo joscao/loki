@@ -7,12 +7,32 @@
 
 import operator as _op
 from loki import (
-     FindNodes, CallStatement, Assignment, Scalar, RangeIndex, resolve_associates,
-     simplify, Sum, Product, IntLiteral, as_tuple, SubstituteExpressions, Array,
-     symbolic_op, StringLiteral, is_constant, LogicLiteral, VariableDeclaration, flatten,
-     FindInlineCalls, Conditional, FindExpressions, Comparison
+    FindNodes,
+    CallStatement,
+    Assignment,
+    Scalar,
+    RangeIndex,
+    resolve_associates,
+    simplify,
+    Sum,
+    Product,
+    IntLiteral,
+    as_tuple,
+    SubstituteExpressions,
+    Array,
+    symbolic_op,
+    StringLiteral,
+    is_constant,
+    LogicLiteral,
+    VariableDeclaration,
+    flatten,
+    FindInlineCalls,
+    Conditional,
+    FindExpressions,
+    Comparison,
 )
 from loki.lint import GenericRule, RuleType
+
 
 class ArgSizeMismatchRule(GenericRule):
     """
@@ -22,7 +42,7 @@ class ArgSizeMismatchRule(GenericRule):
     type = RuleType.WARN
 
     config = {
-        'max_indirections': 2,
+        "max_indirections": 2,
     }
 
     @staticmethod
@@ -110,18 +130,29 @@ class ArgSizeMismatchRule(GenericRule):
         :any:`Subroutine`.
         """
 
-        max_indirections = config['max_indirections']
+        max_indirections = config["max_indirections"]
 
         # first resolve associates
         resolve_associates(subroutine)
 
-        assign_map = {a.lhs: a.rhs for a in FindNodes(Assignment).visit(subroutine.body)}
-        decl_symbols = flatten([decl.symbols for decl in FindNodes(VariableDeclaration).visit(subroutine.spec)])
+        assign_map = {
+            a.lhs: a.rhs for a in FindNodes(Assignment).visit(subroutine.body)
+        }
+        decl_symbols = flatten(
+            [
+                decl.symbols
+                for decl in FindNodes(VariableDeclaration).visit(subroutine.spec)
+            ]
+        )
         decl_symbols = [sym for sym in decl_symbols if sym.type.initial]
         assign_map.update({sym: sym.initial for sym in decl_symbols})
 
-        targets = as_tuple(kwargs.get('targets', None))
-        calls = [c for c in FindNodes(CallStatement).visit(subroutine.body) if c.name in targets]
+        targets = as_tuple(kwargs.get("targets", None))
+        calls = [
+            c
+            for c in FindNodes(CallStatement).visit(subroutine.body)
+            if c.name in targets
+        ]
 
         for call in calls:
 
@@ -136,11 +167,18 @@ class ArgSizeMismatchRule(GenericRule):
                     dummy_arg_size = as_tuple(IntLiteral(1))
                 else:
                     # we can't proceed if dummy arg has assumed shape component
-                    if any(None in (dim.lower, dim.upper)
-                           for dim in arg_map[arg].shape if isinstance(dim, RangeIndex)):
+                    if any(
+                        None in (dim.lower, dim.upper)
+                        for dim in arg_map[arg].shape
+                        if isinstance(dim, RangeIndex)
+                    ):
                         continue
-                    dummy_arg_size = cls.get_explicit_arg_size(arg_map[arg], arg_map[arg].shape)
-                    dummy_arg_size = SubstituteExpressions(dict(call.arg_iter())).visit(dummy_arg_size)
+                    dummy_arg_size = cls.get_explicit_arg_size(
+                        arg_map[arg], arg_map[arg].shape
+                    )
+                    dummy_arg_size = SubstituteExpressions(dict(call.arg_iter())).visit(
+                        dummy_arg_size
+                    )
 
                 # TODO: skip string literal args
                 if isinstance(arg, StringLiteral):
@@ -154,15 +192,22 @@ class ArgSizeMismatchRule(GenericRule):
                     alt_arg_size += as_tuple(IntLiteral(1))
                 else:
                     # check if arg has assumed size component
-                    if any(None in (dim.lower, dim.upper)
-                           for dim in arg.shape if isinstance(dim, RangeIndex)):
+                    if any(
+                        None in (dim.lower, dim.upper)
+                        for dim in arg.shape
+                        if isinstance(dim, RangeIndex)
+                    ):
 
                         # each dim must have explicit range-index to be sure of arg size
                         if not arg.dimensions:
                             continue
-                        if not all(isinstance(dim, RangeIndex) for dim in arg.dimensions):
+                        if not all(
+                            isinstance(dim, RangeIndex) for dim in arg.dimensions
+                        ):
                             continue
-                        if any(None in (dim.lower, dim.upper) for dim in arg.dimensions):
+                        if any(
+                            None in (dim.lower, dim.upper) for dim in arg.dimensions
+                        ):
                             continue
 
                         arg_size = cls.get_explicit_arg_size(arg, arg.dimensions)
@@ -171,19 +216,42 @@ class ArgSizeMismatchRule(GenericRule):
                         # compute dim sizes assuming single element
                         if arg.dimensions:
                             arg_size = cls.get_implicit_arg_size(arg, arg.dimensions)
-                            arg_size = as_tuple([IntLiteral(1) if not isinstance(a, Sum) else simplify(a)
-                                                 for a in arg_size])
+                            arg_size = as_tuple(
+                                [
+                                    IntLiteral(1)
+                                    if not isinstance(a, Sum)
+                                    else simplify(a)
+                                    for a in arg_size
+                                ]
+                            )
                         else:
                             arg_size = cls.get_explicit_arg_size(arg, arg.shape)
 
                         # compute dim sizes assuming array sequence
                         alt_arg_size = cls.get_implicit_arg_size(arg, arg.dimensions)
-                        ubounds = [dim.upper if isinstance(dim, RangeIndex) else dim for dim in arg.shape]
-                        alt_arg_size = as_tuple([simplify(Sum((Product((IntLiteral(-1), a)),
-                                                               ubounds[i], IntLiteral(1))))
-                                                 if not isinstance(a, Sum) else simplify(a)
-                                                 for i, a in enumerate(alt_arg_size)])
-                        alt_arg_size += cls.get_explicit_arg_size(arg, arg.shape[len(arg.dimensions):])
+                        ubounds = [
+                            dim.upper if isinstance(dim, RangeIndex) else dim
+                            for dim in arg.shape
+                        ]
+                        alt_arg_size = as_tuple(
+                            [
+                                simplify(
+                                    Sum(
+                                        (
+                                            Product((IntLiteral(-1), a)),
+                                            ubounds[i],
+                                            IntLiteral(1),
+                                        )
+                                    )
+                                )
+                                if not isinstance(a, Sum)
+                                else simplify(a)
+                                for i, a in enumerate(alt_arg_size)
+                            ]
+                        )
+                        alt_arg_size += cls.get_explicit_arg_size(
+                            arg, arg.shape[len(arg.dimensions) :]
+                        )
 
                 # first check using unmodified dimension names
                 dummy_size = Product(dummy_arg_size)
@@ -195,7 +263,9 @@ class ArgSizeMismatchRule(GenericRule):
                         break
 
                     # if necessary, update dummy arg dimension names and check
-                    dummy_arg_size = SubstituteExpressions(assign_map).visit(dummy_arg_size)
+                    dummy_arg_size = SubstituteExpressions(assign_map).visit(
+                        dummy_arg_size
+                    )
                     dummy_size = Product(dummy_arg_size)
                     stat = cls.compare_sizes(arg_size, alt_arg_size, dummy_size)
 
@@ -208,9 +278,10 @@ class ArgSizeMismatchRule(GenericRule):
                     stat = cls.compare_sizes(arg_size, alt_arg_size, dummy_size)
 
                 if not stat:
-                    msg = f'Size mismatch:: arg: {arg}, dummy_arg: {arg_map[arg]} '
-                    msg += f'in {call} in {subroutine}'
+                    msg = f"Size mismatch:: arg: {arg}, dummy_arg: {arg_map[arg]} "
+                    msg += f"in {call} in {subroutine}"
                     rule_report.add(msg, call)
+
 
 class DynamicUboundCheckRule(GenericRule):
     """
@@ -236,8 +307,10 @@ class DynamicUboundCheckRule(GenericRule):
         Method to return UBOUND checks nested within a :any:`Conditional`.
         """
 
-        cond_map = {cond: FindInlineCalls(unique=False).visit(cond.condition)
-                    for cond in FindNodes(Conditional).visit(subroutine.body)}
+        cond_map = {
+            cond: FindInlineCalls(unique=False).visit(cond.condition)
+            for cond in FindNodes(Conditional).visit(subroutine.body)
+        }
         return {call: cond for cond, calls in cond_map.items() for call in calls}
 
     @classmethod
@@ -260,8 +333,8 @@ class DynamicUboundCheckRule(GenericRule):
         for arg in args:
             checks = [c for c in ubound_checks if arg.name in c.arguments]
             params = flatten([p for c in checks for p in c.arguments if not p == arg])
-            if all(IntLiteral(d+1) in params for d in range(len(arg.shape))):
-                msg = f'Run-time UBOUND checks for assumed-shape arg: {arg}'
+            if all(IntLiteral(d + 1) in params for d in range(len(arg.shape))):
+                msg = f"Run-time UBOUND checks for assumed-shape arg: {arg}"
                 rule_report.add(msg, subroutine)
 
     @classmethod
@@ -281,21 +354,28 @@ class DynamicUboundCheckRule(GenericRule):
             params = {p: c for c in checks for p in c.arguments if not p == arg}
 
             # check if ubounds of all dimensions are tested
-            if all(IntLiteral(d+1) in params for d in range(len(arg.shape))):
+            if all(IntLiteral(d + 1) in params for d in range(len(arg.shape))):
                 new_shape = ()
                 for d in range(len(arg.shape)):
-                    conditional = ubound_checks[params[IntLiteral(d+1)]]
+                    conditional = ubound_checks[params[IntLiteral(d + 1)]]
                     node_map[conditional] = None
 
                     # extract comparison expressions in case they are nested in a logical operation
-                    conditions = [c for c in FindExpressions().visit(conditional.condition)
-                                  if isinstance(c, Comparison)]
-                    conditions = [c for c in conditions if c.operator in ('<', '>')]
+                    conditions = [
+                        c
+                        for c in FindExpressions().visit(conditional.condition)
+                        if isinstance(c, Comparison)
+                    ]
+                    conditions = [c for c in conditions if c.operator in ("<", ">")]
 
-                    cond = [c for c in conditions if arg.name in c and IntLiteral(d+1) in c][0]
+                    cond = [
+                        c
+                        for c in conditions
+                        if arg.name in c and IntLiteral(d + 1) in c
+                    ][0]
 
                     # build ordered tuple for declaration shape
-                    if 'ubound' in FindExpressions().visit(cond.left):
+                    if "ubound" in FindExpressions().visit(cond.left):
                         new_shape += as_tuple(cond.right)
                     else:
                         new_shape += as_tuple(cond.left)
@@ -308,10 +388,15 @@ class DynamicUboundCheckRule(GenericRule):
         for decl in FindNodes(VariableDeclaration).visit(subroutine.spec):
             if decl.dimensions:
                 if not all(sym.shape == decl.dimensions for sym in decl.symbols):
-                    new_decls = as_tuple(VariableDeclaration(as_tuple(sym)) for sym in decl.symbols)
+                    new_decls = as_tuple(
+                        VariableDeclaration(as_tuple(sym)) for sym in decl.symbols
+                    )
                     node_map.update({decl: new_decls})
 
         return node_map
 
+
 # Create the __all__ property of the module to contain only the rule names
-__all__ = tuple(name for name in dir() if name.endswith('Rule') and name != 'GenericRule')
+__all__ = tuple(
+    name for name in dir() if name.endswith("Rule") and name != "GenericRule"
+)

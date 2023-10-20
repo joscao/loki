@@ -22,13 +22,20 @@ declarations and call signatures.
 
 
 from loki import (
-    Transformation, FindNodes, CallStatement, Array, FindVariables,
-    SubstituteExpressions, BasicType, as_tuple, Transformer,
-    CaseInsensitiveDict
+    Transformation,
+    FindNodes,
+    CallStatement,
+    Array,
+    FindVariables,
+    SubstituteExpressions,
+    BasicType,
+    as_tuple,
+    Transformer,
+    CaseInsensitiveDict,
 )
 
 
-__all__ = ['ArgumentArrayShapeAnalysis', 'ExplicitArgumentArrayShapeTransformation']
+__all__ = ["ArgumentArrayShapeAnalysis", "ExplicitArgumentArrayShapeTransformation"]
 
 
 class ArgumentArrayShapeAnalysis(Transformation):
@@ -53,7 +60,9 @@ class ArgumentArrayShapeAnalysis(Transformation):
     `after` this transformation.
     """
 
-    def transform_subroutine(self, routine, **kwargs):  # pylint: disable=arguments-differ
+    def transform_subroutine(
+        self, routine, **kwargs
+    ):  # pylint: disable=arguments-differ
 
         for call in FindNodes(CallStatement).visit(routine.body):
 
@@ -68,14 +77,15 @@ class ArgumentArrayShapeAnalysis(Transformation):
             for arg, val in call.arg_iter():
                 if isinstance(arg, Array) and len(arg.shape) > 0:
                     # Only create new shapes for deferred dimension args
-                    if all(d == ':' for d in arg.shape):
+                    if all(d == ":" for d in arg.shape):
                         if len(val.shape) == len(arg.shape):
                             # We're passing the full value array, copy shape
                             vmap[arg] = arg.clone(type=arg.type.clone(shape=val.shape))
                         else:
                             # Passing a sub-array of val, find the right index
-                            new_shape = [s for s, d in zip(val.shape, val.dimensions)
-                                         if d == ':']
+                            new_shape = [
+                                s for s, d in zip(val.shape, val.dimensions) if d == ":"
+                            ]
                             vmap[arg] = arg.clone(type=arg.type.clone(shape=new_shape))
 
             # Propagate the updated variables to variable definitions in routine
@@ -111,14 +121,16 @@ class ExplicitArgumentArrayShapeTransformation(Transformation):
     in reverse order via ``Scheduler.process(..., reverse=True)``.
     """
 
-    def transform_subroutine(self, routine, **kwargs):  # pylint: disable=arguments-differ
+    def transform_subroutine(
+        self, routine, **kwargs
+    ):  # pylint: disable=arguments-differ
 
         # First, replace assumed array shapes with concrete shapes for
         # all arguments if the shape is known.
         arg_map = {}
         for arg in routine.arguments:
             if isinstance(arg, Array):
-                assumed = tuple(':' for _ in arg.shape)
+                assumed = tuple(":" for _ in arg.shape)
                 if arg.shape != assumed and arg.dimensions == assumed:
                     arg_map[arg] = arg.clone(dimensions=tuple(arg.shape))
         routine.spec = SubstituteExpressions(arg_map).visit(routine.spec)
@@ -138,24 +150,36 @@ class ExplicitArgumentArrayShapeTransformation(Transformation):
                 imported_symbols += callee.parent.imported_symbols
 
             # Collect all potential dimension variables and filter for scalar integers
-            dims = set(d for arg in callee.arguments if isinstance(arg, Array) for d in arg.shape)
+            dims = set(
+                d
+                for arg in callee.arguments
+                if isinstance(arg, Array)
+                for d in arg.shape
+            )
             dim_vars = tuple(d for d in FindVariables().visit(as_tuple(dims)))
 
             # Add all new dimension arguments to the callee signature
             new_args = tuple(d for d in dim_vars if d not in callee.arguments)
             new_args = tuple(d for d in new_args if d.type.dtype == BasicType.INTEGER)
             new_args = tuple(d for d in new_args if d not in imported_symbols)
-            new_args = tuple(d.clone(scope=routine, type=d.type.clone(intent='IN')) for d in new_args)
+            new_args = tuple(
+                d.clone(scope=routine, type=d.type.clone(intent="IN")) for d in new_args
+            )
             callee.arguments += new_args
 
             # Map all local dimension args to unknown callee dimension args
             if len(callee.arguments) > len(list(call.arg_iter())):
                 arg_keys = dict(call.arg_iter()).keys()
-                missing = [a for a in callee.arguments if a not in arg_keys
-                           and not a.type.optional and a in dim_vars]
+                missing = [
+                    a
+                    for a in callee.arguments
+                    if a not in arg_keys and not a.type.optional and a in dim_vars
+                ]
 
                 # Add missing dimension variables (scalars
-                new_kwargs = tuple((str(m), m) for m in missing if m.type.dtype == BasicType.INTEGER)
+                new_kwargs = tuple(
+                    (str(m), m) for m in missing if m.type.dtype == BasicType.INTEGER
+                )
                 call_map[call] = call.clone(kwarguments=call.kwarguments + new_kwargs)
 
         # Replace all adjusted calls on the caller-side

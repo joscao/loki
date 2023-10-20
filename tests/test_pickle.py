@@ -16,14 +16,20 @@ import pytest
 from conftest import available_frontends
 
 from loki import (
-    Subroutine, Module, Sourcefile, SymbolAttributes, BasicType,
-    Scope, AttachScopes, OMNI
+    Subroutine,
+    Module,
+    Sourcefile,
+    SymbolAttributes,
+    BasicType,
+    Scope,
+    AttachScopes,
+    OMNI,
 )
 from loki.expression import symbols
 from loki.bulk import Item
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
@@ -36,14 +42,14 @@ def test_pickle_expression():
 
     # Ensure basic variable components are picklable
     t = SymbolAttributes(BasicType.INTEGER)
-    v1 = symbols.Variable(name='v1', type=t)
+    v1 = symbols.Variable(name="v1", type=t)
     assert v1.symbol == loads(dumps(v1.symbol))
     assert v1.type == loads(dumps(v1.type))
     assert v1 == loads(dumps(v1))
 
     # Now we add a scope to the expression and replicate both
     scope = Scope()
-    v2 = symbols.Variable(name='v2', scope=scope, type=t)
+    v2 = symbols.Variable(name="v2", scope=scope, type=t)
     scope_new = loads(dumps(scope))
     v2_new = loads(dumps(v2))
 
@@ -51,30 +57,30 @@ def test_pickle_expression():
     v2_new = AttachScopes().visit(v2_new, scope=scope_new)
 
     assert len(scope_new.symbol_attrs) == 1
-    assert 'v2' in scope_new.symbol_attrs
-    assert scope_new.symbol_attrs['v2'] == t
+    assert "v2" in scope_new.symbol_attrs
+    assert scope_new.symbol_attrs["v2"] == t
     assert v2_new == v2
 
     # And now, one more time but with arrays!
     scope = Scope()
-    i = symbols.Variable(name='i', scope=scope, type=t)
-    v3 = symbols.Variable(name='v3', dimensions=(i,), scope=scope, type=t)
+    i = symbols.Variable(name="i", scope=scope, type=t)
+    v3 = symbols.Variable(name="v3", dimensions=(i,), scope=scope, type=t)
     scope_new = loads(dumps(scope))
     v3_new = loads(dumps(v3))
     v3_new = AttachScopes().visit(v3_new, scope=scope_new)
 
     assert len(scope_new.symbol_attrs) == 2
-    assert 'v3' in scope_new.symbol_attrs
-    assert 'i' in scope_new.symbol_attrs
-    assert scope_new.symbol_attrs['v3'] == t
+    assert "v3" in scope_new.symbol_attrs
+    assert "i" in scope_new.symbol_attrs
+    assert scope_new.symbol_attrs["v3"] == t
     assert v3_new == v3
 
     # Check that Literals are trivial replicated
-    i = symbols.IntLiteral(value=1., kind='jpim')
+    i = symbols.IntLiteral(value=1.0, kind="jpim")
     assert loads(dumps(i)) == i
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pickle_subroutine(frontend):
     """
     Ensure that :any:`Subroutine` and its components are picklable.
@@ -111,7 +117,7 @@ end subroutine my_routine
     assert routine == loads(dumps(routine))
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pickle_module(frontend):
     """
     Ensure that serialisation/deserialisation via pickling works as expected.
@@ -134,7 +140,7 @@ end module my_type_mod
     assert module == loads(dumps(module))
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pickle_module_with_typedef(frontend):
     """
     Ensure that a type definition in a module is pickle-safe.
@@ -155,7 +161,7 @@ end module my_type_mod
     module = Module.from_source(fcode, frontend=frontend)
 
     # Replicate the TypeDef individually
-    typedef = module['a_type']
+    typedef = module["a_type"]
     typedef_new = loads(dumps(typedef))
     assert typedef_new == typedef
 
@@ -180,7 +186,9 @@ end module my_type_mod
     assert module == loads(dumps(module))
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'No external module available')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "No external module available")])
+)
 def test_pickle_subroutine_with_member(frontend):
     """
     Ensure that :any:`Subroutine` and its components are picklable.
@@ -235,7 +243,7 @@ end subroutine my_routine
     assert routine_new == routine
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pickle_module_with_routines(frontend):
     """
     Ensure that :any:`Module` object with cross-calling subroutines
@@ -290,15 +298,15 @@ end module my_module
     assert module_new == module
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pickle_scheduler_item(here, frontend):
     """
     Test that :any:`Item` objects are picklable, so that we may use
     them with parallel processes.
     """
-    filepath = here/'sources/sourcefile_item.f90'
+    filepath = here / "sources/sourcefile_item.f90"
     source = Sourcefile.from_file(filename=filepath, frontend=frontend)
-    item_a = Item(name='#routine_a', source=source)
+    item_a = Item(name="#routine_a", source=source)
 
     # Check the individual routines and modules in the parsed source file
     for node in item_a.source.ir.body:

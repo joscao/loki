@@ -13,12 +13,12 @@ from conftest import jit_compile, clean_test, available_frontends
 from loki import OMNI, Subroutine, FindNodes, Loop, Conditional, Node, Intrinsic
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_loop_nest_fixed(here, frontend):
     """
     Test basic loops and reductions with fixed sizes.
@@ -52,14 +52,14 @@ subroutine loop_nest_fixed(in1, in2, out1, out2)
   end do
 end subroutine loop_nest_fixed
 """
-    filepath = here/(f'control_flow_loop_nest_fixed_{frontend}.f90')
+    filepath = here / (f"control_flow_loop_nest_fixed_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='loop_nest_fixed')
+    function = jit_compile(routine, filepath=filepath, objname="loop_nest_fixed")
 
-    in1 = np.array([[1., 2.], [2., 3.], [3., 4.]], order='F')
-    in2 = np.array([[2., 3.], [3., 4.], [4., 5.]], order='F')
-    out1 = np.zeros((3, 2), order='F')
-    out2 = np.zeros(2, order='F')
+    in1 = np.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0]], order="F")
+    in2 = np.array([[2.0, 3.0], [3.0, 4.0], [4.0, 5.0]], order="F")
+    out1 = np.zeros((3, 2), order="F")
+    out2 = np.zeros(2, order="F")
 
     function(in1, in2, out1, out2)
     assert (out1 == [[3, 5], [5, 7], [7, 9]]).all()
@@ -67,7 +67,7 @@ end subroutine loop_nest_fixed
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_loop_nest_variable(here, frontend):
     """
     Test basic loops and reductions with passed sizes.
@@ -102,14 +102,14 @@ subroutine loop_nest_variable(dim1, dim2, in1, in2, out1, out2)
   end do
 end subroutine loop_nest_variable
 """
-    filepath = here/(f'control_flow_loop_nest_variable_{frontend}.f90')
+    filepath = here / (f"control_flow_loop_nest_variable_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='loop_nest_variable')
+    function = jit_compile(routine, filepath=filepath, objname="loop_nest_variable")
 
-    in1 = np.array([[1., 2.], [2., 3.], [3., 4.]], order='F')
-    in2 = np.array([[2., 3.], [3., 4.], [4., 5.]], order='F')
-    out1 = np.zeros((3, 2), order='F')
-    out2 = np.zeros(2, order='F')
+    in1 = np.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0]], order="F")
+    in2 = np.array([[2.0, 3.0], [3.0, 4.0], [4.0, 5.0]], order="F")
+    out1 = np.zeros((3, 2), order="F")
+    out2 = np.zeros(2, order="F")
 
     function(3, 2, in1, in2, out1, out2)
     assert (out1 == [[3, 5], [5, 7], [7, 9]]).all()
@@ -117,7 +117,7 @@ end subroutine loop_nest_variable
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_loop_scalar_logical_expr(here, frontend):
     """
     Test a while loop with a logical expression as condition.
@@ -133,16 +133,18 @@ subroutine loop_scalar_logical_expr(outvar)
   end do
 end subroutine loop_scalar_logical_expr
 """
-    filepath = here/(f'control_flow_loop_scalar_logical_expr_{frontend}.f90')
+    filepath = here / (f"control_flow_loop_scalar_logical_expr_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='loop_scalar_logical_expr')
+    function = jit_compile(
+        routine, filepath=filepath, objname="loop_scalar_logical_expr"
+    )
 
     outvar = function()
     assert outvar == 5
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_loop_unbounded(here, frontend):
     """
     Test unbounded loops.
@@ -161,16 +163,16 @@ subroutine loop_unbounded(out)
   enddo
 end subroutine loop_unbounded
 """
-    filepath = here/(f'control_flow_loop_unbounded_{frontend}.f90')
+    filepath = here / (f"control_flow_loop_unbounded_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='loop_unbounded')
+    function = jit_compile(routine, filepath=filepath, objname="loop_unbounded")
 
     outvar = function()
     assert outvar == 6
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_loop_labeled_continue(here, frontend):
     """
     Test labeled loops with continue statement.
@@ -191,20 +193,20 @@ subroutine loop_labeled_continue(out)
 101 continue
 end subroutine loop_labeled_continue
 """
-    filepath = here/(f'control_flow_loop_labeled_continue_{frontend}.f90')
+    filepath = here / (f"control_flow_loop_labeled_continue_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
     if frontend != OMNI:  # OMNI doesn't read the Loop label...
-        assert FindNodes(Loop).visit(routine.ir)[0].loop_label == '101'
+        assert FindNodes(Loop).visit(routine.ir)[0].loop_label == "101"
 
-    function = jit_compile(routine, filepath=filepath, objname='loop_labeled_continue')
+    function = jit_compile(routine, filepath=filepath, objname="loop_labeled_continue")
 
     outvar = function()
     assert outvar == 11
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_inline_conditionals(here, frontend):
     """
     Test the use of inline conditionals.
@@ -222,9 +224,9 @@ subroutine inline_conditionals(in1, in2, out1, out2)
   if (in2 > 5) out2 = 5
 end subroutine inline_conditionals
 """
-    filepath = here/(f'control_flow_inline_conditionals_{frontend}.f90')
+    filepath = here / (f"control_flow_inline_conditionals_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='inline_conditionals')
+    function = jit_compile(routine, filepath=filepath, objname="inline_conditionals")
 
     in1, in2 = 2, 2
     out1, out2 = function(in1, in2)
@@ -236,7 +238,7 @@ end subroutine inline_conditionals
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_multi_body_conditionals(here, frontend):
     fcode = """
 subroutine multi_body_conditionals(in1, out1, out2)
@@ -261,7 +263,7 @@ subroutine multi_body_conditionals(in1, out1, out2)
   end if
 end subroutine multi_body_conditionals
 """
-    filepath = here/(f'control_flow_multi_body_conditionals_{frontend}.f90')
+    filepath = here / (f"control_flow_multi_body_conditionals_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
     conditionals = FindNodes(Conditional).visit(routine.body)
@@ -269,7 +271,9 @@ end subroutine multi_body_conditionals
     if frontend != OMNI:
         assert sum(int(cond.has_elseif) for cond in conditionals) == 2
 
-    function = jit_compile(routine, filepath=filepath, objname='multi_body_conditionals')
+    function = jit_compile(
+        routine, filepath=filepath, objname="multi_body_conditionals"
+    )
 
     out1, out2 = function(5)
     assert out1 == 1 and out2 == 4
@@ -285,7 +289,7 @@ end subroutine multi_body_conditionals
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_goto_stmt(here, frontend):
     fcode = """
 subroutine goto_stmt(var)
@@ -298,16 +302,16 @@ subroutine goto_stmt(var)
   var = 7
 end subroutine goto_stmt
 """
-    filepath = here/(f'control_flow_goto_stmt_{frontend}.f90')
+    filepath = here / (f"control_flow_goto_stmt_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='goto_stmt')
+    function = jit_compile(routine, filepath=filepath, objname="goto_stmt")
 
     result = function()
     assert result == 3
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_select_case(here, frontend):
     fcode = """
 subroutine select_case(cmd, out1)
@@ -327,9 +331,9 @@ subroutine select_case(cmd, out1)
   end select
 end subroutine select_case
 """
-    filepath = here/(f'control_flow_select_case_{frontend}.f90')
+    filepath = here / (f"control_flow_select_case_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='select_case')
+    function = jit_compile(routine, filepath=filepath, objname="select_case")
 
     in_out_pairs = {0: 0, 1: 1, 2: 1, 5: 1, 9: 1, 10: 2, 11: 2, 12: -1}
     for cmd, ref in in_out_pairs.items():
@@ -338,7 +342,7 @@ end subroutine select_case
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_select_case_nested(here, frontend):
     fcode = """
 subroutine select_case(cmd, out1)
@@ -374,9 +378,9 @@ subroutine select_case(cmd, out1)
   end select
 end subroutine select_case
 """
-    filepath = here/(f'control_flow_select_case_nested_{frontend}.f90')
+    filepath = here / (f"control_flow_select_case_nested_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='select_case')
+    function = jit_compile(routine, filepath=filepath, objname="select_case")
 
     in_out_pairs = {0: 0, 1: 1, 2: 101, 5: 201, 9: 1, 10: 2, 11: 2, 12: -1}
     for cmd, ref in in_out_pairs.items():
@@ -384,10 +388,10 @@ end subroutine select_case
         assert out1 == ref
     clean_test(filepath)
 
-    assert routine.to_fortran().count('! comment') == 7
+    assert routine.to_fortran().count("! comment") == 7
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_cycle_stmt(here, frontend):
     fcode = """
 subroutine cycle_stmt(var)
@@ -402,16 +406,16 @@ subroutine cycle_stmt(var)
   end do
 end subroutine cycle_stmt
 """
-    filepath = here/(f'control_flow_cycle_stmt_{frontend}.f90')
+    filepath = here / (f"control_flow_cycle_stmt_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='cycle_stmt')
+    function = jit_compile(routine, filepath=filepath, objname="cycle_stmt")
 
     result = function()
     assert result == 6
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_conditional_bodies(frontend):
     """Verify that conditional bodies and else-bodies are tuples of :class:`Node`"""
     fcode = """
@@ -448,16 +452,20 @@ end subroutine conditional_body
     conditionals = FindNodes(Conditional).visit(routine.ir)
     assert len(conditionals) == 5
     assert all(
-        c.body and isinstance(c.body, tuple) and all(isinstance(n, Node) for n in c.body)
+        c.body
+        and isinstance(c.body, tuple)
+        and all(isinstance(n, Node) for n in c.body)
         for c in conditionals
     )
     assert all(
-        c.else_body and isinstance(c.else_body, tuple) and all(isinstance(n, Node) for n in c.else_body)
+        c.else_body
+        and isinstance(c.else_body, tuple)
+        and all(isinstance(n, Node) for n in c.else_body)
         for c in conditionals
     )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_conditional_else_body_return(frontend):
     fcode = """
 FUNCTION FUNC(PX,KN)
@@ -491,9 +499,9 @@ END FUNCTION FUNC
     conditionals = FindNodes(Conditional).visit(routine.body)
     assert len(conditionals) == 2
     assert isinstance(conditionals[0].body[-1], Intrinsic)
-    assert conditionals[0].body[-1].text.upper() == 'RETURN'
+    assert conditionals[0].body[-1].text.upper() == "RETURN"
     assert conditionals[0].else_body == (conditionals[1],)
     assert isinstance(conditionals[1].body[-1], Intrinsic)
-    assert conditionals[1].body[-1].text.upper() == 'RETURN'
+    assert conditionals[1].body[-1].text.upper() == "RETURN"
     assert isinstance(conditionals[1].else_body[-1], Intrinsic)
-    assert conditionals[1].else_body[-1].text.upper() == 'RETURN'
+    assert conditionals[1].else_body[-1].text.upper() == "RETURN"

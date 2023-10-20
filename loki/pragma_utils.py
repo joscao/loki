@@ -17,10 +17,18 @@ from loki.visitors import FindNodes, Visitor, Transformer, MaskedTransformer
 
 
 __all__ = [
-    'is_loki_pragma', 'get_pragma_parameters', 'process_dimension_pragmas',
-    'attach_pragmas', 'detach_pragmas', 'extract_pragma_region',
-    'pragmas_attached', 'attach_pragma_regions', 'detach_pragma_regions',
-    'pragma_regions_attached', 'PragmaAttacher', 'PragmaDetacher'
+    "is_loki_pragma",
+    "get_pragma_parameters",
+    "process_dimension_pragmas",
+    "attach_pragmas",
+    "detach_pragmas",
+    "extract_pragma_region",
+    "pragmas_attached",
+    "attach_pragma_regions",
+    "detach_pragma_regions",
+    "pragma_regions_attached",
+    "PragmaAttacher",
+    "PragmaDetacher",
 ]
 
 
@@ -39,15 +47,18 @@ def is_loki_pragma(pragma, starts_with=None):
     pragma = as_tuple(pragma)
     if not pragma:
         return False
-    loki_pragmas = [p for p in pragma if p.keyword.lower() == 'loki']
+    loki_pragmas = [p for p in pragma if p.keyword.lower() == "loki"]
     if not loki_pragmas:
         return False
-    if starts_with is not None and not any(p.content and p.content.startswith(starts_with) for p in loki_pragmas):
+    if starts_with is not None and not any(
+        p.content and p.content.startswith(starts_with) for p in loki_pragmas
+    ):
         return False
     return True
 
 
-_get_pragma_parameters_re = re.compile(r'(?P<command>[\w-]+)\s*(?:\((?P<arg>.+?)\))?')
+_get_pragma_parameters_re = re.compile(r"(?P<command>[\w-]+)\s*(?:\((?P<arg>.+?)\))?")
+
 
 def get_pragma_parameters(pragma, starts_with=None, only_loki_pragmas=True):
     """
@@ -77,15 +88,15 @@ def get_pragma_parameters(pragma, starts_with=None, only_loki_pragmas=True):
     pragma = as_tuple(pragma)
     parameters = defaultdict(list)
     for p in pragma:
-        if only_loki_pragmas and p.keyword.lower() != 'loki':
+        if only_loki_pragmas and p.keyword.lower() != "loki":
             continue
-        content = p.content or ''
+        content = p.content or ""
         if starts_with is not None:
             if not content.lower().startswith(starts_with.lower()):
                 continue
-            content = content[len(starts_with):]
+            content = content[len(starts_with) :]
         for match in re.finditer(_get_pragma_parameters_re, content):
-            parameters[match.group('command')].append(match.group('arg'))
+            parameters[match.group("command")].append(match.group("arg"))
     parameters = {k: v if len(v) > 1 else v[0] for k, v in parameters.items()}
     return parameters
 
@@ -103,11 +114,11 @@ def process_dimension_pragmas(ir):
         Root node of the (section of the) internal representation to process
     """
     for decl in FindNodes(VariableDeclaration).visit(ir):
-        if is_loki_pragma(decl.pragma, starts_with='dimension'):
+        if is_loki_pragma(decl.pragma, starts_with="dimension"):
             for v in decl.symbols:
                 # Found dimension override for variable
-                dims = get_pragma_parameters(decl.pragma)['dimension']
-                dims = [d.strip() for d in dims.split(',')]
+                dims = get_pragma_parameters(decl.pragma)["dimension"]
+                dims = [d.strip() for d in dims.split(",")]
                 shape = []
                 for d in dims:
                     if d.isnumeric():
@@ -167,9 +178,10 @@ class PragmaAttacher(Visitor):
                         # Found a node of given type: attach pragmas
                         i._update(pragma=as_tuple(pragmas))
                     elif (
-                          self.attach_pragma_post and updated and
-                          isinstance(updated[-1], self.node_type) and
-                          hasattr(updated[-1], 'pragma_post')
+                        self.attach_pragma_post
+                        and updated
+                        and isinstance(updated[-1], self.node_type)
+                        and hasattr(updated[-1], "pragma_post")
                     ):
                         # Encountered a different node but have some pragmas: attach to last
                         # node as pragma_post if type matches
@@ -227,14 +239,18 @@ class PragmaDetacher(Visitor):
         updated = ()
         for i in o:
             i = self.visit(i, **kwargs)
-            if isinstance(i, self.node_type) and getattr(i, 'pragma', None):
+            if isinstance(i, self.node_type) and getattr(i, "pragma", None):
                 # Pragmas need to go before the node
                 updated += as_tuple(i.pragma)
                 # Modify the node in-place to leave existing references intact
                 i._update(pragma=None)
             # Insert node into the tuple
             updated += (i,)
-            if self.detach_pragma_post and isinstance(i, self.node_type) and getattr(i, 'pragma_post', None):
+            if (
+                self.detach_pragma_post
+                and isinstance(i, self.node_type)
+                and getattr(i, "pragma_post", None)
+            ):
                 # pragma_post need to go after the node
                 updated += as_tuple(i.pragma_post)
                 # Modify the node in-place to leave existing references intact
@@ -369,21 +385,25 @@ def pragmas_attached(module_or_routine, node_type, attach_pragma_post=True):
     attach_pragma_post : bool, optional
         process ``pragma_post`` attachments.
     """
-    if hasattr(module_or_routine, 'spec'):
-        module_or_routine.spec = attach_pragmas(module_or_routine.spec, node_type,
-                                                attach_pragma_post=attach_pragma_post)
-    if hasattr(module_or_routine, 'body'):
-        module_or_routine.body = attach_pragmas(module_or_routine.body, node_type,
-                                                attach_pragma_post=attach_pragma_post)
+    if hasattr(module_or_routine, "spec"):
+        module_or_routine.spec = attach_pragmas(
+            module_or_routine.spec, node_type, attach_pragma_post=attach_pragma_post
+        )
+    if hasattr(module_or_routine, "body"):
+        module_or_routine.body = attach_pragmas(
+            module_or_routine.body, node_type, attach_pragma_post=attach_pragma_post
+        )
     try:
         yield module_or_routine
     finally:
-        if hasattr(module_or_routine, 'spec'):
-            module_or_routine.spec = detach_pragmas(module_or_routine.spec, node_type,
-                                                    detach_pragma_post=attach_pragma_post)
-        if hasattr(module_or_routine, 'body'):
-            module_or_routine.body = detach_pragmas(module_or_routine.body, node_type,
-                                                    detach_pragma_post=attach_pragma_post)
+        if hasattr(module_or_routine, "spec"):
+            module_or_routine.spec = detach_pragmas(
+                module_or_routine.spec, node_type, detach_pragma_post=attach_pragma_post
+            )
+        if hasattr(module_or_routine, "body"):
+            module_or_routine.body = detach_pragmas(
+                module_or_routine.body, node_type, detach_pragma_post=attach_pragma_post
+            )
 
 
 def get_matching_region_pragmas(pragmas):
@@ -396,25 +416,25 @@ def get_matching_region_pragmas(pragmas):
     """
 
     def _matches_starting_pragma(start, p):
-        """ Definition of which pragmas match """
-        stok = start.content.lower().split(' ')
-        ptok = p.content.lower().split(' ')
-        if 'end' not in ptok:
+        """Definition of which pragmas match"""
+        stok = start.content.lower().split(" ")
+        ptok = p.content.lower().split(" ")
+        if "end" not in ptok:
             return False
         if not start.keyword == p.keyword:
             return False
-        idx = ptok.index('end')
-        return ptok[idx+1] == stok[idx]
+        idx = ptok.index("end")
+        return ptok[idx + 1] == stok[idx]
 
     matches = []
     stack = []
     for i, p in enumerate(pragmas):
-        if 'end' not in p.content.lower():
+        if "end" not in p.content.lower():
             # If we encounter one that does have a match, stack it
             if any(_matches_starting_pragma(p, p2) for p2 in pragmas[i:]):
                 stack.append(p)
 
-        elif 'end' in p.content.lower() and stack:
+        elif "end" in p.content.lower() and stack:
             # If we and end that matches our last stacked, keep it!
             if _matches_starting_pragma(stack[-1], p):
                 p1 = stack.pop()
@@ -468,6 +488,7 @@ def attach_pragma_regions(ir):
         ir = extract_pragma_region(ir, start=start, end=end)
     return ir
 
+
 def detach_pragma_regions(ir):
     """
     Remove any :any:`PragmaRegion` node objects and replace each with a
@@ -477,8 +498,10 @@ def detach_pragma_regions(ir):
     All replacements are performed in-place, without rebuilding any IR
     nodes.
     """
-    mapper = {region: as_tuple(region.pragma) + region.body + as_tuple(region.pragma_post)
-              for region in FindNodes(PragmaRegion).visit(ir)}
+    mapper = {
+        region: as_tuple(region.pragma) + region.body + as_tuple(region.pragma_post)
+        for region in FindNodes(PragmaRegion).visit(ir)
+    }
     return Transformer(mapper, inplace=True).visit(ir)
 
 
@@ -523,15 +546,15 @@ def pragma_regions_attached(module_or_routine):
     module_or_routine : :any:`Module` or :any:`Subroutine` in
         which :any:`PragmaRegion` objects are to be inserted.
     """
-    if hasattr(module_or_routine, 'spec'):
+    if hasattr(module_or_routine, "spec"):
         module_or_routine.spec = attach_pragma_regions(module_or_routine.spec)
-    if hasattr(module_or_routine, 'body'):
+    if hasattr(module_or_routine, "body"):
         module_or_routine.body = attach_pragma_regions(module_or_routine.body)
 
     try:
         yield module_or_routine
     finally:
-        if hasattr(module_or_routine, 'spec'):
+        if hasattr(module_or_routine, "spec"):
             module_or_routine.spec = detach_pragma_regions(module_or_routine.spec)
-        if hasattr(module_or_routine, 'body'):
+        if hasattr(module_or_routine, "body"):
             module_or_routine.body = detach_pragma_regions(module_or_routine.body)

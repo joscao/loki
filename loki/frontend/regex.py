@@ -26,7 +26,7 @@ from loki.scope import SymbolAttributes
 from loki.tools import as_tuple, timeout
 from loki.types import BasicType, ProcedureType, DerivedType
 
-__all__ = ['RegexParserClass', 'parse_regex_source', 'HAVE_REGEX']
+__all__ = ["RegexParserClass", "parse_regex_source", "HAVE_REGEX"]
 
 
 HAVE_REGEX = True
@@ -42,12 +42,15 @@ class RegexParserClass(Flag):
     pattern matching can be switched on and off for some pattern classes, and thus the overall
     parse time reduced.
     """
+
     ProgramUnitClass = auto()
     ImportClass = auto()
     TypeDefClass = auto()
     DeclarationClass = auto()
     CallClass = auto()
-    AllClasses = ProgramUnitClass | ImportClass | TypeDefClass | DeclarationClass | CallClass  # pylint: disable=unsupported-binary-operation
+    AllClasses = (
+        ProgramUnitClass | ImportClass | TypeDefClass | DeclarationClass | CallClass
+    )  # pylint: disable=unsupported-binary-operation
 
 
 class Pattern:
@@ -102,7 +105,9 @@ class Pattern:
         """
 
     @classmethod
-    def match_block_candidates(cls, reader, candidates, parser_classes=None, scope=None):
+    def match_block_candidates(
+        cls, reader, candidates, parser_classes=None, scope=None
+    ):
         """
         Attempt to match block candidates
 
@@ -133,14 +138,19 @@ class Pattern:
             if not candidate.parser_class & parser_classes:
                 continue
             while reader:
-                pre, match, reader = candidate.match(reader, parser_classes=parser_classes, scope=scope)
+                pre, match, reader = candidate.match(
+                    reader, parser_classes=parser_classes, scope=scope
+                )
                 if not match:
                     assert pre is None
                     break
                 if pre:
                     # See if any of the other candidates match before this match
                     ir_ += cls.match_block_candidates(
-                        pre, candidates[idx+1:], parser_classes=parser_classes, scope=scope
+                        pre,
+                        candidates[idx + 1 :],
+                        parser_classes=parser_classes,
+                        scope=scope,
                     )
                 ir_ += [match]
 
@@ -155,7 +165,9 @@ class Pattern:
         return ir_
 
     @classmethod
-    def match_statement_candidates(cls, reader, candidates, parser_classes=None, scope=None):
+    def match_statement_candidates(
+        cls, reader, candidates, parser_classes=None, scope=None
+    ):
         """
         Attempt to match single-line statement candidates
 
@@ -178,9 +190,13 @@ class Pattern:
         # Extract source bits that would be swept under the rag when sanitizing
         head = reader.source_from_head()
 
-        filtered_candidates = [PATTERN_REGISTRY[candidate_name] for candidate_name in candidates]
         filtered_candidates = [
-            candidate for candidate in filtered_candidates if candidate.parser_class & parser_classes
+            PATTERN_REGISTRY[candidate_name] for candidate_name in candidates
+        ]
+        filtered_candidates = [
+            candidate
+            for candidate in filtered_candidates
+            if candidate.parser_class & parser_classes
         ]
         if not filtered_candidates:
             return []
@@ -189,10 +205,15 @@ class Pattern:
         last_match = -1
         for idx, _ in enumerate(reader):
             for candidate in filtered_candidates:
-                match = candidate.match(reader, parser_classes=parser_classes, scope=scope)
+                match = candidate.match(
+                    reader, parser_classes=parser_classes, scope=scope
+                )
                 if match:
                     if last_match - idx > 1:
-                        span = (reader.sanitized_spans[last_match + 1], reader.sanitized_spans[idx])
+                        span = (
+                            reader.sanitized_spans[last_match + 1],
+                            reader.sanitized_spans[idx],
+                        )
                         source = reader.source_from_sanitized_span(span)
                         ir_ += [ir.RawSource(source.string, source=source)]
                     last_match = idx
@@ -210,7 +231,12 @@ class Pattern:
 
     @classmethod
     def match_block_statement_candidates(
-        cls, reader, block_candidates, statement_candidates, parser_classes=None, scope=None
+        cls,
+        reader,
+        block_candidates,
+        statement_candidates,
+        parser_classes=None,
+        scope=None,
     ):
         """
         Attempt to match block candidates and subsequently attempt to match statement candidates
@@ -247,14 +273,19 @@ class Pattern:
             if not candidate.parser_class & parser_classes:
                 continue
             while reader:
-                pre, match, reader = candidate.match(reader, parser_classes=parser_classes, scope=scope)
+                pre, match, reader = candidate.match(
+                    reader, parser_classes=parser_classes, scope=scope
+                )
                 if not match:
                     assert pre is None
                     break
                 if pre:
                     # See if any of the other candidates match before this match
                     ir_ += cls.match_block_statement_candidates(
-                        pre, block_candidates[idx+1:], statement_candidates, scope=scope
+                        pre,
+                        block_candidates[idx + 1 :],
+                        statement_candidates,
+                        scope=scope,
                     )
                 ir_ += [match]
 
@@ -269,10 +300,10 @@ class Pattern:
             )
         return ir_
 
-    _pattern_opening_parenthesis = re.compile(r'\(')
-    _pattern_closing_parenthesis = re.compile(r'\)')
-    _pattern_opening_bracket = re.compile(r'\[')
-    _pattern_closing_bracket = re.compile(r'\]')
+    _pattern_opening_parenthesis = re.compile(r"\(")
+    _pattern_closing_parenthesis = re.compile(r"\)")
+    _pattern_opening_bracket = re.compile(r"\[")
+    _pattern_closing_bracket = re.compile(r"\]")
     _pattern_quoted_string = re.compile(r'(?:\'.*?\')|(?:".*?")')
 
     @classmethod
@@ -280,11 +311,19 @@ class Pattern:
         """
         Remove any quoted strings and parentheses with their content in the given string
         """
-        string = cls._pattern_quoted_string.sub('', string)
-        p_open = [match.start() for match in cls._pattern_opening_parenthesis.finditer(string)]
-        p_close = [match.start() for match in cls._pattern_closing_parenthesis.finditer(string)]
-        b_open = [match.start() for match in cls._pattern_opening_bracket.finditer(string)]
-        b_close = [match.start() for match in cls._pattern_closing_bracket.finditer(string)]
+        string = cls._pattern_quoted_string.sub("", string)
+        p_open = [
+            match.start() for match in cls._pattern_opening_parenthesis.finditer(string)
+        ]
+        p_close = [
+            match.start() for match in cls._pattern_closing_parenthesis.finditer(string)
+        ]
+        b_open = [
+            match.start() for match in cls._pattern_opening_bracket.finditer(string)
+        ]
+        b_close = [
+            match.start() for match in cls._pattern_closing_bracket.finditer(string)
+        ]
         if len(p_open) > len(p_close):
             # Note: fparser's reader has currently problems with opening
             # quotes in comments in combination with line continuation, thus
@@ -293,7 +332,7 @@ class Pattern:
             # opening parenthesis, well aware that we're potentially
             # loosing information...
             # See https://github.com/stfc/fparser/issues/264
-            return string[:p_open[0]]
+            return string[: p_open[0]]
         assert len(p_open) == len(p_close)
         assert len(b_open) == len(b_close)
         if not p_close and not b_close:
@@ -336,14 +375,17 @@ class Pattern:
 
         # We should now be left with no parentheses anymore and can build the new string
         # by using everything between these parenthesis "spans"
-        new_string = string[:spans[0][0]]
+        new_string = string[: spans[0][0]]
         for (_, start), (end, _) in zip(spans[:-1], spans[1:]):
-            new_string += string[start+1:end]
-        new_string += string[spans[-1][1]+1:]
+            new_string += string[start + 1 : end]
+        new_string += string[spans[-1][1] + 1 :]
         return new_string
 
 
-@Timer(logger=debug, text=lambda s: f'[Loki::REGEX] Executed parse_regex_source in {s:.2f}s')
+@Timer(
+    logger=debug,
+    text=lambda s: f"[Loki::REGEX] Executed parse_regex_source in {s:.2f}s",
+)
 def parse_regex_source(source, parser_classes=None, scope=None):
     """
     Generate a reduced Loki IR from regex parsing of the given Fortran source
@@ -362,14 +404,18 @@ def parse_regex_source(source, parser_classes=None, scope=None):
     """
     if parser_classes is None:
         parser_classes = RegexParserClass.AllClasses
-    candidates = ('ModulePattern', 'SubroutineFunctionPattern')
+    candidates = ("ModulePattern", "SubroutineFunctionPattern")
     if isinstance(source, Source):
         reader = FortranReader(source.string)
     else:
         reader = FortranReader(source)
-    timeout_message = f'REGEX frontend timeout of {config["regex-frontend-timeout"]} s exceeded'
-    with timeout(config['regex-frontend-timeout'], message=timeout_message):
-        ir_ = Pattern.match_block_candidates(reader, candidates, parser_classes=parser_classes, scope=scope)
+    timeout_message = (
+        f'REGEX frontend timeout of {config["regex-frontend-timeout"]} s exceeded'
+    )
+    with timeout(config["regex-frontend-timeout"], message=timeout_message):
+        ir_ = Pattern.match_block_candidates(
+            reader, candidates, parser_classes=parser_classes, scope=scope
+        )
     return ir.Section(body=as_tuple(ir_), source=source)
 
 
@@ -382,15 +428,15 @@ class ModulePattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^module[ \t]+(?P<name>\w+)\b.*?$'
-            r'(?P<spec>.*?)'
-            r'(?P<contains>^contains\n(?:'
-            r'(?:[ \t\w()]*?subroutine.*?^end[ \t]*subroutine\b(?:[ \t]\w+)?\n)|'
-            r'(?:[ \t\w()]*?function.*?^end[ \t]*function\b(?:[ \t]\w+)?\n)|'
-            r'(?:^#\w+.*?\n)'
-            r')*)?'
-            r'^end[ \t]*module\b(?:[ \t](?P=name))?',
-            re.IGNORECASE | re.DOTALL | re.MULTILINE
+            r"^module[ \t]+(?P<name>\w+)\b.*?$"
+            r"(?P<spec>.*?)"
+            r"(?P<contains>^contains\n(?:"
+            r"(?:[ \t\w()]*?subroutine.*?^end[ \t]*subroutine\b(?:[ \t]\w+)?\n)|"
+            r"(?:[ \t\w()]*?function.*?^end[ \t]*function\b(?:[ \t]\w+)?\n)|"
+            r"(?:^#\w+.*?\n)"
+            r")*)?"
+            r"^end[ \t]*module\b(?:[ \t](?P=name))?",
+            re.IGNORECASE | re.DOTALL | re.MULTILINE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -407,13 +453,14 @@ class ModulePattern(Pattern):
             The parent scope for the current source fragment
         """
         from loki import Module  # pylint: disable=import-outside-toplevel,cyclic-import
+
         match = self.pattern.search(reader.sanitized_string)
         if not match:
             return None, None, reader
 
         # Check if the Module node has been created before by looking it up in the scope
         module = None
-        name = match['name']
+        name = match["name"]
         if scope is not None and name in scope.symbol_attrs:
             module_type = scope.symbol_attrs[name]  # Look-up only in current scope!
             if module_type and module_type.dtype.module != BasicType.DEFERRED:
@@ -423,37 +470,59 @@ class ModulePattern(Pattern):
             source = reader.source_from_sanitized_span(match.span())
             module = Module(name=name, source=source, parent=scope)
 
-        if match['spec'] and match['spec'].strip():
-            block_candidates = ('TypedefPattern', 'InterfacePattern')
-            statement_candidates = ('ImportPattern', 'VariableDeclarationPattern')
+        if match["spec"] and match["spec"].strip():
+            block_candidates = ("TypedefPattern", "InterfacePattern")
+            statement_candidates = ("ImportPattern", "VariableDeclarationPattern")
             spec = self.match_block_statement_candidates(
-                reader.reader_from_sanitized_span(match.span('spec'), include_padding=True),
-                block_candidates, statement_candidates, parser_classes=parser_classes, scope=module
+                reader.reader_from_sanitized_span(
+                    match.span("spec"), include_padding=True
+                ),
+                block_candidates,
+                statement_candidates,
+                parser_classes=parser_classes,
+                scope=module,
             )
         else:
             spec = None
 
-        if match['contains']:
-            contains = [ir.Intrinsic(text='CONTAINS')]
-            span = match.span('contains')
-            span = (span[0] + 8, span[1])  # Skip the "contains" keyword as it has been added
-            candidates = ['SubroutineFunctionPattern']
+        if match["contains"]:
+            contains = [ir.Intrinsic(text="CONTAINS")]
+            span = match.span("contains")
+            span = (
+                span[0] + 8,
+                span[1],
+            )  # Skip the "contains" keyword as it has been added
+            candidates = ["SubroutineFunctionPattern"]
             contains += self.match_block_candidates(
                 reader.reader_from_sanitized_span(span, include_padding=True),
-                candidates, parser_classes=parser_classes, scope=module
+                candidates,
+                parser_classes=parser_classes,
+                scope=module,
             )
         else:
             contains = None
 
         module.__initialize__(  # pylint: disable=unnecessary-dunder-call
-            name=module.name, spec=spec, contains=contains, source=module.source, incomplete=True
+            name=module.name,
+            spec=spec,
+            contains=contains,
+            source=module.source,
+            incomplete=True,
         )
 
         if match.span()[0] > 0:
-            pre = reader.reader_from_sanitized_span((0, match.span()[0]), include_padding=True)
+            pre = reader.reader_from_sanitized_span(
+                (0, match.span()[0]), include_padding=True
+            )
         else:
             pre = None
-        return pre, module, reader.reader_from_sanitized_span((match.span()[1], None), include_padding=True)
+        return (
+            pre,
+            module,
+            reader.reader_from_sanitized_span(
+                (match.span()[1], None), include_padding=True
+            ),
+        )
 
 
 class SubroutineFunctionPattern(Pattern):
@@ -465,15 +534,15 @@ class SubroutineFunctionPattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^(?P<prefix>[ \t\w()=]*)?(?P<keyword>subroutine|function)[ \t]+(?P<name>\w+)\b.*?$'
-            r'(?P<spec>(?:.*?(?:^(?:abstract[ \t]+)?interface\b.*?^end[ \t]+interface)?)+)'
-            r'(?P<contains>^contains\n(?:'
-            r'(?:[ \t\w()]*?subroutine.*?^end[ \t]*subroutine\b(?:[ \t]\w+)?\n)|'
-            r'(?:[ \t\w()]*?function.*?^end[ \t]*function\b(?:[ \t]\w+)?\n)|'
-            r'(?:^#\w+.*?\n)'
-            r')*)?'
-            r'^end[ \t]*(?P=keyword)\b(?:[ \t](?P=name))?',
-            re.IGNORECASE | re.DOTALL | re.MULTILINE
+            r"^(?P<prefix>[ \t\w()=]*)?(?P<keyword>subroutine|function)[ \t]+(?P<name>\w+)\b.*?$"
+            r"(?P<spec>(?:.*?(?:^(?:abstract[ \t]+)?interface\b.*?^end[ \t]+interface)?)+)"
+            r"(?P<contains>^contains\n(?:"
+            r"(?:[ \t\w()]*?subroutine.*?^end[ \t]*subroutine\b(?:[ \t]\w+)?\n)|"
+            r"(?:[ \t\w()]*?function.*?^end[ \t]*function\b(?:[ \t]\w+)?\n)|"
+            r"(?:^#\w+.*?\n)"
+            r")*)?"
+            r"^end[ \t]*(?P=keyword)\b(?:[ \t](?P=name))?",
+            re.IGNORECASE | re.DOTALL | re.MULTILINE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -489,62 +558,98 @@ class SubroutineFunctionPattern(Pattern):
         scope : :any:`Scope`
             The parent scope for the current source fragment
         """
-        from loki import Subroutine  # pylint: disable=import-outside-toplevel,cyclic-import
+        from loki import (
+            Subroutine,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
         match = self.pattern.search(reader.sanitized_string)
         if not match:
             return None, None, reader
 
         # Check if the Subroutine node has been created before by looking it up in the scope
         routine = None
-        name = match['name']
+        name = match["name"]
         if scope is not None and name in scope.symbol_attrs:
             proc_type = scope.symbol_attrs[name]  # Look-up only in current scope!
-            if proc_type and getattr(proc_type.dtype, 'procedure', BasicType.DEFERRED) != BasicType.DEFERRED:
+            if (
+                proc_type
+                and getattr(proc_type.dtype, "procedure", BasicType.DEFERRED)
+                != BasicType.DEFERRED
+            ):
                 routine = proc_type.dtype.procedure
 
         if routine is None:
-            is_function = match['keyword'].lower() == 'function'
+            is_function = match["keyword"].lower() == "function"
             source = reader.source_from_sanitized_span(match.span())
             routine = Subroutine(
                 name=name, args=(), is_function=is_function, source=source, parent=scope
             )
 
-        if match['spec']:
-            statement_candidates = ('ImportPattern', 'VariableDeclarationPattern', 'CallPattern')
-            block_candidates = ('InterfacePattern',)
+        if match["spec"]:
+            statement_candidates = (
+                "ImportPattern",
+                "VariableDeclarationPattern",
+                "CallPattern",
+            )
+            block_candidates = ("InterfacePattern",)
             spec = self.match_block_statement_candidates(
-                reader.reader_from_sanitized_span(match.span('spec'), include_padding=True),
-                block_candidates, statement_candidates, parser_classes=parser_classes, scope=routine
+                reader.reader_from_sanitized_span(
+                    match.span("spec"), include_padding=True
+                ),
+                block_candidates,
+                statement_candidates,
+                parser_classes=parser_classes,
+                scope=routine,
             )
         else:
             spec = None
 
-        if match['contains']:
-            contains = [ir.Intrinsic(text='CONTAINS')]
-            span = match.span('contains')
-            span = (span[0] + 8, span[1])  # Skip the "contains" keyword as it has been added
-            block_children = ['SubroutineFunctionPattern']
+        if match["contains"]:
+            contains = [ir.Intrinsic(text="CONTAINS")]
+            span = match.span("contains")
+            span = (
+                span[0] + 8,
+                span[1],
+            )  # Skip the "contains" keyword as it has been added
+            block_children = ["SubroutineFunctionPattern"]
             contains += self.match_block_candidates(
-                reader.reader_from_sanitized_span(span), block_children, parser_classes=parser_classes, scope=routine
+                reader.reader_from_sanitized_span(span),
+                block_children,
+                parser_classes=parser_classes,
+                scope=routine,
             )
         else:
             contains = None
 
-        if match['prefix'].strip():
-            prefix = match['prefix'].strip()
+        if match["prefix"].strip():
+            prefix = match["prefix"].strip()
         else:
-            prefix=None
+            prefix = None
 
         routine.__initialize__(  # pylint: disable=unnecessary-dunder-call
-            name=routine.name, args=routine._dummies, is_function=routine.is_function,
-            prefix=prefix, spec=spec, contains=contains, source=routine.source, incomplete=True
+            name=routine.name,
+            args=routine._dummies,
+            is_function=routine.is_function,
+            prefix=prefix,
+            spec=spec,
+            contains=contains,
+            source=routine.source,
+            incomplete=True,
         )
 
         if match.span()[0] > 0:
-            pre = reader.reader_from_sanitized_span((0, match.span()[0]), include_padding=True)
+            pre = reader.reader_from_sanitized_span(
+                (0, match.span()[0]), include_padding=True
+            )
         else:
             pre = None
-        return pre, routine, reader.reader_from_sanitized_span((match.span()[1], None), include_padding=True)
+        return (
+            pre,
+            routine,
+            reader.reader_from_sanitized_span(
+                (match.span()[1], None), include_padding=True
+            ),
+        )
 
 
 class InterfacePattern(Pattern):
@@ -556,11 +661,11 @@ class InterfacePattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^(?P<is_abstract>abstract[ \t]+)?'
-            r'interface\b[ \t]*(?P<spec>\w+\b.*?$)?'
-            r'(?P<body>.*?)'
-            r'^end[ \t]+interface\b[ \t]*(?P=spec)?',
-            re.IGNORECASE | re.DOTALL | re.MULTILINE
+            r"^(?P<is_abstract>abstract[ \t]+)?"
+            r"interface\b[ \t]*(?P<spec>\w+\b.*?$)?"
+            r"(?P<body>.*?)"
+            r"^end[ \t]+interface\b[ \t]*(?P=spec)?",
+            re.IGNORECASE | re.DOTALL | re.MULTILINE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -576,23 +681,29 @@ class InterfacePattern(Pattern):
         scope : :any:`Scope`
             The parent scope for the current source fragment
         """
-        from loki import Interface  # pylint: disable=import-outside-toplevel,cyclic-import
+        from loki import (
+            Interface,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
         match = self.pattern.search(reader.sanitized_string)
         if not match:
             return None, None, reader
 
         source = reader.source_from_sanitized_span(match.span())
-        is_abstract = match['is_abstract'] is not None
+        is_abstract = match["is_abstract"] is not None
 
-        block_candidates = ['SubroutineFunctionPattern']
-        statement_candidates = ('ProcedureStatementPattern',)
+        block_candidates = ["SubroutineFunctionPattern"]
+        statement_candidates = ("ProcedureStatementPattern",)
         body = self.match_block_statement_candidates(
-            reader.reader_from_sanitized_span(match.span('body'), include_padding=True),
-            block_candidates, statement_candidates, parser_classes=parser_classes, scope=scope
+            reader.reader_from_sanitized_span(match.span("body"), include_padding=True),
+            block_candidates,
+            statement_candidates,
+            parser_classes=parser_classes,
+            scope=scope,
         )
 
-        if match['spec']:
-            spec = match['spec'].replace(' ', '')
+        if match["spec"]:
+            spec = match["spec"].replace(" ", "")
             type_ = SymbolAttributes(ProcedureType(name=spec, is_generic=True))
             spec = sym.Variable(name=spec, type=type_, scope=scope)
         else:
@@ -600,10 +711,18 @@ class InterfacePattern(Pattern):
 
         interface = Interface(body=body, abstract=is_abstract, spec=spec, source=source)
         if match.span()[0] > 0:
-            pre = reader.reader_from_sanitized_span((0, match.span()[0]), include_padding=True)
+            pre = reader.reader_from_sanitized_span(
+                (0, match.span()[0]), include_padding=True
+            )
         else:
             pre = None
-        return pre, interface, reader.reader_from_sanitized_span((match.span()[1], None), include_padding=True)
+        return (
+            pre,
+            interface,
+            reader.reader_from_sanitized_span(
+                (match.span()[1], None), include_padding=True
+            ),
+        )
 
 
 class ProcedureStatementPattern(Pattern):
@@ -615,13 +734,13 @@ class ProcedureStatementPattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^(?P<module>module[ \t]+)?procedure\b'  # Match ``procedure`` keyword
-            r'(?:[ \t]*::)?'  # Optional `::` delimiter
-            r'[ \t]*'  # Some white space
-            r'(?P<procedures>'  # Beginning of procedures group
-            r'\w+(?:[ \t]*,[ \t]*\w+)*' # Procedure names, separated by ``,``
-            r')',  # End of procedures group
-            re.IGNORECASE
+            r"^(?P<module>module[ \t]+)?procedure\b"  # Match ``procedure`` keyword
+            r"(?:[ \t]*::)?"  # Optional `::` delimiter
+            r"[ \t]*"  # Some white space
+            r"(?P<procedures>"  # Beginning of procedures group
+            r"\w+(?:[ \t]*,[ \t]*\w+)*"  # Procedure names, separated by ``,``
+            r")",  # End of procedures group
+            re.IGNORECASE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -642,11 +761,13 @@ class ProcedureStatementPattern(Pattern):
         if not match:
             return None
 
-        is_module = match['module'] is not None
+        is_module = match["module"] is not None
 
-        procedures = match['procedures'].replace(' ', '').split(',')
+        procedures = match["procedures"].replace(" ", "").split(",")
         symbols = [
-            sym.Variable(name=s, type=SymbolAttributes(ProcedureType(name=s)), scope=scope)
+            sym.Variable(
+                name=s, type=SymbolAttributes(ProcedureType(name=s)), scope=scope
+            )
             for s in procedures
         ]
         return ir.ProcedureDeclaration(
@@ -663,13 +784,13 @@ class TypedefPattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'type(?:[ \t]*,[ \t]*[\w\(\)]+)*?'  # type keyword with optional parameters
-            r'(?:[ \t]*::[ \t]*|[ \t]+)'  # optional `::` separator or white space
-            r'(?P<name>\w+)\b.*?$'  # Type name
-            r'(?P<spec>.*?)'  # Type spec
-            r'(?P<contains>^contains\n.*?)?'  # Optional procedure bindings part (after ``contains`` keyword)
-            r'^end[ \t]*type\b(?:[ \t]+(?P=name))?',  # End keyword with optionally type name repeated
-            re.IGNORECASE | re.DOTALL | re.MULTILINE
+            r"type(?:[ \t]*,[ \t]*[\w\(\)]+)*?"  # type keyword with optional parameters
+            r"(?:[ \t]*::[ \t]*|[ \t]+)"  # optional `::` separator or white space
+            r"(?P<name>\w+)\b.*?$"  # Type name
+            r"(?P<spec>.*?)"  # Type spec
+            r"(?P<contains>^contains\n.*?)?"  # Optional procedure bindings part (after ``contains`` keyword)
+            r"^end[ \t]*type\b(?:[ \t]+(?P=name))?",  # End keyword with optionally type name repeated
+            re.IGNORECASE | re.DOTALL | re.MULTILINE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -690,36 +811,53 @@ class TypedefPattern(Pattern):
             return None, None, reader
 
         source = reader.source_from_sanitized_span(match.span())
-        typedef = ir.TypeDef(name=match['name'], body=(), parent=scope, source=source)
+        typedef = ir.TypeDef(name=match["name"], body=(), parent=scope, source=source)
 
-        if match['spec'] and match['spec'].strip():
-            statement_candidates = ('VariableDeclarationPattern',)
+        if match["spec"] and match["spec"].strip():
+            statement_candidates = ("VariableDeclarationPattern",)
             spec = self.match_statement_candidates(
-                reader.reader_from_sanitized_span(match.span('spec'), include_padding=True),
-                statement_candidates, parser_classes=parser_classes, scope=typedef
+                reader.reader_from_sanitized_span(
+                    match.span("spec"), include_padding=True
+                ),
+                statement_candidates,
+                parser_classes=parser_classes,
+                scope=typedef,
             )
         else:
             spec = []
 
-        if match['contains']:
-            contains = [ir.Intrinsic(text='CONTAINS')]
-            span = match.span('contains')
-            span = (span[0] + 8, span[1])  # Skip the "contains" keyword as it has been added
+        if match["contains"]:
+            contains = [ir.Intrinsic(text="CONTAINS")]
+            span = match.span("contains")
+            span = (
+                span[0] + 8,
+                span[1],
+            )  # Skip the "contains" keyword as it has been added
 
-            statement_candidates = ('ProcedureBindingPattern', 'GenericBindingPattern')
+            statement_candidates = ("ProcedureBindingPattern", "GenericBindingPattern")
             contains += self.match_statement_candidates(
                 reader.reader_from_sanitized_span(span, include_padding=True),
-                statement_candidates, parser_classes=parser_classes, scope=typedef
+                statement_candidates,
+                parser_classes=parser_classes,
+                scope=typedef,
             )
         else:
             contains = []
         typedef._update(body=as_tuple(spec + contains))
 
         if match.span()[0] > 0:
-            pre = reader.reader_from_sanitized_span((0, match.span()[0]), include_padding=True)
+            pre = reader.reader_from_sanitized_span(
+                (0, match.span()[0]), include_padding=True
+            )
         else:
             pre = None
-        return pre, typedef, reader.reader_from_sanitized_span((match.span()[1], None), include_padding=True)
+        return (
+            pre,
+            typedef,
+            reader.reader_from_sanitized_span(
+                (match.span()[1], None), include_padding=True
+            ),
+        )
 
 
 class ProcedureBindingPattern(Pattern):
@@ -731,17 +869,17 @@ class ProcedureBindingPattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^procedure\b'  # Match ``procedure`` keyword
-            r'(?P<attributes>(?:[ \t]*,[ \t]*\w+)*?)'  # Optional attributes
-            r'(?:[ \t]*::)?'  # Optional `::` delimiter
-            r'[ \t]*'  # Some white space
-            r'(?P<bindings>'  # Beginning of bindings group
-            r'\w+(?:[ \t]*=>[ \t]*\w+)?'  # Binding name with optional binding name specifier (via ``=>``)
-            r'(?:[ \t]*,[ \t]*' # Optional group for additional bindings, separated by ``,``
-            r'\w+(?:[ \t]*=>[ \t]*\w+)?'  # Additional binding name with optional binding name specifier
-            r')*'  # End of optional group for additional bindings
-            r')',  # End of bindings group
-            re.IGNORECASE
+            r"^procedure\b"  # Match ``procedure`` keyword
+            r"(?P<attributes>(?:[ \t]*,[ \t]*\w+)*?)"  # Optional attributes
+            r"(?:[ \t]*::)?"  # Optional `::` delimiter
+            r"[ \t]*"  # Some white space
+            r"(?P<bindings>"  # Beginning of bindings group
+            r"\w+(?:[ \t]*=>[ \t]*\w+)?"  # Binding name with optional binding name specifier (via ``=>``)
+            r"(?:[ \t]*,[ \t]*"  # Optional group for additional bindings, separated by ``,``
+            r"\w+(?:[ \t]*=>[ \t]*\w+)?"  # Additional binding name with optional binding name specifier
+            r")*"  # End of optional group for additional bindings
+            r")",  # End of bindings group
+            re.IGNORECASE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -762,8 +900,8 @@ class ProcedureBindingPattern(Pattern):
         if not match:
             return None
 
-        bindings = match['bindings'].replace(' ', '').split(',')
-        bindings = [s.split('=>') for s in bindings]
+        bindings = match["bindings"].replace(" ", "").split(",")
+        bindings = [s.split("=>") for s in bindings]
 
         symbols = []
         for s in bindings:
@@ -773,9 +911,15 @@ class ProcedureBindingPattern(Pattern):
             else:
                 type_ = SymbolAttributes(ProcedureType(name=s[1]))
                 initial = sym.Variable(name=s[1], type=type_, scope=scope.parent)
-                symbols += [sym.Variable(name=s[0], type=type_.clone(initial=initial), scope=scope)]
+                symbols += [
+                    sym.Variable(
+                        name=s[0], type=type_.clone(initial=initial), scope=scope
+                    )
+                ]
 
-        return ir.ProcedureDeclaration(symbols=symbols, source=reader.source_from_current_line())
+        return ir.ProcedureDeclaration(
+            symbols=symbols, source=reader.source_from_current_line()
+        )
 
 
 class GenericBindingPattern(Pattern):
@@ -787,14 +931,14 @@ class GenericBindingPattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^generic'  # Match ``generic`` keyword
-            r'(?P<attributes>(?:[ \t]*,[ \t]*\w+)*?)'  # Optional attributes
-            r'(?:[ \t]*::)?'  # Optional `::` delimiter
-            r'[ \t]*'  # Some white space
-            r'(?P<name>\w+)'  # Binding name
-            r'[ \t]*=>[ \t]*'  # Separator ``=>``
-            r'(?P<bindings>\w+(?:[ \t]*,[ \t]*\w+)*)*',  # Match binding name list
-            re.IGNORECASE
+            r"^generic"  # Match ``generic`` keyword
+            r"(?P<attributes>(?:[ \t]*,[ \t]*\w+)*?)"  # Optional attributes
+            r"(?:[ \t]*::)?"  # Optional `::` delimiter
+            r"[ \t]*"  # Some white space
+            r"(?P<name>\w+)"  # Binding name
+            r"[ \t]*=>[ \t]*"  # Separator ``=>``
+            r"(?P<bindings>\w+(?:[ \t]*,[ \t]*\w+)*)*",  # Match binding name list
+            re.IGNORECASE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -815,11 +959,15 @@ class GenericBindingPattern(Pattern):
         if not match:
             return None
 
-        bindings = match['bindings'].replace(' ', '').split(',')
-        name = match['name']
-        type_ = SymbolAttributes(ProcedureType(name=name, is_generic=True), bind_names=as_tuple(bindings))
+        bindings = match["bindings"].replace(" ", "").split(",")
+        name = match["name"]
+        type_ = SymbolAttributes(
+            ProcedureType(name=name, is_generic=True), bind_names=as_tuple(bindings)
+        )
         symbols = (sym.Variable(name=name, type=type_, scope=scope),)
-        return ir.ProcedureDeclaration(symbols=symbols, generic=True, source=reader.source_from_current_line())
+        return ir.ProcedureDeclaration(
+            symbols=symbols, generic=True, source=reader.source_from_current_line()
+        )
 
 
 class ImportPattern(Pattern):
@@ -831,9 +979,9 @@ class ImportPattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^use +(?P<module>\w+)(?: *, *(?P<only>only *:)?'  # The use statement including an optional ``only``
-            r'(?P<imports>(?: *\w+\b *(?:=> *\w+|\(.*?\))? *,?)+))?',  # The optional list of names (w/ renames, ops)
-            re.IGNORECASE
+            r"^use +(?P<module>\w+)(?: *, *(?P<only>only *:)?"  # The use statement including an optional ``only``
+            r"(?P<imports>(?: *\w+\b *(?:=> *\w+|\(.*?\))? *,?)+))?",  # The optional list of names (w/ renames, ops)
+            re.IGNORECASE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -854,13 +1002,13 @@ class ImportPattern(Pattern):
         if not match:
             return None
 
-        module = match['module']
+        module = match["module"]
         type_ = SymbolAttributes(BasicType.DEFERRED, imported=True)
-        if match['imports']:
-            imports = match['imports'].replace(' ', '').split(',')
-            imports = [s.split('=>') for s in imports]
+        if match["imports"]:
+            imports = match["imports"].replace(" ", "").split(",")
+            imports = [s.split("=>") for s in imports]
             imports = [s for s in imports if s and s[0]]
-            if match['only']:
+            if match["only"]:
                 rename_list = None
                 symbols = []
                 for s in imports:
@@ -869,10 +1017,19 @@ class ImportPattern(Pattern):
                     if len(s) == 1:
                         symbols += [sym.Variable(name=s[0], type=type_, scope=scope)]
                     else:
-                        symbols += [sym.Variable(name=s[0], type=type_.clone(use_name=s[1]), scope=scope)]
+                        symbols += [
+                            sym.Variable(
+                                name=s[0], type=type_.clone(use_name=s[1]), scope=scope
+                            )
+                        ]
             else:
                 rename_list = [
-                    (s[1], sym.Variable(name=s[0], type=type_.clone(use_name=s[1]), scope=scope))
+                    (
+                        s[1],
+                        sym.Variable(
+                            name=s[0], type=type_.clone(use_name=s[1]), scope=scope
+                        ),
+                    )
                     for s in imports
                 ]
                 symbols = None
@@ -881,8 +1038,10 @@ class ImportPattern(Pattern):
             symbols = None
 
         return ir.Import(
-            module, symbols=as_tuple(symbols), rename_list=as_tuple(rename_list),
-            source=reader.source_from_current_line()
+            module,
+            symbols=as_tuple(symbols),
+            rename_list=as_tuple(rename_list),
+            source=reader.source_from_current_line(),
         )
 
 
@@ -895,13 +1054,13 @@ class VariableDeclarationPattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^(((?:type|class)[ \t]*\([ \t]*(?P<typename>\w+)[ \t]*\))|' # TYPE or CLASS keyword with typename
-            r'^([ \t]*(?P<basic_type>(logical|real|integer|complex|character))(\((kind|len)=[a-z0-9_-]+\))?[ \t]*))'
-            r'(?:[ \t]*,[ \t]*[a-z]+(?:\((.(\(.*\))?)*?\))?)*'  # Optional attributes
-            r'(?:[ \t]*::)?'  # Optional `::` delimiter
-            r'[ \t]*'  # Some white space
-            r'(?P<variables>\w+\b.*?)$',  # Variable names
-            re.IGNORECASE
+            r"^(((?:type|class)[ \t]*\([ \t]*(?P<typename>\w+)[ \t]*\))|"  # TYPE or CLASS keyword with typename
+            r"^([ \t]*(?P<basic_type>(logical|real|integer|complex|character))(\((kind|len)=[a-z0-9_-]+\))?[ \t]*))"
+            r"(?:[ \t]*,[ \t]*[a-z]+(?:\((.(\(.*\))?)*?\))?)*"  # Optional attributes
+            r"(?:[ \t]*::)?"  # Optional `::` delimiter
+            r"[ \t]*"  # Some white space
+            r"(?P<variables>\w+\b.*?)$",  # Variable names
+            re.IGNORECASE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -922,17 +1081,28 @@ class VariableDeclarationPattern(Pattern):
         if not match:
             return None
 
-        if (_typename := match['typename']):
+        if _typename := match["typename"]:
             type_ = SymbolAttributes(DerivedType(_typename))
         else:
-            type_ = SymbolAttributes(BasicType.from_str(match['basic_type']))
+            type_ = SymbolAttributes(BasicType.from_str(match["basic_type"]))
         assert type_
 
-        variables = self._remove_quoted_string_nested_parentheses(match['variables'])  # Remove dimensions
-        variables = re.sub(r'=(?:>)?[^,]*(?=,|$)', r'', variables) # Remove initialization
-        variables = variables.replace(' ', '').split(',')  # Variable names without white space
-        variables = tuple(sym.Variable(name=v, type=type_, scope=scope) for v in variables)
-        return ir.VariableDeclaration(variables, source=reader.source_from_current_line())
+        variables = self._remove_quoted_string_nested_parentheses(
+            match["variables"]
+        )  # Remove dimensions
+        variables = re.sub(
+            r"=(?:>)?[^,]*(?=,|$)", r"", variables
+        )  # Remove initialization
+        variables = variables.replace(" ", "").split(
+            ","
+        )  # Variable names without white space
+        variables = tuple(
+            sym.Variable(name=v, type=type_, scope=scope) for v in variables
+        )
+        return ir.VariableDeclaration(
+            variables, source=reader.source_from_current_line()
+        )
+
 
 class CallPattern(Pattern):
     """
@@ -943,9 +1113,9 @@ class CallPattern(Pattern):
 
     def __init__(self):
         super().__init__(
-            r'^(?P<conditional>if[ \t]*\(.*?\)[ \t]*)?'  # Optional inline-conditional preceeding the call
-            r'call',  # Call keyword
-            re.IGNORECASE
+            r"^(?P<conditional>if[ \t]*\(.*?\)[ \t]*)?"  # Optional inline-conditional preceeding the call
+            r"call",  # Call keyword
+            re.IGNORECASE,
         )
 
     def match(self, reader, parser_classes, scope):
@@ -967,32 +1137,45 @@ class CallPattern(Pattern):
             return None
 
         # Extract the called routine name
-        call = line.line[match.span()[1]:].strip()
+        call = line.line[match.span()[1] :].strip()
         if not call:
             return None
-        call = self._remove_quoted_string_nested_parentheses(call)  # Remove arguments and dimension expressions
-        call = call.replace(' ', '')  # Remove any white space
+        call = self._remove_quoted_string_nested_parentheses(
+            call
+        )  # Remove arguments and dimension expressions
+        call = call.replace(" ", "")  # Remove any white space
 
-        name_parts = call.split('%')
+        name_parts = call.split("%")
         name = sym.Variable(name=name_parts[0], scope=scope)
         for cname in name_parts[1:]:
-            name = sym.Variable(name=name.name + '%' + cname, parent=name, scope=scope)  # pylint:disable=no-member
+            name = sym.Variable(
+                name=name.name + "%" + cname, parent=name, scope=scope
+            )  # pylint:disable=no-member
 
-        scope.symbol_attrs[call] = scope.symbol_attrs[call].clone(dtype=ProcedureType(name=call, is_function=False))
+        scope.symbol_attrs[call] = scope.symbol_attrs[call].clone(
+            dtype=ProcedureType(name=call, is_function=False)
+        )
 
         source = reader.source_from_current_line()
-        if match['conditional']:
-            span = match.span('conditional')
+        if match["conditional"]:
+            span = match.span("conditional")
             return [
-                ir.RawSource(text=match['conditional'], source=source.clone_with_span(span)),
-                ir.CallStatement(name=name, arguments=(), source=source.clone_with_span((span[1], None)))
+                ir.RawSource(
+                    text=match["conditional"], source=source.clone_with_span(span)
+                ),
+                ir.CallStatement(
+                    name=name,
+                    arguments=(),
+                    source=source.clone_with_span((span[1], None)),
+                ),
             ]
         return ir.CallStatement(name=name, arguments=(), source=source)
 
 
 PATTERN_REGISTRY = {
-    name: globals()[name]() for name in dir()
-    if name.endswith('Pattern') and name != 'Pattern'
+    name: globals()[name]()
+    for name in dir()
+    if name.endswith("Pattern") and name != "Pattern"
 }
 """
 A global registry of all available patterns

@@ -11,24 +11,32 @@ import numpy as np
 
 from conftest import jit_compile, jit_compile_lib, clean_test, available_frontends
 from loki import (
-    Builder, Module, Subroutine, Section, as_tuple,
-    FindNodes, Loop, Assignment, CallStatement, Intrinsic
+    Builder,
+    Module,
+    Subroutine,
+    Section,
+    as_tuple,
+    FindNodes,
+    Loop,
+    Assignment,
+    CallStatement,
+    Intrinsic,
 )
 from loki.expression import symbols as sym
 from loki.transform import region_hoist, region_to_call, normalize_range_indexing
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.fixture(scope='module', name='builder')
+@pytest.fixture(scope="module", name="builder")
 def fixture_builder(here):
-    return Builder(source_dirs=here, build_dir=here/'build')
+    return Builder(source_dirs=here, build_dir=here / "build")
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_hoist(here, frontend):
     """
     A very simple hoisting example
@@ -51,7 +59,7 @@ subroutine transform_region_hoist(a, b, c)
 end subroutine transform_region_hoist
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
 
     # Test the reference solution
@@ -60,8 +68,10 @@ end subroutine transform_region_hoist
 
     # Apply transformation
     region_hoist(routine)
-    hoisted_filepath = here/(f'{routine.name}_hoisted_{frontend}.f90')
-    hoisted_function = jit_compile(routine, filepath=hoisted_filepath, objname=routine.name)
+    hoisted_filepath = here / (f"{routine.name}_hoisted_{frontend}.f90")
+    hoisted_function = jit_compile(
+        routine, filepath=hoisted_filepath, objname=routine.name
+    )
 
     # Test transformation
     a, b, c = hoisted_function()
@@ -71,7 +81,7 @@ end subroutine transform_region_hoist
     clean_test(hoisted_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_hoist_inlined_pragma(here, frontend):
     """
     Hoisting when pragmas are potentially inlined into other nodes.
@@ -108,37 +118,53 @@ subroutine transform_region_hoist_inlined_pragma(a, b, klon, klev)
 end subroutine transform_region_hoist_inlined_pragma
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
     klon, klev = 32, 100
-    ref_a = np.array([[jl + 1] * klev for jl in range(klon)], order='F')
-    ref_b = np.array([[jk + 1 for jk in range(klev)] for _ in range(klon)], order='F')
+    ref_a = np.array([[jl + 1] * klev for jl in range(klon)], order="F")
+    ref_b = np.array([[jk + 1 for jk in range(klev)] for _ in range(klon)], order="F")
 
     # Test the reference solution
-    a = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
-    b = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
+    a = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
+    b = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
     function(a=a, b=b, klon=klon, klev=klev)
     assert np.all(a == ref_a)
     assert np.all(b == ref_b)
 
     loops = FindNodes(Loop).visit(routine.body)
     assert len(loops) == 6
-    assert [str(loop.variable) for loop in loops] == ['jl', 'jk', 'jl', 'jk', 'jk', 'jl']
+    assert [str(loop.variable) for loop in loops] == [
+        "jl",
+        "jk",
+        "jl",
+        "jk",
+        "jk",
+        "jl",
+    ]
 
     # Apply transformation
     region_hoist(routine)
 
     loops = FindNodes(Loop).visit(routine.body)
     assert len(loops) == 6
-    assert [str(loop.variable) for loop in loops] == ['jk', 'jl', 'jk', 'jl', 'jk', 'jl']
+    assert [str(loop.variable) for loop in loops] == [
+        "jk",
+        "jl",
+        "jk",
+        "jl",
+        "jk",
+        "jl",
+    ]
 
-    hoisted_filepath = here/(f'{routine.name}_hoisted_{frontend}.f90')
-    hoisted_function = jit_compile(routine, filepath=hoisted_filepath, objname=routine.name)
+    hoisted_filepath = here / (f"{routine.name}_hoisted_{frontend}.f90")
+    hoisted_function = jit_compile(
+        routine, filepath=hoisted_filepath, objname=routine.name
+    )
 
     # Test transformation
     klon, klev = 32, 100
-    a = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
-    b = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
+    a = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
+    b = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
     hoisted_function(a=a, b=b, klon=klon, klev=klev)
     assert np.all(a == ref_a)
     assert np.all(b == ref_b)
@@ -147,7 +173,7 @@ end subroutine transform_region_hoist_inlined_pragma
     clean_test(hoisted_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_hoist_multiple(here, frontend):
     """
     Test hoisting with multiple groups and multiple regions per group
@@ -178,7 +204,7 @@ subroutine transform_region_hoist_multiple(a, b, c)
 end subroutine transform_region_hoist_multiple
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
 
     # Test the reference solution
@@ -187,8 +213,10 @@ end subroutine transform_region_hoist_multiple
 
     # Apply transformation
     region_hoist(routine)
-    hoisted_filepath = here/(f'{routine.name}_hoisted_{frontend}.f90')
-    hoisted_function = jit_compile(routine, filepath=hoisted_filepath, objname=routine.name)
+    hoisted_filepath = here / (f"{routine.name}_hoisted_{frontend}.f90")
+    hoisted_function = jit_compile(
+        routine, filepath=hoisted_filepath, objname=routine.name
+    )
 
     # Test transformation
     a, b, c = hoisted_function()
@@ -198,7 +226,7 @@ end subroutine transform_region_hoist_multiple
     clean_test(hoisted_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_hoist_collapse(here, frontend):
     """
     Use collapse with region-hoist.
@@ -235,37 +263,54 @@ subroutine transform_region_hoist_collapse(a, b, klon, klev)
 end subroutine transform_region_hoist_collapse
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
     klon, klev = 32, 100
-    ref_a = np.array([[jl + 1] * klev for jl in range(klon)], order='F')
-    ref_b = np.array([[jk + 1 for jk in range(klev)] for _ in range(klon)], order='F')
+    ref_a = np.array([[jl + 1] * klev for jl in range(klon)], order="F")
+    ref_b = np.array([[jk + 1 for jk in range(klev)] for _ in range(klon)], order="F")
 
     # Test the reference solution
-    a = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
-    b = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
+    a = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
+    b = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
     function(a=a, b=b, klon=klon, klev=klev)
     assert np.all(a == ref_a)
     assert np.all(b == ref_b)
 
     loops = FindNodes(Loop).visit(routine.body)
     assert len(loops) == 6
-    assert [str(loop.variable) for loop in loops] == ['jl', 'jk', 'jl', 'jk', 'jk', 'jl']
+    assert [str(loop.variable) for loop in loops] == [
+        "jl",
+        "jk",
+        "jl",
+        "jk",
+        "jk",
+        "jl",
+    ]
 
     # Apply transformation
     region_hoist(routine)
 
     loops = FindNodes(Loop).visit(routine.body)
     assert len(loops) == 7
-    assert [str(loop.variable) for loop in loops] == ['jk', 'jl', 'jk', 'jl', 'jk', 'jk', 'jl']
+    assert [str(loop.variable) for loop in loops] == [
+        "jk",
+        "jl",
+        "jk",
+        "jl",
+        "jk",
+        "jk",
+        "jl",
+    ]
 
-    hoisted_filepath = here/(f'{routine.name}_hoisted_{frontend}.f90')
-    hoisted_function = jit_compile(routine, filepath=hoisted_filepath, objname=routine.name)
+    hoisted_filepath = here / (f"{routine.name}_hoisted_{frontend}.f90")
+    hoisted_function = jit_compile(
+        routine, filepath=hoisted_filepath, objname=routine.name
+    )
 
     # Test transformation
     klon, klev = 32, 100
-    a = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
-    b = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
+    a = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
+    b = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
     hoisted_function(a=a, b=b, klon=klon, klev=klev)
     assert np.all(a == ref_a)
     assert np.all(b == ref_b)
@@ -274,7 +319,7 @@ end subroutine transform_region_hoist_collapse
     clean_test(hoisted_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_hoist_promote(here, frontend):
     """
     Use collapse with region-hoist.
@@ -316,43 +361,62 @@ subroutine transform_region_hoist_promote(a, b, klon, klev)
 end subroutine transform_region_hoist_promote
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
     klon, klev = 32, 100
-    ref_a = np.array([[jl + 1] * klev for jl in range(klon)], order='F')
-    ref_b = np.array([[jk + 1 for jk in range(klev)] for _ in range(klon)], order='F')
+    ref_a = np.array([[jl + 1] * klev for jl in range(klon)], order="F")
+    ref_b = np.array([[jk + 1 for jk in range(klev)] for _ in range(klon)], order="F")
 
     # Test the reference solution
-    a = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
-    b = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
+    a = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
+    b = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
     function(a=a, b=b, klon=klon, klev=klev)
     assert np.all(a == ref_a)
     assert np.all(b == ref_b)
 
     loops = FindNodes(Loop).visit(routine.body)
     assert len(loops) == 7
-    assert [str(loop.variable) for loop in loops] == ['jl', 'jk', 'jl', 'jk', 'jk', 'jk', 'jl']
+    assert [str(loop.variable) for loop in loops] == [
+        "jl",
+        "jk",
+        "jl",
+        "jk",
+        "jk",
+        "jk",
+        "jl",
+    ]
 
-    assert isinstance(routine.variable_map['b_tmp'], sym.Scalar)
+    assert isinstance(routine.variable_map["b_tmp"], sym.Scalar)
 
     # Apply transformation
     region_hoist(routine)
 
     loops = FindNodes(Loop).visit(routine.body)
     assert len(loops) == 8
-    assert [str(loop.variable) for loop in loops] == ['jk', 'jl', 'jk', 'jl', 'jk', 'jk', 'jk', 'jl']
+    assert [str(loop.variable) for loop in loops] == [
+        "jk",
+        "jl",
+        "jk",
+        "jl",
+        "jk",
+        "jk",
+        "jk",
+        "jl",
+    ]
 
-    b_tmp = routine.variable_map['b_tmp']
+    b_tmp = routine.variable_map["b_tmp"]
     assert isinstance(b_tmp, sym.Array) and len(b_tmp.type.shape) == 1
-    assert str(b_tmp.type.shape[0]) == 'klev'
+    assert str(b_tmp.type.shape[0]) == "klev"
 
-    hoisted_filepath = here/(f'{routine.name}_hoisted_{frontend}.f90')
-    hoisted_function = jit_compile(routine, filepath=hoisted_filepath, objname=routine.name)
+    hoisted_filepath = here / (f"{routine.name}_hoisted_{frontend}.f90")
+    hoisted_function = jit_compile(
+        routine, filepath=hoisted_filepath, objname=routine.name
+    )
 
     # Test transformation
     klon, klev = 32, 100
-    a = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
-    b = np.zeros(shape=(klon, klev), order='F', dtype=np.int32)
+    a = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
+    b = np.zeros(shape=(klon, klev), order="F", dtype=np.int32)
     hoisted_function(a=a, b=b, klon=klon, klev=klev)
     assert np.all(a == ref_a)
     assert np.all(b == ref_b)
@@ -361,7 +425,7 @@ end subroutine transform_region_hoist_promote
     clean_test(hoisted_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_to_call(here, frontend):
     """
     A very simple region-to-call test case
@@ -381,7 +445,7 @@ subroutine transform_region_to_call(a, b, c)
 end subroutine transform_region_to_call
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
 
     # Test the reference solution
@@ -393,16 +457,16 @@ end subroutine transform_region_to_call
 
     # Apply transformation
     routines = region_to_call(routine)
-    assert len(routines) == 1 and routines[0].name == f'{routine.name}_region_to_call_0'
+    assert len(routines) == 1 and routines[0].name == f"{routine.name}_region_to_call_0"
 
     assert len(FindNodes(Assignment).visit(routine.body)) == 3
     assert len(FindNodes(Assignment).visit(routines[0].body)) == 1
     assert len(FindNodes(CallStatement).visit(routine.body)) == 1
 
     # Test transformation
-    contains = Section(body=as_tuple([Intrinsic('CONTAINS'), *routines, routine]))
-    module = Module(name=f'{routine.name}_mod', spec=None, contains=contains)
-    mod_filepath = here/(f'{module.name}_converted_{frontend}.f90')
+    contains = Section(body=as_tuple([Intrinsic("CONTAINS"), *routines, routine]))
+    module = Module(name=f"{routine.name}_mod", spec=None, contains=contains)
+    mod_filepath = here / (f"{module.name}_converted_{frontend}.f90")
     mod = jit_compile(module, filepath=mod_filepath, objname=module.name)
     mod_function = getattr(mod, routine.name)
 
@@ -413,7 +477,7 @@ end subroutine transform_region_to_call
     clean_test(mod_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_to_call_multiple(here, frontend):
     """
     Test hoisting with multiple groups and multiple regions per group
@@ -440,7 +504,7 @@ subroutine transform_region_to_call_multiple(a, b, c)
 end subroutine transform_region_to_call_multiple
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
 
     # Test the reference solution
@@ -453,17 +517,17 @@ end subroutine transform_region_to_call_multiple
     # Apply transformation
     routines = region_to_call(routine)
     assert len(routines) == 3
-    assert routines[0].name == 'oiwjfklsf'
-    assert all(routines[i].name == f'{routine.name}_region_to_call_{i}' for i in (1,2))
+    assert routines[0].name == "oiwjfklsf"
+    assert all(routines[i].name == f"{routine.name}_region_to_call_{i}" for i in (1, 2))
 
     assert len(FindNodes(Assignment).visit(routine.body)) == 4
     assert all(len(FindNodes(Assignment).visit(r.body)) == 1 for r in routines)
     assert len(FindNodes(CallStatement).visit(routine.body)) == 3
 
     # Test transformation
-    contains = Section(body=as_tuple([Intrinsic('CONTAINS'), *routines, routine]))
-    module = Module(name=f'{routine.name}_mod', spec=None, contains=contains)
-    mod_filepath = here/(f'{module.name}_converted_{frontend}.f90')
+    contains = Section(body=as_tuple([Intrinsic("CONTAINS"), *routines, routine]))
+    module = Module(name=f"{routine.name}_mod", spec=None, contains=contains)
+    mod_filepath = here / (f"{module.name}_converted_{frontend}.f90")
     mod = jit_compile(module, filepath=mod_filepath, objname=module.name)
     mod_function = getattr(mod, routine.name)
 
@@ -474,7 +538,7 @@ end subroutine transform_region_to_call_multiple
     clean_test(mod_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_to_call_arguments(here, frontend):
     """
     Test hoisting with multiple groups and multiple regions per group
@@ -503,7 +567,7 @@ subroutine transform_region_to_call_arguments(a, b, c)
 end subroutine transform_region_to_call_arguments
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
 
     # Test the reference solution
@@ -516,28 +580,31 @@ end subroutine transform_region_to_call_arguments
     # Apply transformation
     routines = region_to_call(routine)
     assert len(routines) == 3
-    assert [r.name for r in routines] == ['func_a', 'func_b', 'func_c']
+    assert [r.name for r in routines] == ["func_a", "func_b", "func_c"]
 
     assert len(routines[0].arguments) == 1
-    assert routines[0].arguments[0] == 'a' and routines[0].arguments[0].type.intent == 'inout'
+    assert (
+        routines[0].arguments[0] == "a"
+        and routines[0].arguments[0].type.intent == "inout"
+    )
 
-    assert {str(a) for a in routines[1].arguments} == {'a', 'b'}
-    assert routines[1].variable_map['a'].type.intent == 'in'
-    assert routines[1].variable_map['b'].type.intent == 'out'
+    assert {str(a) for a in routines[1].arguments} == {"a", "b"}
+    assert routines[1].variable_map["a"].type.intent == "in"
+    assert routines[1].variable_map["b"].type.intent == "out"
 
-    assert {str(a) for a in routines[2].arguments} == {'a', 'b', 'c'}
-    assert routines[2].variable_map['a'].type.intent == 'in'
-    assert routines[2].variable_map['b'].type.intent == 'inout'
-    assert routines[2].variable_map['c'].type.intent == 'out'
+    assert {str(a) for a in routines[2].arguments} == {"a", "b", "c"}
+    assert routines[2].variable_map["a"].type.intent == "in"
+    assert routines[2].variable_map["b"].type.intent == "inout"
+    assert routines[2].variable_map["c"].type.intent == "out"
 
     assert len(FindNodes(Assignment).visit(routine.body)) == 4
     assert all(len(FindNodes(Assignment).visit(r.body)) == 1 for r in routines)
     assert len(FindNodes(CallStatement).visit(routine.body)) == 3
 
     # Test transformation
-    contains = Section(body=as_tuple([Intrinsic('CONTAINS'), *routines, routine]))
-    module = Module(name=f'{routine.name}_mod', spec=None, contains=contains)
-    mod_filepath = here/(f'{module.name}_converted_{frontend}.f90')
+    contains = Section(body=as_tuple([Intrinsic("CONTAINS"), *routines, routine]))
+    module = Module(name=f"{routine.name}_mod", spec=None, contains=contains)
+    mod_filepath = here / (f"{module.name}_converted_{frontend}.f90")
     mod = jit_compile(module, filepath=mod_filepath, objname=module.name)
     mod_function = getattr(mod, routine.name)
 
@@ -548,7 +615,7 @@ end subroutine transform_region_to_call_arguments
     clean_test(mod_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_to_call_arrays(here, frontend):
     """
     Test hoisting with array variables
@@ -582,7 +649,7 @@ end subroutine transform_region_to_call_arrays
     routine = Subroutine.from_source(fcode, frontend=frontend)
     normalize_range_indexing(routine)
 
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
 
     # Test the reference solution
@@ -590,7 +657,7 @@ end subroutine transform_region_to_call_arrays
     a = np.zeros(shape=(n,), dtype=np.int32)
     b = np.zeros(shape=(n,), dtype=np.int32)
     function(a, b, n)
-    assert np.all(a == range(1,n+1))
+    assert np.all(a == range(1, n + 1))
     assert np.all(b == [1] * n)
 
     assert len(FindNodes(Assignment).visit(routine.body)) == 4
@@ -604,29 +671,39 @@ end subroutine transform_region_to_call_arrays
 
     assert len(routines) == 3
 
-    assert {(str(a), a.type.intent) for a in routines[0].arguments} == {('a(n)', 'out'), ('n', 'in')}
-    assert {(str(a), a.type.intent) for a in routines[1].arguments} == {('b(n)', 'out'), ('n', 'in')}
-    assert {(str(a), a.type.intent) for a in routines[2].arguments} == {('a(n)', 'in'), ('b(n)', 'inout'), ('n', 'in')}
-    assert routines[0].variable_map['a'].dimensions[0].scope is routines[0]
+    assert {(str(a), a.type.intent) for a in routines[0].arguments} == {
+        ("a(n)", "out"),
+        ("n", "in"),
+    }
+    assert {(str(a), a.type.intent) for a in routines[1].arguments} == {
+        ("b(n)", "out"),
+        ("n", "in"),
+    }
+    assert {(str(a), a.type.intent) for a in routines[2].arguments} == {
+        ("a(n)", "in"),
+        ("b(n)", "inout"),
+        ("n", "in"),
+    }
+    assert routines[0].variable_map["a"].dimensions[0].scope is routines[0]
 
     # Test transformation
-    contains = Section(body=as_tuple([Intrinsic('CONTAINS'), *routines, routine]))
-    module = Module(name=f'{routine.name}_mod', spec=None, contains=contains)
-    mod_filepath = here/(f'{module.name}_converted_{frontend}.f90')
+    contains = Section(body=as_tuple([Intrinsic("CONTAINS"), *routines, routine]))
+    module = Module(name=f"{routine.name}_mod", spec=None, contains=contains)
+    mod_filepath = here / (f"{module.name}_converted_{frontend}.f90")
     mod = jit_compile(module, filepath=mod_filepath, objname=module.name)
     mod_function = getattr(mod, routine.name)
 
     a = np.zeros(shape=(n,), dtype=np.int32)
     b = np.zeros(shape=(n,), dtype=np.int32)
     mod_function(a, b, n)
-    assert np.all(a == range(1,n+1))
+    assert np.all(a == range(1, n + 1))
     assert np.all(b == [1] * n)
 
     clean_test(filepath)
     clean_test(mod_filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transform_region_to_call_imports(here, builder, frontend):
     """
     Test hoisting with correct treatment of imports
@@ -674,8 +751,10 @@ end module transform_region_to_call_imports_mod
     ext_module = Module.from_source(fcode_module, frontend=frontend)
     module = Module.from_source(fcode, frontend=frontend, definitions=ext_module)
     normalize_range_indexing(module.subroutines[0])
-    refname = f'ref_{module.name}_{frontend}'
-    reference = jit_compile_lib([module, ext_module], path=here, name=refname, builder=builder)
+    refname = f"ref_{module.name}_{frontend}"
+    reference = jit_compile_lib(
+        [module, ext_module], path=here, name=refname, builder=builder
+    )
     function = getattr(getattr(reference, module.name), module.subroutines[0].name)
 
     # Test the reference solution
@@ -683,8 +762,8 @@ end module transform_region_to_call_imports_mod
     b = np.zeros(shape=(10,), dtype=np.int32)
     function(a, b)
     assert np.all(a == [1] * 10)
-    assert np.all(b == range(1,11))
-    (here/f'{module.name}.f90').unlink()
+    assert np.all(b == range(1, 11))
+    (here / f"{module.name}.f90").unlink()
 
     assert len(FindNodes(Assignment).visit(module.subroutines[0].body)) == 4
     assert len(FindNodes(CallStatement).visit(module.subroutines[0].body)) == 0
@@ -697,14 +776,24 @@ end module transform_region_to_call_imports_mod
 
     assert len(routines) == 3
 
-    assert {(str(a), a.type.intent) for a in routines[0].arguments} == {('a(10)', 'out')}
+    assert {(str(a), a.type.intent) for a in routines[0].arguments} == {
+        ("a(10)", "out")
+    }
     assert {(str(a), a.type.intent) for a in routines[1].arguments} == set()
-    assert {(str(a), a.type.intent) for a in routines[2].arguments} == {('a(10)', 'in'), ('b(10)', 'out')}
+    assert {(str(a), a.type.intent) for a in routines[2].arguments} == {
+        ("a(10)", "in"),
+        ("b(10)", "out"),
+    }
 
     # Insert created routines into module
     module.contains.append(routines)
 
-    obj = jit_compile_lib([module, ext_module], path=here, name=f'{module.name}_{frontend}', builder=builder)
+    obj = jit_compile_lib(
+        [module, ext_module],
+        path=here,
+        name=f"{module.name}_{frontend}",
+        builder=builder,
+    )
     mod_function = getattr(getattr(obj, module.name), module.subroutines[0].name)
 
     # Test transformation
@@ -712,6 +801,6 @@ end module transform_region_to_call_imports_mod
     b = np.zeros(shape=(10,), dtype=np.int32)
     mod_function(a, b)
     assert np.all(a == [1] * 10)
-    assert np.all(b == range(1,11))
-    (here/f'{module.name}.f90').unlink()
-    (here/f'{ext_module.name}.f90').unlink()
+    assert np.all(b == range(1, 11))
+    (here / f"{module.name}.f90").unlink()
+    (here / f"{ext_module.name}.f90").unlink()

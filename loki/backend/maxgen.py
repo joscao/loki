@@ -12,32 +12,32 @@ from loki.ir import Import
 from loki.types import BasicType, DerivedType
 from loki.visitors import Stringifier, FindNodes
 
-__all__ = ['maxjgen', 'MaxjCodegen', 'MaxjCodeMapper']
+__all__ = ["maxjgen", "MaxjCodegen", "MaxjCodeMapper"]
 
 
 def maxj_local_type(_type):
     if _type.dtype == BasicType.DEFERRED:
         return _type.name
     if _type.dtype == BasicType.LOGICAL:
-        return 'boolean'
+        return "boolean"
     if _type.dtype == BasicType.INTEGER:
-        return 'int'
+        return "int"
     if _type.dtype == BasicType.REAL:
-        if str(_type.kind) in ['real32']:
-            return 'float'
-        return 'double'
+        if str(_type.kind) in ["real32"]:
+            return "float"
+        return "double"
     raise ValueError(str(_type))
 
 
 def maxj_dfevar_type(_type):
     if _type.dtype == BasicType.LOGICAL:
-        return 'dfeBool()'
+        return "dfeBool()"
     if _type.dtype == BasicType.INTEGER:
-        return 'dfeUInt(32)'  # TODO: Distinguish between signed and unsigned
+        return "dfeUInt(32)"  # TODO: Distinguish between signed and unsigned
     if _type.dtype == BasicType.REAL:
-        if str(_type.kind) in ['real32']:
-            return 'dfeFloat(8, 24)'
-        return 'dfeFloat(11, 53)'
+        if str(_type.kind) in ["real32"]:
+            return "dfeFloat(8, 24)"
+        return "dfeFloat(11, 53)"
     raise ValueError(str(_type))
 
 
@@ -52,11 +52,13 @@ class MaxjCodeMapper(LokiStringifyMapper):
 
     def map_variable_symbol(self, expr, enclosing_prec, *args, **kwargs):
         # TODO: Big hack, this is completely agnostic to whether value or address is to be assigned
-        ptr = '*' if expr.type and expr.type.pointer else ''
+        ptr = "*" if expr.type and expr.type.pointer else ""
         if expr.parent is not None:
-            parent = self.parenthesize(self.rec(expr.parent, enclosing_prec, *args, **kwargs))
-            return self.format('%s%s.%s', ptr, parent, expr.basename)
-        return self.format('%s%s', ptr, expr.name)
+            parent = self.parenthesize(
+                self.rec(expr.parent, enclosing_prec, *args, **kwargs)
+            )
+            return self.format("%s%s.%s", ptr, parent, expr.basename)
+        return self.format("%s%s", ptr, expr.name)
 
     def map_meta_symbol(self, expr, enclosing_prec, *args, **kwargs):
         return self.rec(expr._symbol, enclosing_prec, *args, **kwargs)
@@ -66,31 +68,38 @@ class MaxjCodeMapper(LokiStringifyMapper):
 
     def map_array_subscript(self, expr, enclosing_prec, *args, **kwargs):
         name_str = self.rec(expr.aggregate, PREC_NONE, *args, **kwargs)
-        index_str = ''
+        index_str = ""
         for index in expr.index_tuple:
             d = self.format(self.rec(index, PREC_NONE, *args, **kwargs))
             if d:
-                index_str += self.format('[%s]', d)
-        return self.format('%s%s', name_str, index_str)
+                index_str += self.format("[%s]", d)
+        return self.format("%s%s", name_str, index_str)
 
     map_string_subscript = map_array_subscript
 
     def map_range_index(self, expr, enclosing_prec, *args, **kwargs):
-        return self.rec(expr.upper, enclosing_prec, *args, **kwargs) if expr.upper else ''
+        return (
+            self.rec(expr.upper, enclosing_prec, *args, **kwargs) if expr.upper else ""
+        )
 
     def map_cast(self, expr, enclosing_prec, *args, **kwargs):
         name = self.rec(expr.function, PREC_CALL, *args, **kwargs)
         expression = self.rec(expr.parameters[0], PREC_NONE, *args, **kwargs)
-        kind = f'{maxj_dfevar_type(expr.kind)}, ' if expr.kind else ''
-        return self.format('%s(%s%s)', name, kind, expression)
+        kind = f"{maxj_dfevar_type(expr.kind)}, " if expr.kind else ""
+        return self.format("%s(%s%s)", name, kind, expression)
 
     def map_comparison(self, expr, enclosing_prec, *args, **kwargs):
-        if expr.operator in ('==', '!='):
+        if expr.operator in ("==", "!="):
             return self.parenthesize_if_needed(
-                self.format("%s.%s(%s)", self.rec(expr.left, PREC_CALL, *args, **kwargs),
-                            {'==': 'eq', '!=': 'neq'}[expr.operator],
-                            self.rec(expr.right, PREC_NONE, *args, **kwargs)),
-                enclosing_prec, PREC_COMPARISON)
+                self.format(
+                    "%s.%s(%s)",
+                    self.rec(expr.left, PREC_CALL, *args, **kwargs),
+                    {"==": "eq", "!=": "neq"}[expr.operator],
+                    self.rec(expr.right, PREC_NONE, *args, **kwargs),
+                ),
+                enclosing_prec,
+                PREC_COMPARISON,
+            )
         return super().map_comparison(expr, enclosing_prec, *args, **kwargs)
 
 
@@ -99,9 +108,14 @@ class MaxjCodegen(Stringifier):
     Tree visitor to generate Maxeler maxj kernel code from IR.
     """
 
-    def __init__(self, depth=0, indent='  ', linewidth=90):
-        super().__init__(depth=depth, indent=indent, linewidth=linewidth,
-                         line_cont='\n{}  '.format, symgen=MaxjCodeMapper())
+    def __init__(self, depth=0, indent="  ", linewidth=90):
+        super().__init__(
+            depth=depth,
+            indent=indent,
+            linewidth=linewidth,
+            line_cont="\n{}  ".format,
+            symgen=MaxjCodeMapper(),
+        )
 
     # Handler for outer objects
 
@@ -152,22 +166,22 @@ class MaxjCodegen(Stringifier):
             }
         """
         # Figure out what kind of module we have here
-        if o.name.endswith('ManagerMAX5C'):
+        if o.name.endswith("ManagerMAX5C"):
             is_manager = True
             is_interface = False
-            package_name = o.name[:-len('ManagerMAX5C')]
-        elif o.name.endswith('Manager'):
+            package_name = o.name[: -len("ManagerMAX5C")]
+        elif o.name.endswith("Manager"):
             is_manager = True
             is_interface = True
-            package_name = o.name[:-len('Manager')]
-        elif o.name.endswith('Kernel'):
+            package_name = o.name[: -len("Manager")]
+        elif o.name.endswith("Kernel"):
             is_manager = False
-            package_name = o.name[:-len('Kernel')]
+            package_name = o.name[: -len("Kernel")]
         else:
-            raise ValueError('Module is neither Manager nor Kernel')
+            raise ValueError("Module is neither Manager nor Kernel")
 
         # Declare package
-        header = [self.format_line('package ', package_name, ';')]
+        header = [self.format_line("package ", package_name, ";")]
 
         # Some imports
         # TODO: include here imports defined by routines
@@ -177,13 +191,25 @@ class MaxjCodegen(Stringifier):
         # Class signature
         if is_manager:
             if is_interface:
-                header += [self.format_line(
-                    'public interface ', o.name, ' extends ManagerPCIe, ManagerKernel {')]
+                header += [
+                    self.format_line(
+                        "public interface ",
+                        o.name,
+                        " extends ManagerPCIe, ManagerKernel {",
+                    )
+                ]
             else:
-                header += [self.format_line(
-                    'public class ', o.name, ' extends MAX5CManager implements ', o.name[:-5], ' {')]
+                header += [
+                    self.format_line(
+                        "public class ",
+                        o.name,
+                        " extends MAX5CManager implements ",
+                        o.name[:-5],
+                        " {",
+                    )
+                ]
         else:
-            header += [self.format_line('class ', o.name, ' extends Kernel {')]
+            header += [self.format_line("class ", o.name, " extends Kernel {")]
         self.depth += 1
 
         # Rest of the spec
@@ -194,7 +220,7 @@ class MaxjCodegen(Stringifier):
 
         # Footer
         self.depth -= 1
-        footer = [self.format_line('}')]
+        footer = [self.format_line("}")]
 
         return self.join_lines(*header, *body, *footer)
 
@@ -210,9 +236,11 @@ class MaxjCodegen(Stringifier):
             }
         """
         # Constructor signature
-        args = [f'{self.visit(arg.type, **kwargs)} {self.visit(arg, **kwargs)}'
-                for arg in o.arguments]
-        header = [self.format_line(o.name, '(', self.join_items(args), ') {')]
+        args = [
+            f"{self.visit(arg.type, **kwargs)} {self.visit(arg, **kwargs)}"
+            for arg in o.arguments
+        ]
+        header = [self.format_line(o.name, "(", self.join_items(args), ") {")]
         self.depth += 1
 
         # Generate body
@@ -221,7 +249,7 @@ class MaxjCodegen(Stringifier):
 
         # Closing brackets
         self.depth -= 1
-        footer = [self.format_line('}')]
+        footer = [self.format_line("}")]
 
         return self.join_lines(*header, *body, *footer)
 
@@ -235,7 +263,7 @@ class MaxjCodegen(Stringifier):
 
             // <repr(Node)>
         """
-        return self.format_line('// <', repr(o), '>')
+        return self.format_line("// <", repr(o), ">")
 
     # Handler for IR nodes
 
@@ -250,7 +278,7 @@ class MaxjCodegen(Stringifier):
         Format comments.
         """
         text = o.text or o.source.string
-        text = str(text).lstrip().replace('!', '//', 1)
+        text = str(text).lstrip().replace("!", "//", 1)
         return self.format_line(text, no_wrap=True)
 
     def visit_CommentBlock(self, o, **kwargs):
@@ -277,11 +305,14 @@ class MaxjCodegen(Stringifier):
             var_name = self.visit(var.clone(dimensions=None), **kwargs)
             if var.initial:
                 initial = self.visit(var.initial, **kwargs)
-                return self.format_line(var_type, ' ', var_name, ' = ', initial, ';')
-            return self.format_line(var_type, ' ', var_name, ';')
+                return self.format_line(var_type, " ", var_name, " = ", initial, ";")
+            return self.format_line(var_type, " ", var_name, ";")
 
-        declarations = [format_declaration(var) for var in o.symbols
-                        if not var.type.intent or var.type.dfevar]
+        declarations = [
+            format_declaration(var)
+            for var in o.symbols
+            if not var.type.intent or var.type.dfevar
+        ]
         return self.join_lines(comment, *declarations)
 
     def visit_Loop(self, o, **kwargs):
@@ -294,12 +325,14 @@ class MaxjCodegen(Stringifier):
                 ...body...
             }
         """
-        control = 'for ({var} = {start}; {var} <= {end}; {var} += {incr})'.format(
-            var=self.visit(o.variable, **kwargs), start=self.visit(o.bounds.start, **kwargs),
+        control = "for ({var} = {start}; {var} <= {end}; {var} += {incr})".format(
+            var=self.visit(o.variable, **kwargs),
+            start=self.visit(o.bounds.start, **kwargs),
             end=self.visit(o.bounds.stop, **kwargs),
-            incr=self.visit(o.bounds.step, **kwargs) if o.bounds.step else 1)
-        header = self.format_line(control, ' {')
-        footer = self.format_line('}')
+            incr=self.visit(o.bounds.step, **kwargs) if o.bounds.step else 1,
+        )
+        header = self.format_line(control, " {")
+        footer = self.format_line("}")
         self.depth += 1
         body = self.visit(o.body, **kwargs)
         self.depth -= 1
@@ -321,12 +354,12 @@ class MaxjCodegen(Stringifier):
         """
         lhs = self.visit(o.lhs, **kwargs)
         rhs = self.visit(o.rhs, **kwargs)
-        comment = ''
+        comment = ""
         if o.comment:
-            comment = f'  {self.visit(o.comment, **kwargs)}'
+            comment = f"  {self.visit(o.comment, **kwargs)}"
         if o.lhs.type.dfevar and o.lhs.type.shape:
-            return self.format_line(lhs, ' <== ', rhs, ';', comment=comment)
-        return self.format_line(lhs, ' = ', rhs, ';', comment=comment)
+            return self.format_line(lhs, " <== ", rhs, ";", comment=comment)
+        return self.format_line(lhs, " = ", rhs, ";", comment=comment)
 
     def visit_ConditionalAssignment(self, o, **kwargs):
         """
@@ -340,7 +373,7 @@ class MaxjCodegen(Stringifier):
         condition = self.visit(o.condition, **kwargs)
         rhs = self.visit(o.rhs, **kwargs)
         else_rhs = self.visit(o.else_rhs, **kwargs)
-        return self.format_line(lhs, ' = ', condition, ' ? ', rhs, ' : ', else_rhs, ';')
+        return self.format_line(lhs, " = ", condition, " ? ", rhs, " : ", else_rhs, ";")
 
     def visit_Section(self, o, **kwargs):
         """
@@ -359,7 +392,7 @@ class MaxjCodegen(Stringifier):
         name = self.visit(o.name, **kwargs)
         args = self.visit_all(o.arguments, **kwargs)
         assert not o.kwarguments
-        return self.format_line(name, '(', self.join_items(args), ');')
+        return self.format_line(name, "(", self.join_items(args), ");")
 
     def visit_Import(self, o, **kwargs):
         """
@@ -369,10 +402,10 @@ class MaxjCodegen(Stringifier):
 
             import <name>;
         """
-        if kwargs.get('skip_imports') is True:
+        if kwargs.get("skip_imports") is True:
             return None
         assert not o.symbols
-        return self.format_line('import ', o.module, ';')
+        return self.format_line("import ", o.module, ";")
 
     def visit_SymbolAttributes(self, o, **kwargs):  # pylint: disable=unused-argument
         if isinstance(o.dtype, DerivedType):
@@ -380,15 +413,15 @@ class MaxjCodegen(Stringifier):
         #    return 'DFEStructType {}'.format(o.name)
         if o.dfevar:
             if o.shape:
-                return f'DFEVector<{self.visit(o.clone(shape=o.shape[:-1]), **kwargs)}>'
-            return 'DFEVar'
+                return f"DFEVector<{self.visit(o.clone(shape=o.shape[:-1]), **kwargs)}>"
+            return "DFEVar"
         return maxj_local_type(o)
 
     def visit_TypeDef(self, o):
         self.depth += 1
         decls = self.visit(o.declarations)
         self.depth -= 1
-        return f'DFEStructType {o.name} {{\n{decls}\n}} ;'
+        return f"DFEStructType {o.name} {{\n{decls}\n}} ;"
 
 
 def maxjgen(ir):

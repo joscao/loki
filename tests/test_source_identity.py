@@ -15,17 +15,17 @@ they mostly check whether at the end comes out what went in at the beginning.
 from pathlib import Path
 import pytest
 from conftest import clean_test, available_frontends
-from loki import (
-  Sourcefile, Subroutine, OMNI, fgen, FindNodes, ir
-)
+from loki import Sourcefile, Subroutine, OMNI, fgen, FindNodes, ir
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'OMNI stores no source.string')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "OMNI stores no source.string")])
+)
 def test_raw_source_loop(here, frontend):
     """Verify that the raw_source property is correctly used to annotate
     AST nodes with source strings for loops."""
@@ -46,11 +46,11 @@ outer: do ia=1,10
 end do outer
 end subroutine routine_raw_source_loop
     """.strip()
-    filename = here / (f'routine_raw_source_loop_{frontend}.f90')
+    filename = here / (f"routine_raw_source_loop_{frontend}.f90")
     Sourcefile.to_file(fcode, filename)
 
     source = Sourcefile.from_file(filename, frontend=frontend)
-    routine = source['routine_raw_source_loop']
+    routine = source["routine_raw_source_loop"]
     assert source.source.string.strip() == fcode
     assert routine.source.string.strip() == fcode
 
@@ -64,7 +64,7 @@ end subroutine routine_raw_source_loop
         # Verify that source string is subset of the relevant line in the original source
         assert node.source is not None
         assert node.source.lines in ((l, l) for l in intrinsic_lines)
-        assert node.source.string in fcode[node.source.lines[0]-1]
+        assert node.source.string in fcode[node.source.lines[0] - 1]
 
     # Check the do loops
     do_construct_name_found = 0  # Note: this is the construct name 'outer'
@@ -74,25 +74,29 @@ end subroutine routine_raw_source_loop
         # Verify that source string is subset of the relevant line in the original source
         assert node.source is not None
         assert node.source.lines in do_lines
-        assert node.source.string in ('\n'.join(fcode[start-1:end]) for start, end in do_lines)
+        assert node.source.string in (
+            "\n".join(fcode[start - 1 : end]) for start, end in do_lines
+        )
         # Make sure the labels and names are correctly identified and contained
         if node.name:
             do_construct_name_found += 1
-            assert node.name == 'outer'
+            assert node.name == "outer"
         if node.loop_label:
             loop_label_found += 1
-            assert node.loop_label == '6'
+            assert node.loop_label == "6"
     assert do_construct_name_found == 1
     assert loop_label_found == 1
 
     # Assert output of body matches original string (except for case)
-    ref = '\n'.join(fcode[3:-1]).replace('.lt.', '<').replace('.gt.', '>')
+    ref = "\n".join(fcode[3:-1]).replace(".lt.", "<").replace(".gt.", ">")
     assert fgen(routine.body).strip().lower() == ref
 
     clean_test(filename)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'OMNI stores no source.string')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "OMNI stores no source.string")])
+)
 def test_raw_source_conditional(here, frontend):
     """Verify that the raw_source property is correctly used to annotate
     AST nodes with source strings for conditionals."""
@@ -110,11 +114,11 @@ end if check
 if (ic == 1) print *, ic
 end subroutine routine_raw_source_cond
     """.strip()
-    filename = here / (f'routine_raw_source_cond_{frontend}.f90')
+    filename = here / (f"routine_raw_source_cond_{frontend}.f90")
     Sourcefile.to_file(fcode, filename)
 
     source = Sourcefile.from_file(filename, frontend=frontend)
-    routine = source['routine_raw_source_cond']
+    routine = source["routine_raw_source_cond"]
     assert source.source.string.strip() == fcode
     assert routine.source.string.strip() == fcode
 
@@ -128,7 +132,7 @@ end subroutine routine_raw_source_cond
         # Verify that source string is subset of the relevant line in the original source
         assert node.source is not None
         assert node.source.lines in ((l, l) for l in intrinsic_lines)
-        assert node.source.string in fcode[node.source.lines[0]-1]
+        assert node.source.string in fcode[node.source.lines[0] - 1]
 
     # Check the conditionals
     cond_name_found = 0
@@ -137,19 +141,23 @@ end subroutine routine_raw_source_cond
         assert node.source is not None
         assert node.source.lines in cond_lines
         # Verify that source string is subset of the relevant lines in the original source
-        assert node.source.string in ('\n'.join(fcode[start-1:end]) for start, end in cond_lines)
+        assert node.source.string in (
+            "\n".join(fcode[start - 1 : end]) for start, end in cond_lines
+        )
         if node.name:
             cond_name_found += 1
-            assert node.name == 'check'
+            assert node.name == "check"
     assert cond_name_found == 1
 
     # Assert output of body matches original string (except for case)
-    assert fgen(routine.body).strip().lower() == '\n'.join(fcode[3:-1])
+    assert fgen(routine.body).strip().lower() == "\n".join(fcode[3:-1])
 
     clean_test(filename)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'OMNI stores no source.string')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "OMNI stores no source.string")])
+)
 def test_raw_source_multicond(here, frontend):
     """Verify that the raw_source property is correctly used to annotate
     AST nodes with source strings for multi conditionals."""
@@ -167,11 +175,11 @@ case default multicond
 end select multicond
 end subroutine routine_raw_source_multicond
     """.strip()
-    filename = here / (f'routine_raw_source_multicond_{frontend}.f90')
+    filename = here / (f"routine_raw_source_multicond_{frontend}.f90")
     Sourcefile.to_file(fcode, filename)
 
     source = Sourcefile.from_file(filename, frontend=frontend)
-    routine = source['routine_raw_source_multicond']
+    routine = source["routine_raw_source_multicond"]
     assert source.source.string.strip() == fcode
     assert routine.source.string.strip() == fcode
 
@@ -185,7 +193,7 @@ end subroutine routine_raw_source_multicond
         # Verify that source string is subset of the relevant line in the original source
         assert node.source is not None
         assert node.source.lines in ((l, l) for l in intrinsic_lines)
-        assert node.source.string in fcode[node.source.lines[0]-1]
+        assert node.source.string in fcode[node.source.lines[0] - 1]
 
     # Check the conditional
     cond_name_found = 0
@@ -194,19 +202,23 @@ end subroutine routine_raw_source_multicond
         assert node.source is not None
         assert node.source.lines in cond_lines
         # Verify that source string is subset of the relevant lines in the original source
-        assert node.source.string in ('\n'.join(fcode[start-1:end]) for start, end in cond_lines)
+        assert node.source.string in (
+            "\n".join(fcode[start - 1 : end]) for start, end in cond_lines
+        )
         if node.name:
             cond_name_found += 1
-            assert node.name == 'multicond'
+            assert node.name == "multicond"
     assert cond_name_found == 1
 
     # Assert output of body matches original string (except for case)
-    assert fgen(routine.body).strip().lower() == '\n'.join(fcode[3:-1])
+    assert fgen(routine.body).strip().lower() == "\n".join(fcode[3:-1])
 
     clean_test(filename)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'This is outright impossible')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "This is outright impossible")])
+)
 def test_subroutine_conservative(frontend):
     """
     Test that conservative output of fgen reproduces the original source string for
@@ -238,7 +250,9 @@ END SUBROUTINE CONSERVATIVE
     assert source == fcode
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'This is outright impossible')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "This is outright impossible")])
+)
 def test_subroutine_simple_fgen(frontend):
     """
     Test that non-conservative output produces the original source string for
@@ -277,8 +291,11 @@ END SUBROUTINE SIMPLE_FGEN
     assert source == fcode
 
 
-@pytest.mark.parametrize('frontend', available_frontends(
-    xfail=[(OMNI, 'OMNI does it for you BUT WITHOUT DELETING THE KEYWORD!!!')])
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(
+        xfail=[(OMNI, "OMNI does it for you BUT WITHOUT DELETING THE KEYWORD!!!")]
+    ),
 )
 def test_multiline_pragma(frontend):
     """
@@ -307,10 +324,12 @@ end subroutine multiline_pragma
     routine = Subroutine.from_source(fcode, frontend=frontend)
     pragmas = FindNodes(ir.Pragma).visit(routine.body)
     pragma_content = {
-        'foo': ['some very long pragma with a line break'],
-        'bar': ['some pragma with more than one line break',
-                'followed by another multiline pragma with same keyword'],
-        'foobar': ['and yet another multiline pragma']
+        "foo": ["some very long pragma with a line break"],
+        "bar": [
+            "some pragma with more than one line break",
+            "followed by another multiline pragma with same keyword",
+        ],
+        "foobar": ["and yet another multiline pragma"],
     }
 
     assert len(pragmas) == 4

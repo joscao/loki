@@ -15,7 +15,12 @@ from loki.tools import flatten, is_iterable, as_tuple
 from loki.visitors.visitor import Visitor
 
 
-__all__ = ['Transformer', 'NestedTransformer', 'MaskedTransformer', 'NestedMaskedTransformer']
+__all__ = [
+    "Transformer",
+    "NestedTransformer",
+    "MaskedTransformer",
+    "NestedMaskedTransformer",
+]
 
 
 class Transformer(Visitor):
@@ -71,7 +76,9 @@ class Transformer(Visitor):
         :math:`n \in T` to the rebuilt nodes in the new tree :math:`n' \in T'`.
     """
 
-    def __init__(self, mapper=None, invalidate_source=True, inplace=False, rebuild_scopes=False):
+    def __init__(
+        self, mapper=None, invalidate_source=True, inplace=False, rebuild_scopes=False
+    ):
         super().__init__()
         self.mapper = mapper.copy() if mapper is not None else {}
         self.invalidate_source = invalidate_source
@@ -85,8 +92,8 @@ class Transformer(Visitor):
         """
         args_frozen = o.args_frozen
         args_frozen.update(args)
-        if 'source' in o.args_frozen:
-            args_frozen['source'] = None
+        if "source" in o.args_frozen:
+            args_frozen["source"] = None
 
         if self.inplace:
             # Updated nodes in place, if requested
@@ -105,10 +112,14 @@ class Transformer(Visitor):
         """
         args_frozen = o.args_frozen
         args_frozen.update(args)
-        if self.invalidate_source and 'source' in args_frozen:
+        if self.invalidate_source and "source" in args_frozen:
             if any(isinstance(child, Node) for child in flatten(children)):
-                child_has_no_source = [getattr(i, 'source', None) is None for i in flatten(children)]
-                if any(child_has_no_source) or len(child_has_no_source) != len(flatten(o.children)):
+                child_has_no_source = [
+                    getattr(i, "source", None) is None for i in flatten(children)
+                ]
+                if any(child_has_no_source) or len(child_has_no_source) != len(
+                    flatten(o.children)
+                ):
                     return self._rebuild_without_source(o, children, **args_frozen)
 
         if self.inplace:
@@ -128,11 +139,12 @@ class Transformer(Visitor):
         Utility method for one-to-many mappings to insert iterables for
         the replaced node into a tuple.
         """
+
         def _inject_handle(nodes, i, old, new):
             """Utility to replace `old` in `nodes[i:]` by `new`"""
             j = nodes.index(old, i)
             new = tuple(new)
-            nodes = nodes[:j] + new + nodes[j+1:]
+            nodes = nodes[:j] + new + nodes[j + 1 :]
             return nodes, j + len(new)
 
         for k, handle in self.mapper.items():
@@ -140,7 +152,7 @@ class Transformer(Visitor):
                 w = list(windowed(o, len(k)))
                 if k in w:
                     i = list(w).index(k)
-                    o = o[:i] + as_tuple(handle) + o[i+len(k):]
+                    o = o[:i] + as_tuple(handle) + o[i + len(k) :]
             if k in o and is_iterable(handle):
                 # Replace k by the iterable that is provided by handle
                 o, i = _inject_handle(o, 0, k, handle)
@@ -214,15 +226,15 @@ class Transformer(Visitor):
 
         # Rebuild the node (and update parent pointer if necessary)
         if self.rebuild_scopes:
-            if 'scope' in kwargs:
-                o = self._rebuild(o, o.children, parent=kwargs['scope'])
+            if "scope" in kwargs:
+                o = self._rebuild(o, o.children, parent=kwargs["scope"])
             else:
                 o = self._rebuild(o, o.children)
-        elif 'scope' in kwargs and kwargs['scope'] is not o.parent:
-            o._update(parent=kwargs['scope'])
+        elif "scope" in kwargs and kwargs["scope"] is not o.parent:
+            o._update(parent=kwargs["scope"])
 
         # Recurse to children, passing down the scope
-        kwargs['scope'] = o
+        kwargs["scope"] = o
         rebuilt = tuple(self.visit(i, **kwargs) for i in o.children)
 
         # Update in-place the node with rebuilt children
@@ -321,18 +333,22 @@ class NestedTransformer(Transformer):
 
         # Rebuild the handle (and update parent pointer if necessary)
         if self.rebuild_scopes:
-            if 'scope' in kwargs and isinstance(handle, ScopedNode):
-                handle = self._rebuild(handle, handle.children, parent=kwargs['scope'])
+            if "scope" in kwargs and isinstance(handle, ScopedNode):
+                handle = self._rebuild(handle, handle.children, parent=kwargs["scope"])
             else:
                 handle = self._rebuild(handle, handle.children)
-        elif 'scope' in kwargs and isinstance(handle, ScopedNode) and kwargs['scope'] is not handle.parent:
-            handle._update(parent=kwargs['scope'])
+        elif (
+            "scope" in kwargs
+            and isinstance(handle, ScopedNode)
+            and kwargs["scope"] is not handle.parent
+        ):
+            handle._update(parent=kwargs["scope"])
 
         # Rebuild children
         if is_iterable(handle):
-            kwargs['scope'] = o
+            kwargs["scope"] = o
         elif isinstance(handle, ScopedNode):
-            kwargs['scope'] = handle
+            kwargs["scope"] = handle
         rebuilt = [self.visit(i, **kwargs) for i in o.children]
 
         # Update the node with rebuilt children
@@ -420,9 +436,16 @@ class MaskedTransformer(Transformer):
         Keyword arguments that are passed to the parent class constructor.
     """
 
-    def __init__(self, start=None, stop=None, active=False,
-                 require_all_start=False, greedy_stop=False, **kwargs):
-        kwargs.setdefault('rebuild_scopes', True)
+    def __init__(
+        self,
+        start=None,
+        stop=None,
+        active=False,
+        require_all_start=False,
+        greedy_stop=False,
+        **kwargs
+    ):
+        kwargs.setdefault("rebuild_scopes", True)
         super().__init__(**kwargs)
 
         self.start = set(as_tuple(start))
@@ -450,7 +473,7 @@ class MaskedTransformer(Transformer):
         return super().visit(o, *args, **kwargs)
 
     def visit_object(self, o, **kwargs):
-        if kwargs['parent_active']:
+        if kwargs["parent_active"]:
             # this is not an IR node but usually an expression tree or similar
             # we need to retain this only if the "parent" IR node is active
             return o
@@ -461,9 +484,9 @@ class MaskedTransformer(Transformer):
             return super().visit_Node(o, **kwargs)
 
         # pass to children if this node is active
-        kwargs['parent_active'] = self.active
+        kwargs["parent_active"] = self.active
         rebuilt = tuple(self.visit(i, **kwargs) for i in o.children)
-        if kwargs['parent_active']:
+        if kwargs["parent_active"]:
             return self._rebuild(o, rebuilt)
         return tuple(i for i in rebuilt if i is not None) or None
 
@@ -473,20 +496,20 @@ class MaskedTransformer(Transformer):
 
         # Rebuild the node (and update parent pointer if necessary)
         if self.rebuild_scopes:
-            if 'scope' in kwargs:
-                o = self._rebuild(o, o.children, parent=kwargs['scope'])
+            if "scope" in kwargs:
+                o = self._rebuild(o, o.children, parent=kwargs["scope"])
             else:
                 o = self._rebuild(o, o.children)
-        elif 'scope' in kwargs and kwargs['scope'] is not o.parent:
-            o._update(parent=kwargs['scope'])
+        elif "scope" in kwargs and kwargs["scope"] is not o.parent:
+            o._update(parent=kwargs["scope"])
 
         # Recurse to children, passing down the scope and if this node is active
-        kwargs['scope'] = o
-        kwargs['parent_active'] = self.active
+        kwargs["scope"] = o
+        kwargs["parent_active"] = self.active
         rebuilt = tuple(self.visit(i, **kwargs) for i in o.children)
 
         # Update rebuilt node
-        if kwargs['parent_active']:
+        if kwargs["parent_active"]:
             o._update(rebuilt)
             return o
         return tuple(i for i in rebuilt if i is not None) or None
@@ -541,7 +564,7 @@ class NestedMaskedTransformer(MaskedTransformer):
             return super().visit_Node(o, **kwargs)
 
         rebuilt = [self.visit(i, **kwargs) for i in o.children]
-        body_index = o._traversable.index('body')
+        body_index = o._traversable.index("body")
 
         if rebuilt[body_index]:
             rebuilt[body_index] = as_tuple(flatten(rebuilt[body_index]))
@@ -569,8 +592,12 @@ class NestedMaskedTransformer(MaskedTransformer):
         if not body:
             return else_body
 
-        has_elseif = o.has_elseif and bool(else_body) and isinstance(else_body[0], Conditional)
-        return self._rebuild(o, tuple((condition,) + (body,) + (else_body,)), has_elseif=has_elseif)
+        has_elseif = (
+            o.has_elseif and bool(else_body) and isinstance(else_body[0], Conditional)
+        )
+        return self._rebuild(
+            o, tuple((condition,) + (body,) + (else_body,)), has_elseif=has_elseif
+        )
 
     def visit_MultiConditional(self, o, **kwargs):
         """
@@ -586,8 +613,10 @@ class NestedMaskedTransformer(MaskedTransformer):
 
         # need to make (value, body) pairs to track vanishing bodies
         expr = self.visit(o.expr, **kwargs)
-        branches = tuple((self.visit(c, **kwargs), self.visit(b, **kwargs))
-                         for c, b in zip(o.values, o.bodies))
+        branches = tuple(
+            (self.visit(c, **kwargs), self.visit(b, **kwargs))
+            for c, b in zip(o.values, o.bodies)
+        )
         branches = tuple((c, b) for c, b in branches if flatten(as_tuple(b)))
         else_body = self.visit(o.else_body, **kwargs)
 

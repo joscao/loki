@@ -16,7 +16,11 @@ import operator as op
 from loki.logging import info
 from loki.analyse import dataflow_analysis_attached
 from loki.expression import (
-    symbols as sym, simplify, symbolic_op, FindVariables, SubstituteExpressions
+    symbols as sym,
+    simplify,
+    symbolic_op,
+    FindVariables,
+    SubstituteExpressions,
 )
 from loki.ir import Assignment, Loop, VariableDeclaration
 from loki.tools import as_tuple, CaseInsensitiveDict
@@ -25,10 +29,14 @@ from loki.visitors import FindNodes, Transformer
 
 
 __all__ = [
-    'shift_to_zero_indexing', 'invert_array_indices',
-    'resolve_vector_notation', 'normalize_range_indexing',
-    'promote_variables', 'promote_nonmatching_variables',
-    'promotion_dimensions_from_loop_nest', 'demote_variables'
+    "shift_to_zero_indexing",
+    "invert_array_indices",
+    "resolve_vector_notation",
+    "normalize_range_indexing",
+    "promote_variables",
+    "promote_nonmatching_variables",
+    "promotion_dimensions_from_loop_nest",
+    "demote_variables",
 ]
 
 
@@ -99,12 +107,14 @@ def resolve_vector_notation(routine):
             if not v.dimensions:
                 continue
 
-            ivar_basename = f'i_{stmt.lhs.basename}'
+            ivar_basename = f"i_{stmt.lhs.basename}"
             for i, dim, s in zip(count(), v.dimensions, as_tuple(v.shape)):
                 if isinstance(dim, sym.RangeIndex):
                     # Create new index variable
                     vtype = SymbolAttributes(BasicType.INTEGER)
-                    ivar = sym.Variable(name=f'{ivar_basename}_{i}', type=vtype, scope=routine)
+                    ivar = sym.Variable(
+                        name=f"{ivar_basename}_{i}", type=vtype, scope=routine
+                    )
                     shape_index_map[s] = ivar
                     index_range_map[ivar] = s
 
@@ -112,8 +122,10 @@ def resolve_vector_notation(routine):
                         vdims.append(ivar)
 
             # Add index variable to range replacement
-            new_dims = as_tuple(shape_index_map.get(s, d)
-                                for d, s in zip(v.dimensions, as_tuple(v.shape)))
+            new_dims = as_tuple(
+                shape_index_map.get(s, d)
+                for d, s in zip(v.dimensions, as_tuple(v.shape))
+            )
             vmap[v] = v.clone(dimensions=new_dims)
 
         index_vars.update(list(vdims))
@@ -145,6 +157,7 @@ def normalize_range_indexing(routine):
     """
     Replace the ``(1:size)`` indexing in array sizes that OMNI introduces.
     """
+
     def is_one_index(dim):
         return isinstance(dim, sym.RangeIndex) and dim.lower == 1 and dim.step is None
 
@@ -202,7 +215,9 @@ def promote_variables(routine, variable_names, pos, index=None, size=None):
         routine.body = Transformer().visit(routine.body)
 
         with dataflow_analysis_attached(routine):
-            for node, var_list in FindVariables(unique=False, with_ir_node=True).visit(routine.body):
+            for node, var_list in FindVariables(unique=False, with_ir_node=True).visit(
+                routine.body
+            ):
                 # All the variables marked for promotion that appear in this IR node
                 var_list = [v for v in var_list if v.name.lower() in variable_names]
 
@@ -211,14 +226,16 @@ def promote_variables(routine, variable_names, pos, index=None, size=None):
 
                 # We use the given index expression in this node if all
                 # variables therein are defined, otherwise we use `:`
-                node_index = tuple(i if v <= node.live_symbols else sym.RangeIndex((None, None))
-                                   for i, v in zip(index, index_vars))
+                node_index = tuple(
+                    i if v <= node.live_symbols else sym.RangeIndex((None, None))
+                    for i, v in zip(index, index_vars)
+                )
 
                 var_map = {}
                 for var in var_list:
                     # If the position is given relative to the end we convert it to
                     # a positive index
-                    if hasattr(var, 'dimensions'):
+                    if hasattr(var, "dimensions"):
                         var_dim = var.dimensions
                     else:
                         var_dim = ()
@@ -227,7 +244,9 @@ def promote_variables(routine, variable_names, pos, index=None, size=None):
                     else:
                         var_pos = pos
 
-                    dimensions = as_tuple(var_dim[:var_pos] + node_index + var_dim[var_pos:])
+                    dimensions = as_tuple(
+                        var_dim[:var_pos] + node_index + var_dim[var_pos:]
+                    )
                     var_map[var] = var.clone(dimensions=dimensions)
 
                 # need to apply update immediately because identical variable use
@@ -238,22 +257,30 @@ def promote_variables(routine, variable_names, pos, index=None, size=None):
     if size is not None:
         size = as_tuple(size)
 
-        var_list = [var for decl in FindNodes(VariableDeclaration).visit(routine.spec)
-                    for var in decl.symbols if var.name.lower() in variable_names]
+        var_list = [
+            var
+            for decl in FindNodes(VariableDeclaration).visit(routine.spec)
+            for var in decl.symbols
+            if var.name.lower() in variable_names
+        ]
 
-        var_shapes = [getattr(var, 'shape', ()) for var in var_list]
+        var_shapes = [getattr(var, "shape", ()) for var in var_list]
         if pos < 0:
             var_pos = [len(shape) - pos + 1 for shape in var_shapes]
         else:
             var_pos = [pos] * len(var_shapes)
         var_shapes = [d[:p] + size + d[p:] for d, p in zip(var_shapes, var_pos)]
 
-        var_map = {v: v.clone(type=v.type.clone(shape=shape), dimensions=shape)
-                   for v, shape in zip(var_list, var_shapes)}
+        var_map = {
+            v: v.clone(type=v.type.clone(shape=shape), dimensions=shape)
+            for v, shape in zip(var_list, var_shapes)
+        }
         routine.spec = SubstituteExpressions(var_map).visit(routine.spec)
 
 
-def promotion_dimensions_from_loop_nest(var_names, loops, promotion_vars_dims, promotion_vars_index):
+def promotion_dimensions_from_loop_nest(
+    var_names, loops, promotion_vars_dims, promotion_vars_index
+):
     """
     Determine promotion dimensions corresponding to the iteration space of a loop nest.
 
@@ -296,7 +323,9 @@ def promotion_dimensions_from_loop_nest(var_names, loops, promotion_vars_dims, p
         """
         # Let's assume we have the same or more promotion dimensions in b than in a
         if len(dims_b) < len(dims_a):
-            return _merge_dims_and_index(dims_b, index_b, dims_a, index_a, var_name)  # pylint: disable=arguments-out-of-order
+            return _merge_dims_and_index(
+                dims_b, index_b, dims_a, index_a, var_name
+            )  # pylint: disable=arguments-out-of-order
 
         # We identify each dimension by the index expression; therefore, we have
         # to merge them first
@@ -316,7 +345,7 @@ def promotion_dimensions_from_loop_nest(var_names, loops, promotion_vars_dims, p
                 ptr_a += 1
             else:
                 # Found a in b: add it and anything before from b
-                new_index += index_b[ptr_b:a_in_b+1]
+                new_index += index_b[ptr_b : a_in_b + 1]
                 ptr_a += 1
                 ptr_b = a_in_b + 1
 
@@ -371,9 +400,16 @@ def promotion_dimensions_from_loop_nest(var_names, loops, promotion_vars_dims, p
             promotion_vars_dims[var_name] = loop_lengths
             promotion_vars_index[var_name] = loop_index
         else:
-            promotion_vars_dims[var_name], promotion_vars_index[var_name] = \
-                _merge_dims_and_index(promotion_vars_dims[var_name], promotion_vars_index[var_name],
-                                      loop_lengths, loop_index, var_name)
+            (
+                promotion_vars_dims[var_name],
+                promotion_vars_index[var_name],
+            ) = _merge_dims_and_index(
+                promotion_vars_dims[var_name],
+                promotion_vars_index[var_name],
+                loop_lengths,
+                loop_index,
+                var_name,
+            )
 
     return promotion_vars_dims, promotion_vars_index
 
@@ -410,11 +446,15 @@ def promote_nonmatching_variables(routine, promotion_vars_dims, promotion_vars_i
             continue
 
         # Eliminate 1:n declared shapes (mostly thanks to OMNI)
-        shape = [s.stop if isinstance(s, sym.Range) and s.start == 1 else s for s in shape]
+        shape = [
+            s.stop if isinstance(s, sym.Range) and s.start == 1 else s for s in shape
+        ]
 
         dims = []
         index = []
-        for dim, idx in zip(promotion_vars_dims[var_name], promotion_vars_index[var_name]):
+        for dim, idx in zip(
+            promotion_vars_dims[var_name], promotion_vars_index[var_name]
+        ):
             if not any(symbolic_op(dim, op.eq, d) for d in shape):
                 dims += [dim]
                 index += [idx]
@@ -424,10 +464,16 @@ def promote_nonmatching_variables(routine, promotion_vars_dims, promotion_vars_i
     # Group promotion variables by index and size to reduce number of traversals for promotion
     index_size_var_map = defaultdict(list)
     for var_name, size in promotion_vars_dims.items():
-        index_size_var_map[(as_tuple(promotion_vars_index[var_name]), as_tuple(size))] += [var_name]
+        index_size_var_map[
+            (as_tuple(promotion_vars_index[var_name]), as_tuple(size))
+        ] += [var_name]
     for (index, size), var_names in index_size_var_map.items():
         promote_variables(routine, var_names, -1, index=index, size=size)
-    info('%s: promoted variable(s): %s', routine.name, ', '.join(promotion_vars_dims.keys()))
+    info(
+        "%s: promoted variable(s): %s",
+        routine.name,
+        ", ".join(promotion_vars_dims.keys()),
+    )
 
 
 def demote_variables(routine, variable_names, dimensions):
@@ -453,7 +499,7 @@ def demote_variables(routine, variable_names, dimensions):
 
     variables = FindVariables(unique=False).visit(routine.ir)
     variables = tuple(v for v in variables if v.name.lower() in vnames)
-    variables = tuple(v for v in variables if hasattr(v, 'shape'))
+    variables = tuple(v for v in variables if hasattr(v, "shape"))
 
     if not variables:
         return
@@ -477,22 +523,34 @@ def demote_variables(routine, variable_names, dimensions):
 
     # Ensure all declarations with `DIMENSION` keywords are modified too!
     decls = tuple(
-        d for d in FindNodes(VariableDeclaration).visit(routine.spec)
+        d
+        for d in FindNodes(VariableDeclaration).visit(routine.spec)
         if d.dimensions and any(s.name.lower() in vnames for s in d.symbols)
     )
     decl_map = {}
     for decl in decls:
         # If all symbols have the same shape (after demotion)
-        sym_shape = tuple(s.shape if isinstance(s, sym.Array) else None for s in decl.symbols)
+        sym_shape = tuple(
+            s.shape if isinstance(s, sym.Array) else None for s in decl.symbols
+        )
         if all(d == sym_shape[0] for d in sym_shape):
-            dimensions = decl.symbols[0].shape if isinstance(decl.symbols[0], sym.Array) else None
+            dimensions = (
+                decl.symbols[0].shape
+                if isinstance(decl.symbols[0], sym.Array)
+                else None
+            )
             decl_map[decl] = decl.clone(dimensions=dimensions)
         else:
             # If not, split into multiple declarations
-            sdims = tuple(s.shape if isinstance(s, sym.Array) else None for s in decl.symbols)
+            sdims = tuple(
+                s.shape if isinstance(s, sym.Array) else None for s in decl.symbols
+            )
             decl_map[decl] = tuple(
-                decl.clone(symbols=(s,), dimensions=d) for s, d in zip(decl.symbols, sdims)
+                decl.clone(symbols=(s,), dimensions=d)
+                for s, d in zip(decl.symbols, sdims)
             )
     routine.spec = Transformer(decl_map).visit(routine.spec)
 
-    info(f'[Loki::Transform] Demoted variables in {routine.name}: {", ".join(variable_names)}')
+    info(
+        f'[Loki::Transform] Demoted variables in {routine.name}: {", ".join(variable_names)}'
+    )

@@ -53,43 +53,70 @@ from pathlib import Path
 from shutil import rmtree
 import pytest
 
-from conftest import (available_frontends, graphviz_present)
+from conftest import available_frontends, graphviz_present
 from loki import (
-    Scheduler, SchedulerConfig, DependencyTransformation, FP, OFP,
-    HAVE_FP, HAVE_OFP, REGEX, Sourcefile, FindNodes, CallStatement,
-    fexprgen, Transformation, BasicType, CMakePlanner, Subroutine,
-    SubroutineItem, ProcedureBindingItem, gettempdir, ProcedureSymbol,
-    ProcedureType, DerivedType, TypeDef, Scalar, Array, FindInlineCalls,
-    Import, Variable, GenericImportItem, GlobalVarImportItem, flatten
+    Scheduler,
+    SchedulerConfig,
+    DependencyTransformation,
+    FP,
+    OFP,
+    HAVE_FP,
+    HAVE_OFP,
+    REGEX,
+    Sourcefile,
+    FindNodes,
+    CallStatement,
+    fexprgen,
+    Transformation,
+    BasicType,
+    CMakePlanner,
+    Subroutine,
+    SubroutineItem,
+    ProcedureBindingItem,
+    gettempdir,
+    ProcedureSymbol,
+    ProcedureType,
+    DerivedType,
+    TypeDef,
+    Scalar,
+    Array,
+    FindInlineCalls,
+    Import,
+    Variable,
+    GenericImportItem,
+    GlobalVarImportItem,
+    flatten,
 )
 
 
-pytestmark = pytest.mark.skipif(not HAVE_FP and not HAVE_OFP, reason='Fparser and OFP not available')
+pytestmark = pytest.mark.skipif(
+    not HAVE_FP and not HAVE_OFP, reason="Fparser and OFP not available"
+)
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.fixture(name='config')
+@pytest.fixture(name="config")
 def fixture_config():
     """
     Default configuration dict with basic options.
     """
     return {
-        'default': {
-            'mode': 'idem',
-            'role': 'kernel',
-            'expand': True,
-            'strict': True,
-            'disable': ['abort']
+        "default": {
+            "mode": "idem",
+            "role": "kernel",
+            "expand": True,
+            "strict": True,
+            "disable": ["abort"],
         },
-        'routines': []
+        "routines": [],
     }
 
 
-@pytest.fixture(name='frontend')
+@pytest.fixture(name="frontend")
 def fixture_frontend():
     """
     Frontend to use.
@@ -106,11 +133,13 @@ class VisGraphWrapper:
     Testing utility to parse the generated callgraph visualisation.
     """
 
-    _re_nodes = re.compile(r'\s*\"?(?P<node>[\w%#./]+)\"? \[colo', re.IGNORECASE)
-    _re_edges = re.compile(r'\s*\"?(?P<parent>[\w%#./]+)\"? -> \"?(?P<child>[\w%#./]+)\"?', re.IGNORECASE)
+    _re_nodes = re.compile(r"\s*\"?(?P<node>[\w%#./]+)\"? \[colo", re.IGNORECASE)
+    _re_edges = re.compile(
+        r"\s*\"?(?P<parent>[\w%#./]+)\"? -> \"?(?P<child>[\w%#./]+)\"?", re.IGNORECASE
+    )
 
     def __init__(self, path):
-        with Path(path).open('r') as f:
+        with Path(path).open("r") as f:
             self.text = f.read()
 
     @property
@@ -122,8 +151,8 @@ class VisGraphWrapper:
         return list(self._re_edges.findall(self.text))
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
-@pytest.mark.parametrize('with_file_graph', [True, False, 'filegraph_simple'])
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
+@pytest.mark.parametrize("with_file_graph", [True, False, "filegraph_simple"])
 def test_scheduler_graph_simple(here, config, frontend, with_file_graph):
     """
     Create a simple task graph from a single sub-project:
@@ -132,24 +161,30 @@ def test_scheduler_graph_simple(here, config, frontend, with_file_graph):
                            |
                            | --> another_l1 -> another_l2
     """
-    projA = here/'sources/projA'
+    projA = here / "sources/projA"
 
     scheduler = Scheduler(
-        paths=projA, includes=projA/'include', config=config,
-        seed_routines=['driverA'], frontend=frontend
+        paths=projA,
+        includes=projA / "include",
+        config=config,
+        seed_routines=["driverA"],
+        frontend=frontend,
     )
 
     expected_items = [
-        'driverA_mod#driverA', 'kernelA_mod#kernelA',
-        'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2',
-        '#another_l1', '#another_l2'
+        "driverA_mod#driverA",
+        "kernelA_mod#kernelA",
+        "compute_l1_mod#compute_l1",
+        "compute_l2_mod#compute_l2",
+        "#another_l1",
+        "#another_l2",
     ]
     expected_dependencies = [
-        ('driverA_mod#driverA', 'kernelA_mod#kernelA'),
-        ('kernelA_mod#kernelA', 'compute_l1_mod#compute_l1'),
-        ('compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'),
-        ('kernelA_mod#kernelA', '#another_l1'),
-        ('#another_l1', '#another_l2'),
+        ("driverA_mod#driverA", "kernelA_mod#kernelA"),
+        ("kernelA_mod#kernelA", "compute_l1_mod#compute_l1"),
+        ("compute_l1_mod#compute_l1", "compute_l2_mod#compute_l2"),
+        ("kernelA_mod#kernelA", "#another_l1"),
+        ("#another_l1", "#another_l2"),
     ]
     assert all(n in scheduler.items for n in expected_items)
     assert all(e in scheduler.dependencies for e in expected_dependencies)
@@ -157,47 +192,55 @@ def test_scheduler_graph_simple(here, config, frontend, with_file_graph):
     if with_file_graph:
         file_graph = scheduler.file_graph
         expected_files = [
-            'module/driverA_mod.f90', 'module/kernelA_mod.F90',
-            'module/compute_l1_mod.f90', 'module/compute_l2_mod.f90',
-            'source/another_l1.F90', 'source/another_l2.F90',
+            "module/driverA_mod.f90",
+            "module/kernelA_mod.F90",
+            "module/compute_l1_mod.f90",
+            "module/compute_l2_mod.f90",
+            "source/another_l1.F90",
+            "source/another_l2.F90",
         ]
         expected_file_dependencies = [
-            ('module/driverA_mod.f90', 'module/kernelA_mod.F90'),
-            ('module/kernelA_mod.F90', 'module/compute_l1_mod.f90'),
-            ('module/compute_l1_mod.f90', 'module/compute_l2_mod.f90'),
-            ('module/kernelA_mod.F90', 'source/another_l1.F90'),
-            ('source/another_l1.F90', 'source/another_l2.F90'),
+            ("module/driverA_mod.f90", "module/kernelA_mod.F90"),
+            ("module/kernelA_mod.F90", "module/compute_l1_mod.f90"),
+            ("module/compute_l1_mod.f90", "module/compute_l2_mod.f90"),
+            ("module/kernelA_mod.F90", "source/another_l1.F90"),
+            ("source/another_l1.F90", "source/another_l2.F90"),
         ]
         assert all(Path(n) in file_graph for n in expected_files)
-        assert all((Path(a), Path(b)) in file_graph.edges for a, b in expected_file_dependencies)
+        assert all(
+            (Path(a), Path(b)) in file_graph.edges
+            for a, b in expected_file_dependencies
+        )
 
     # Testing of callgraph visualisation
-    cg_path = here/'callgraph_simple'
+    cg_path = here / "callgraph_simple"
     if not isinstance(with_file_graph, bool):
-        with_file_graph = here/with_file_graph
+        with_file_graph = here / with_file_graph
     scheduler.callgraph(cg_path, with_file_graph=with_file_graph)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
 
     if with_file_graph:
         if isinstance(with_file_graph, bool):
-            fg_path = cg_path.with_name(f'{cg_path.stem}_file_graph{cg_path.suffix}')
+            fg_path = cg_path.with_name(f"{cg_path.stem}_file_graph{cg_path.suffix}")
         else:
-            fg_path = here/with_file_graph
+            fg_path = here / with_file_graph
         fgraph = VisGraphWrapper(fg_path)
         assert all(n in fgraph.nodes for n in expected_files)
         assert all((e[0], e[1]) in fgraph.edges for e in expected_file_dependencies)
 
         fg_path.unlink()
-        fg_path.with_suffix('.pdf').unlink(missing_ok=True)
+        fg_path.with_suffix(".pdf").unlink(missing_ok=True)
 
     cg_path.unlink()
-    cg_path.with_suffix('.pdf').unlink(missing_ok=True)
+    cg_path.with_suffix(".pdf").unlink(missing_ok=True)
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_graph_partial(here, config, frontend):
     """
     Create a sub-graph from a select set of branches in  single project:
@@ -206,52 +249,60 @@ def test_scheduler_graph_partial(here, config, frontend):
 
            another_l1 -> another_l2
     """
-    projA = here/'sources/projA'
+    projA = here / "sources/projA"
 
-    config['routine'] = [
+    config["routine"] = [
         {
-            'name': 'compute_l1',
-            'role': 'driver',
-            'expand': True,
-        }, {
-            'name': 'another_l1',
-            'role': 'driver',
-            'expand': True,
+            "name": "compute_l1",
+            "role": "driver",
+            "expand": True,
+        },
+        {
+            "name": "another_l1",
+            "role": "driver",
+            "expand": True,
         },
     ]
 
-    scheduler = Scheduler(paths=projA, includes=projA/'include', config=config, frontend=frontend)
+    scheduler = Scheduler(
+        paths=projA, includes=projA / "include", config=config, frontend=frontend
+    )
 
     expected_items = [
-        'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2', '#another_l1', '#another_l2'
+        "compute_l1_mod#compute_l1",
+        "compute_l2_mod#compute_l2",
+        "#another_l1",
+        "#another_l2",
     ]
     expected_dependencies = [
-        ('compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'),
-        ('#another_l1', '#another_l2')
+        ("compute_l1_mod#compute_l1", "compute_l2_mod#compute_l2"),
+        ("#another_l1", "#another_l2"),
     ]
 
     # Check the correct sub-graph is generated
     assert all(n in scheduler.items for n in expected_items)
     assert all(e in scheduler.dependencies for e in expected_dependencies)
-    assert 'driverA' not in scheduler.items
-    assert 'kernelA' not in scheduler.items
+    assert "driverA" not in scheduler.items
+    assert "kernelA" not in scheduler.items
 
     # Testing of callgraph visualisation
-    cg_path = here/'callgraph_partial'
+    cg_path = here / "callgraph_partial"
     scheduler.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
-    assert 'DRIVERA' not in vgraph.nodes
-    assert 'KERNELA' not in vgraph.nodes
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
+    assert "DRIVERA" not in vgraph.nodes
+    assert "KERNELA" not in vgraph.nodes
 
     cg_path.unlink()
-    if cg_path.with_suffix('.pdf').exists():
-        cg_path.with_suffix('.pdf').unlink()
+    if cg_path.with_suffix(".pdf").exists():
+        cg_path.with_suffix(".pdf").unlink()
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_graph_config_file(here, frontend):
     """
     Create a sub-graph from a branches using a config file:
@@ -260,37 +311,45 @@ def test_scheduler_graph_config_file(here, frontend):
 
            another_l1 -> another_l2
     """
-    projA = here/'sources/projA'
-    config = projA/'scheduler_partial.config'
+    projA = here / "sources/projA"
+    config = projA / "scheduler_partial.config"
 
-    scheduler = Scheduler(paths=projA, includes=projA/'include', config=config, frontend=frontend)
+    scheduler = Scheduler(
+        paths=projA, includes=projA / "include", config=config, frontend=frontend
+    )
 
-    expected_items = ['compute_l1_mod#compute_l1', '#another_l1', '#another_l2']
-    expected_dependencies = [('#another_l1', '#another_l2')]
+    expected_items = ["compute_l1_mod#compute_l1", "#another_l1", "#another_l2"]
+    expected_dependencies = [("#another_l1", "#another_l2")]
 
     # Check the correct sub-graph is generated
     assert all(n in scheduler.items for n in expected_items)
     assert all(e in scheduler.dependencies for e in expected_dependencies)
-    assert 'compute_l2' not in scheduler.items  # We're blocking `compute_l2` in config file
+    assert (
+        "compute_l2" not in scheduler.items
+    )  # We're blocking `compute_l2` in config file
 
     # Testing of callgraph visualisation
-    cg_path = here/'callgraph_config_file'
+    cg_path = here / "callgraph_config_file"
     scheduler.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
-    assert 'COMPUTE_L2_MOD#COMPUTE_L2' in vgraph.nodes  # We're blocking this, but it's still in the VGraph
-    assert ('COMPUTE_L1_MOD#COMPUTE_L1', 'COMPUTE_L2_MOD#COMPUTE_L2') in vgraph.edges
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
+    assert (
+        "COMPUTE_L2_MOD#COMPUTE_L2" in vgraph.nodes
+    )  # We're blocking this, but it's still in the VGraph
+    assert ("COMPUTE_L1_MOD#COMPUTE_L1", "COMPUTE_L2_MOD#COMPUTE_L2") in vgraph.edges
     assert len(vgraph.nodes) == 4
     assert len(vgraph.edges) == 2
 
     cg_path.unlink()
-    if cg_path.with_suffix('.pdf').exists():
-        cg_path.with_suffix('.pdf').unlink()
+    if cg_path.with_suffix(".pdf").exists():
+        cg_path.with_suffix(".pdf").unlink()
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_graph_blocked(here, config, frontend):
     """
     Create a simple task graph with a single branch blocked:
@@ -299,48 +358,58 @@ def test_scheduler_graph_blocked(here, config, frontend):
                            |
                            X --> <blocked>
     """
-    projA = here/'sources/projA'
+    projA = here / "sources/projA"
 
-    config['default']['block'] = ['another_l1']
+    config["default"]["block"] = ["another_l1"]
 
     scheduler = Scheduler(
-        paths=projA, includes=projA/'include', config=config,
-        seed_routines=['driverA'], frontend=frontend
+        paths=projA,
+        includes=projA / "include",
+        config=config,
+        seed_routines=["driverA"],
+        frontend=frontend,
     )
 
     expected_items = [
-        'driverA_mod#driverA', 'kernelA_mod#kernelA', 'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'
+        "driverA_mod#driverA",
+        "kernelA_mod#kernelA",
+        "compute_l1_mod#compute_l1",
+        "compute_l2_mod#compute_l2",
     ]
     expected_dependencies = [
-        ('driverA_mod#driverA', 'kernelA_mod#kernelA'),
-        ('kernelA_mod#kernelA', 'compute_l1_mod#compute_l1'),
-        ('compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'),
+        ("driverA_mod#driverA", "kernelA_mod#kernelA"),
+        ("kernelA_mod#kernelA", "compute_l1_mod#compute_l1"),
+        ("compute_l1_mod#compute_l1", "compute_l2_mod#compute_l2"),
     ]
 
     assert all(n in scheduler.items for n in expected_items)
     assert all(e in scheduler.dependencies for e in expected_dependencies)
 
-    assert '#another_l1' not in scheduler.items
-    assert '#another_l2' not in scheduler.items
-    assert ('kernelA', 'another_l1') not in scheduler.dependencies
-    assert ('another_l1', 'another_l2') not in scheduler.dependencies
+    assert "#another_l1" not in scheduler.items
+    assert "#another_l2" not in scheduler.items
+    assert ("kernelA", "another_l1") not in scheduler.dependencies
+    assert ("another_l1", "another_l2") not in scheduler.dependencies
 
     # Testing of callgraph visualisation
-    cg_path = here/'callgraph_block'
+    cg_path = here / "callgraph_block"
     scheduler.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
-    assert '#ANOTHER_L1' in vgraph.nodes  # We're blocking this, but it's still in the VGraph
-    assert '#ANOTHER_L2' not in vgraph.nodes
-    assert ('KERNELA_MOD#KERNELA', '#ANOTHER_L1') in vgraph.edges
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
+    assert (
+        "#ANOTHER_L1" in vgraph.nodes
+    )  # We're blocking this, but it's still in the VGraph
+    assert "#ANOTHER_L2" not in vgraph.nodes
+    assert ("KERNELA_MOD#KERNELA", "#ANOTHER_L1") in vgraph.edges
     assert len(vgraph.nodes) == 5
     assert len(vgraph.edges) == 4
 
     cg_path.unlink()
-    if cg_path.with_suffix('.pdf').exists():
-        cg_path.with_suffix('.pdf').unlink()
+    if cg_path.with_suffix(".pdf").exists():
+        cg_path.with_suffix(".pdf").unlink()
 
 
 def test_scheduler_definitions(here, config, frontend):
@@ -352,21 +421,25 @@ def test_scheduler_definitions(here, config, frontend):
                      <header_type>
                            | --> another_l1 -> another_l2
     """
-    projA = here/'sources/projA'
+    projA = here / "sources/projA"
 
-    header = Sourcefile.from_file(projA/'module/header_mod.f90', frontend=frontend)
+    header = Sourcefile.from_file(projA / "module/header_mod.f90", frontend=frontend)
 
     scheduler = Scheduler(
-        paths=projA, definitions=header['header_mod'], includes=projA/'include',
-        config=config, seed_routines=['driverA'], frontend=frontend
+        paths=projA,
+        definitions=header["header_mod"],
+        includes=projA / "include",
+        config=config,
+        seed_routines=["driverA"],
+        frontend=frontend,
     )
 
-    driver = scheduler.item_map['drivera_mod#drivera'].routine
+    driver = scheduler.item_map["drivera_mod#drivera"].routine
     call = FindNodes(CallStatement).visit(driver.body)[0]
     assert call.arguments[0].parent.type.dtype.typedef is not BasicType.DEFERRED
-    assert fexprgen(call.arguments[0].shape) == '(:,)'
+    assert fexprgen(call.arguments[0].shape) == "(:,)"
     assert call.arguments[1].parent.type.dtype.typedef is not BasicType.DEFERRED
-    assert fexprgen(call.arguments[1].shape) == '(3, 3)'
+    assert fexprgen(call.arguments[1].shape) == "(3, 3)"
 
 
 def test_scheduler_process(here, config, frontend):
@@ -380,39 +453,49 @@ def test_scheduler_process(here, config, frontend):
                            | --> another_l1 -> another_l2
                                   <driver>      <kernel>
     """
-    projA = here/'sources/projA'
+    projA = here / "sources/projA"
 
-    config['routine'] = [
+    config["routine"] = [
         {
-            'name': 'compute_l1',
-            'role': 'driver',
-            'expand': True,
-        }, {
-            'name': 'another_l1',
-            'role': 'driver',
-            'expand': True,
+            "name": "compute_l1",
+            "role": "driver",
+            "expand": True,
+        },
+        {
+            "name": "another_l1",
+            "role": "driver",
+            "expand": True,
         },
     ]
 
-    scheduler = Scheduler(paths=projA, includes=projA/'include', config=config, frontend=frontend)
+    scheduler = Scheduler(
+        paths=projA, includes=projA / "include", config=config, frontend=frontend
+    )
 
     class AppendRole(Transformation):
         """
         Simply append role to subroutine names.
         """
+
         def transform_subroutine(self, routine, **kwargs):
-            role = kwargs.get('role', None)
-            routine.name += f'_{role}'
+            role = kwargs.get("role", None)
+            routine.name += f"_{role}"
 
     # Apply re-naming transformation and check result
     scheduler.process(transformation=AppendRole())
-    assert scheduler.item_map['compute_l1_mod#compute_l1'].routine.name == 'compute_l1_driver'
-    assert scheduler.item_map['compute_l2_mod#compute_l2'].routine.name == 'compute_l2_kernel'
-    assert scheduler.item_map['#another_l1'].routine.name == 'another_l1_driver'
-    assert scheduler.item_map['#another_l2'].routine.name == 'another_l2_kernel'
+    assert (
+        scheduler.item_map["compute_l1_mod#compute_l1"].routine.name
+        == "compute_l1_driver"
+    )
+    assert (
+        scheduler.item_map["compute_l2_mod#compute_l2"].routine.name
+        == "compute_l2_kernel"
+    )
+    assert scheduler.item_map["#another_l1"].routine.name == "another_l1_driver"
+    assert scheduler.item_map["#another_l2"].routine.name == "another_l2_kernel"
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_process_filter(here, config, frontend):
     """
     Applies simple kernels over complex callgraphs to check that we
@@ -424,51 +507,61 @@ def test_scheduler_process_filter(here, config, frontend):
                            | --> another_l1 -> another_l2
                                   <driver>      <kernel>
     """
-    projA = here/'sources/projA'
-    projB = here/'sources/projB'
+    projA = here / "sources/projA"
+    projB = here / "sources/projB"
 
-    config['routine'] = [
-        {'name': 'driverE_single', 'role': 'driver', 'expand': True,},
+    config["routine"] = [
+        {
+            "name": "driverE_single",
+            "role": "driver",
+            "expand": True,
+        },
     ]
 
-
     scheduler = Scheduler(
-        paths=[projA, projB], includes=projA/'include', config=config, frontend=frontend
+        paths=[projA, projB],
+        includes=projA / "include",
+        config=config,
+        frontend=frontend,
     )
 
     class XMarksTheSpot(Transformation):
         """
         Append 'X' to a given :any:`Subroutine`
         """
+
         def transform_subroutine(self, routine, **kwargs):
-            routine.name += '_X'
+            routine.name += "_X"
 
     # Apply re-naming transformation and check result
     scheduler.process(transformation=XMarksTheSpot())
 
     # Check that the targeted subroutines have been renamed
-    assert 'drivere_mod#drivere_single' in scheduler.items
-    assert scheduler.item_map['drivere_mod#drivere_single'].routine.name == 'driverE_single_X'
+    assert "drivere_mod#drivere_single" in scheduler.items
+    assert (
+        scheduler.item_map["drivere_mod#drivere_single"].routine.name
+        == "driverE_single_X"
+    )
 
     # Check that the second call-tree is excluded
-    assert 'drivere_mod#drivere_multiple' not in scheduler.items
+    assert "drivere_mod#drivere_multiple" not in scheduler.items
     # Get the source from the scheduler and check for side-effects
-    drivere_source =  scheduler.item_map['drivere_mod#drivere_single'].source
-    assert drivere_source.all_subroutines[0].name == 'driverE_single_X'
-    assert drivere_source.all_subroutines[1].name == 'driverE_multiple'
+    drivere_source = scheduler.item_map["drivere_mod#drivere_single"].source
+    assert drivere_source.all_subroutines[0].name == "driverE_single_X"
+    assert drivere_source.all_subroutines[1].name == "driverE_multiple"
 
     # Check that the kernel files have been renamed appropriately
-    assert 'kernele_mod#kernele' in scheduler.items
-    assert scheduler.item_map['kernele_mod#kernele'].routine.name == 'kernelE_X'
+    assert "kernele_mod#kernele" in scheduler.items
+    assert scheduler.item_map["kernele_mod#kernele"].routine.name == "kernelE_X"
 
     # Check that excluded kernel has not been altered
-    assert 'kernele_mod#kernelet' not in scheduler.items
-    kernele_source =  scheduler.item_map['kernele_mod#kernele'].source
-    assert kernele_source.all_subroutines[0].name == 'kernelE_X'
-    assert kernele_source.all_subroutines[1].name == 'kernelET'
+    assert "kernele_mod#kernelet" not in scheduler.items
+    kernele_source = scheduler.item_map["kernele_mod#kernele"].source
+    assert kernele_source.all_subroutines[0].name == "kernelE_X"
+    assert kernele_source.all_subroutines[1].name == "kernelET"
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_graph_multiple_combined(here, config, frontend):
     """
     Create a single task graph spanning two projects
@@ -477,43 +570,51 @@ def test_scheduler_graph_multiple_combined(here, config, frontend):
                          |
     projB:          ext_driver -> ext_kernel
     """
-    projA = here/'sources/projA'
-    projB = here/'sources/projB'
+    projA = here / "sources/projA"
+    projB = here / "sources/projB"
 
     scheduler = Scheduler(
-        paths=[projA, projB], includes=projA/'include', config=config,
-        seed_routines=['driverB'], frontend=frontend
+        paths=[projA, projB],
+        includes=projA / "include",
+        config=config,
+        seed_routines=["driverB"],
+        frontend=frontend,
     )
 
     expected_items = [
-        'driverB_mod#driverB', 'kernelB_mod#kernelB',
-        'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2',
-        'ext_driver_mod#ext_driver', 'ext_kernel_mod#ext_kernel'
+        "driverB_mod#driverB",
+        "kernelB_mod#kernelB",
+        "compute_l1_mod#compute_l1",
+        "compute_l2_mod#compute_l2",
+        "ext_driver_mod#ext_driver",
+        "ext_kernel_mod#ext_kernel",
     ]
     expected_dependencies = [
-        ('driverB_mod#driverB', 'kernelB_mod#kernelB'),
-        ('kernelB_mod#kernelB', 'compute_l1_mod#compute_l1'),
-        ('compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'),
-        ('kernelB_mod#kernelB', 'ext_driver_mod#ext_driver'),
-        ('ext_driver_mod#ext_driver', 'ext_kernel_mod#ext_kernel'),
+        ("driverB_mod#driverB", "kernelB_mod#kernelB"),
+        ("kernelB_mod#kernelB", "compute_l1_mod#compute_l1"),
+        ("compute_l1_mod#compute_l1", "compute_l2_mod#compute_l2"),
+        ("kernelB_mod#kernelB", "ext_driver_mod#ext_driver"),
+        ("ext_driver_mod#ext_driver", "ext_kernel_mod#ext_kernel"),
     ]
     assert all(n in scheduler.items for n in expected_items)
     assert all(e in scheduler.dependencies for e in expected_dependencies)
 
     # Testing of callgraph visualisation
-    cg_path = here/'callgraph_multiple_combined'
+    cg_path = here / "callgraph_multiple_combined"
     scheduler.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
 
     cg_path.unlink()
-    if cg_path.with_suffix('.pdf').exists():
-        cg_path.with_suffix('.pdf').unlink()
+    if cg_path.with_suffix(".pdf").exists():
+        cg_path.with_suffix(".pdf").unlink()
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_graph_multiple_separate(here, config, frontend):
     """
     Tests combining two scheduler graphs, where that an individual
@@ -527,33 +628,38 @@ def test_scheduler_graph_multiple_separate(here, config, frontend):
 
     projB:            ext_driver -> ext_kernel
     """
-    projA = here/'sources/projA'
-    projB = here/'sources/projB'
+    projA = here / "sources/projA"
+    projB = here / "sources/projB"
 
     configA = config.copy()
-    configA['routine'] = [
+    configA["routine"] = [
         {
-            'name': 'kernelB',
-            'role': 'kernel',
-            'ignore': ['ext_driver'],
-            'enrich': ['ext_driver'],
+            "name": "kernelB",
+            "role": "kernel",
+            "ignore": ["ext_driver"],
+            "enrich": ["ext_driver"],
         },
     ]
 
     schedulerA = Scheduler(
-        paths=[projA, projB], includes=projA/'include', config=configA,
-        seed_routines=['driverB'], frontend=frontend
+        paths=[projA, projB],
+        includes=projA / "include",
+        config=configA,
+        seed_routines=["driverB"],
+        frontend=frontend,
     )
 
     expected_itemsA = [
-        'driverB_mod#driverB', 'kernelB_mod#kernelB',
-        'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2',
+        "driverB_mod#driverB",
+        "kernelB_mod#kernelB",
+        "compute_l1_mod#compute_l1",
+        "compute_l2_mod#compute_l2",
     ]
     expected_dependenciesA = [
-        ('driverB_mod#driverB', 'kernelB_mod#kernelB'),
-        ('kernelB_mod#kernelB', 'compute_l1_mod#compute_l1'),
-        ('compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'),
-     ]
+        ("driverB_mod#driverB", "kernelB_mod#kernelB"),
+        ("kernelB_mod#kernelB", "compute_l1_mod#compute_l1"),
+        ("compute_l1_mod#compute_l1", "compute_l2_mod#compute_l2"),
+    ]
 
     assert all(n in schedulerA.items for n in expected_itemsA)
     assert all(e in schedulerA.dependencies for e in expected_dependenciesA)
@@ -561,53 +667,59 @@ def test_scheduler_graph_multiple_separate(here, config, frontend):
     # assert 'ext_kernel' not in schedulerA.items
 
     # Test callgraph visualisation
-    cg_path = here/'callgraph_multiple_separate_A'
+    cg_path = here / "callgraph_multiple_separate_A"
     schedulerA.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_itemsA)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependenciesA)
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependenciesA
+    )
 
     cg_path.unlink()
-    if cg_path.with_suffix('.pdf').exists():
-        cg_path.with_suffix('.pdf').unlink()
+    if cg_path.with_suffix(".pdf").exists():
+        cg_path.with_suffix(".pdf").unlink()
 
     # Test second scheduler instance that holds the receiver items
     configB = config.copy()
-    configB['routine'] = [
+    configB["routine"] = [
         {
-            'name': 'ext_driver',
-            'role': 'kernel',
+            "name": "ext_driver",
+            "role": "kernel",
         },
     ]
 
     schedulerB = Scheduler(
-        paths=projB, config=configB, seed_routines=['ext_driver'],
-        frontend=frontend
+        paths=projB, config=configB, seed_routines=["ext_driver"], frontend=frontend
     )
 
     # TODO: Technically we should check that the role=kernel has been honoured in B
-    assert 'ext_driver_mod#ext_driver' in schedulerB.items
-    assert 'ext_kernel_mod#ext_kernel' in schedulerB.items
-    assert ('ext_driver_mod#ext_driver', 'ext_kernel_mod#ext_kernel') in schedulerB.dependencies
+    assert "ext_driver_mod#ext_driver" in schedulerB.items
+    assert "ext_kernel_mod#ext_kernel" in schedulerB.items
+    assert (
+        "ext_driver_mod#ext_driver",
+        "ext_kernel_mod#ext_kernel",
+    ) in schedulerB.dependencies
 
     # Check that the call from kernelB to ext_driver has been enriched with IPA meta-info
-    call = FindNodes(CallStatement).visit(schedulerA.item_map['kernelb_mod#kernelb'].routine.body)[1]
+    call = FindNodes(CallStatement).visit(
+        schedulerA.item_map["kernelb_mod#kernelb"].routine.body
+    )[1]
     assert isinstance(call.routine, Subroutine)
-    assert fexprgen(call.routine.arguments) == '(vector(:), matrix(:, :))'
+    assert fexprgen(call.routine.arguments) == "(vector(:), matrix(:, :))"
 
     # Test callgraph visualisation
-    cg_path = here/'callgraph_multiple_separate_B'
+    cg_path = here / "callgraph_multiple_separate_B"
     schedulerB.callgraph(cg_path)
 
     vgraphB = VisGraphWrapper(cg_path)
-    assert 'EXT_DRIVER_MOD#EXT_DRIVER' in vgraphB.nodes
-    assert 'EXT_KERNEL_MOD#EXT_KERNEL' in vgraphB.nodes
-    assert ('EXT_DRIVER_MOD#EXT_DRIVER', 'EXT_KERNEL_MOD#EXT_KERNEL') in vgraphB.edges
+    assert "EXT_DRIVER_MOD#EXT_DRIVER" in vgraphB.nodes
+    assert "EXT_KERNEL_MOD#EXT_KERNEL" in vgraphB.nodes
+    assert ("EXT_DRIVER_MOD#EXT_DRIVER", "EXT_KERNEL_MOD#EXT_KERNEL") in vgraphB.edges
 
     cg_path.unlink()
-    if cg_path.with_suffix('.pdf').exists():
-        cg_path.with_suffix('.pdf').unlink()
+    if cg_path.with_suffix(".pdf").exists():
+        cg_path.with_suffix(".pdf").unlink()
 
 
 def test_scheduler_module_dependency(here, config, frontend):
@@ -619,32 +731,42 @@ def test_scheduler_module_dependency(here, config, frontend):
                            |
     projC:                 | --> routine_one -> routine_two
     """
-    projA = here/'sources/projA'
-    projC = here/'sources/projC'
+    projA = here / "sources/projA"
+    projC = here / "sources/projC"
 
     scheduler = Scheduler(
-        paths=[projA, projC], includes=projA/'include', config=config,
-        seed_routines=['driverC'], frontend=frontend
+        paths=[projA, projC],
+        includes=projA / "include",
+        config=config,
+        seed_routines=["driverC"],
+        frontend=frontend,
     )
 
     expected_items = [
-        'driverC_mod#driverC', 'kernelC_mod#kernelC',
-        'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2',
-        'proj_c_util_mod#routine_one', 'proj_c_util_mod#routine_two'
+        "driverC_mod#driverC",
+        "kernelC_mod#kernelC",
+        "compute_l1_mod#compute_l1",
+        "compute_l2_mod#compute_l2",
+        "proj_c_util_mod#routine_one",
+        "proj_c_util_mod#routine_two",
     ]
     expected_dependencies = [
-        ('driverC_mod#driverC', 'kernelC_mod#kernelC'),
-        ('kernelC_mod#kernelC', 'compute_l1_mod#compute_l1'),
-        ('compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'),
-        ('kernelC_mod#kernelC', 'proj_c_util_mod#routine_one'),
-        ('proj_c_util_mod#routine_one', 'proj_c_util_mod#routine_two'),
+        ("driverC_mod#driverC", "kernelC_mod#kernelC"),
+        ("kernelC_mod#kernelC", "compute_l1_mod#compute_l1"),
+        ("compute_l1_mod#compute_l1", "compute_l2_mod#compute_l2"),
+        ("kernelC_mod#kernelC", "proj_c_util_mod#routine_one"),
+        ("proj_c_util_mod#routine_one", "proj_c_util_mod#routine_two"),
     ]
     assert all(n in scheduler.items for n in expected_items)
     assert all(e in scheduler.dependencies for e in expected_dependencies)
 
     # Ensure that we got the right routines from the module
-    assert scheduler.item_map['proj_c_util_mod#routine_one'].routine.name == 'routine_one'
-    assert scheduler.item_map['proj_c_util_mod#routine_two'].routine.name == 'routine_two'
+    assert (
+        scheduler.item_map["proj_c_util_mod#routine_one"].routine.name == "routine_one"
+    )
+    assert (
+        scheduler.item_map["proj_c_util_mod#routine_two"].routine.name == "routine_two"
+    )
 
 
 def test_scheduler_module_dependencies_unqualified(here, config, frontend):
@@ -657,32 +779,42 @@ def test_scheduler_module_dependencies_unqualified(here, config, frontend):
                            |
     projC:                 | --> routine_one -> routine_two
     """
-    projA = here/'sources/projA'
-    projC = here/'sources/projC'
+    projA = here / "sources/projA"
+    projC = here / "sources/projC"
 
     scheduler = Scheduler(
-        paths=[projA, projC], includes=projA/'include', config=config,
-        seed_routines=['driverD'], frontend=frontend
+        paths=[projA, projC],
+        includes=projA / "include",
+        config=config,
+        seed_routines=["driverD"],
+        frontend=frontend,
     )
 
     expected_items = [
-        'driverD_mod#driverD', 'kernelD_mod#kernelD',
-        'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2',
-        'proj_c_util_mod#routine_one', 'proj_c_util_mod#routine_two'
+        "driverD_mod#driverD",
+        "kernelD_mod#kernelD",
+        "compute_l1_mod#compute_l1",
+        "compute_l2_mod#compute_l2",
+        "proj_c_util_mod#routine_one",
+        "proj_c_util_mod#routine_two",
     ]
     expected_dependencies = [
-        ('driverD_mod#driverD', 'kernelD_mod#kernelD'),
-        ('kernelD_mod#kernelD', 'compute_l1_mod#compute_l1'),
-        ('compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'),
-        ('kernelD_mod#kernelD', 'proj_c_util_mod#routine_one'),
-        ('proj_c_util_mod#routine_one', 'proj_c_util_mod#routine_two'),
+        ("driverD_mod#driverD", "kernelD_mod#kernelD"),
+        ("kernelD_mod#kernelD", "compute_l1_mod#compute_l1"),
+        ("compute_l1_mod#compute_l1", "compute_l2_mod#compute_l2"),
+        ("kernelD_mod#kernelD", "proj_c_util_mod#routine_one"),
+        ("proj_c_util_mod#routine_one", "proj_c_util_mod#routine_two"),
     ]
     assert all(n in scheduler.items for n in expected_items)
     assert all(e in scheduler.dependencies for e in expected_dependencies)
 
     # Ensure that we got the right routines from the module
-    assert scheduler.item_map['proj_c_util_mod#routine_one'].routine.name == 'routine_one'
-    assert scheduler.item_map['proj_c_util_mod#routine_two'].routine.name == 'routine_two'
+    assert (
+        scheduler.item_map["proj_c_util_mod#routine_one"].routine.name == "routine_one"
+    )
+    assert (
+        scheduler.item_map["proj_c_util_mod#routine_two"].routine.name == "routine_two"
+    )
 
 
 def test_scheduler_missing_files(here, config, frontend):
@@ -694,36 +826,44 @@ def test_scheduler_missing_files(here, config, frontend):
                            |
     projC:                 < cannot find path >
     """
-    projA = here/'sources/projA'
+    projA = here / "sources/projA"
 
-    config['default']['strict'] = True
+    config["default"]["strict"] = True
     with pytest.raises(FileNotFoundError):
         scheduler = Scheduler(
-            paths=[projA], includes=projA/'include', config=config,
-            seed_routines=['driverC'], frontend=frontend
+            paths=[projA],
+            includes=projA / "include",
+            config=config,
+            seed_routines=["driverC"],
+            frontend=frontend,
         )
 
-    config['default']['strict'] = False
+    config["default"]["strict"] = False
     scheduler = Scheduler(
-        paths=[projA], includes=projA/'include', config=config,
-        seed_routines=['driverC'], frontend=frontend
+        paths=[projA],
+        includes=projA / "include",
+        config=config,
+        seed_routines=["driverC"],
+        frontend=frontend,
     )
 
     expected_items = [
-        'driverC_mod#driverC', 'kernelC_mod#kernelC',
-        'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'
+        "driverC_mod#driverC",
+        "kernelC_mod#kernelC",
+        "compute_l1_mod#compute_l1",
+        "compute_l2_mod#compute_l2",
     ]
     expected_dependencies = [
-        ('driverC_mod#driverC', 'kernelC_mod#kernelC'),
-        ('kernelC_mod#kernelC', 'compute_l1_mod#compute_l1'),
-        ('compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'),
+        ("driverC_mod#driverC", "kernelC_mod#kernelC"),
+        ("kernelC_mod#kernelC", "compute_l1_mod#compute_l1"),
+        ("compute_l1_mod#compute_l1", "compute_l2_mod#compute_l2"),
     ]
     assert all(n in scheduler.items for n in expected_items)
     assert all(e in scheduler.dependencies for e in expected_dependencies)
 
     # Ensure that the missing items are not in the graph
-    assert 'proj_c_util_mod#routine_one' not in scheduler.items
-    assert 'proj_c_util_mod#routine_two' not in scheduler.items
+    assert "proj_c_util_mod#routine_one" not in scheduler.items
+    assert "proj_c_util_mod#routine_two" not in scheduler.items
 
 
 def test_scheduler_dependencies_ignore(here, frontend):
@@ -735,45 +875,64 @@ def test_scheduler_dependencies_ignore(here, frontend):
                          |
     projB:          ext_driver -> ext_kernel
     """
-    projA = here/'sources/projA'
-    projB = here/'sources/projB'
+    projA = here / "sources/projA"
+    projB = here / "sources/projB"
 
-    configA = SchedulerConfig.from_dict({
-        'default': {'role': 'kernel', 'expand': True, 'strict': True},
-        'routine': [
-            {'name': 'driverB', 'role': 'driver'},
-            {'name': 'kernelB', 'ignore': ['ext_driver']},
+    configA = SchedulerConfig.from_dict(
+        {
+            "default": {"role": "kernel", "expand": True, "strict": True},
+            "routine": [
+                {"name": "driverB", "role": "driver"},
+                {"name": "kernelB", "ignore": ["ext_driver"]},
+            ],
+        }
+    )
+
+    configB = SchedulerConfig.from_dict(
+        {
+            "default": {"role": "kernel", "expand": True, "strict": True},
+            "routine": [{"name": "ext_driver", "role": "kernel"}],
+        }
+    )
+
+    schedulerA = Scheduler(
+        paths=[projA, projB],
+        includes=projA / "include",
+        config=configA,
+        frontend=frontend,
+    )
+
+    schedulerB = Scheduler(
+        paths=projB, includes=projB / "include", config=configB, frontend=frontend
+    )
+
+    assert all(
+        n in schedulerA.items
+        for n in [
+            "driverB_mod#driverB",
+            "kernelB_mod#kernelB",
+            "compute_l1_mod#compute_l1",
+            "compute_l2_mod#compute_l2",
         ]
-    })
+    )
+    assert "ext_driver_mod#ext_driver" not in schedulerA.items
+    assert "ext_kernel_mod#ext_kernel" not in schedulerA.items
 
-    configB = SchedulerConfig.from_dict({
-        'default': {'role': 'kernel', 'expand': True, 'strict': True},
-        'routine': [
-            {'name': 'ext_driver', 'role': 'kernel'}
-        ]
-    })
-
-    schedulerA = Scheduler(paths=[projA, projB], includes=projA/'include', config=configA, frontend=frontend)
-
-    schedulerB = Scheduler(paths=projB, includes=projB/'include', config=configB, frontend=frontend)
-
-    assert all(n in schedulerA.items for n in [
-        'driverB_mod#driverB', 'kernelB_mod#kernelB',
-        'compute_l1_mod#compute_l1', 'compute_l2_mod#compute_l2'
-    ])
-    assert 'ext_driver_mod#ext_driver' not in schedulerA.items
-    assert 'ext_kernel_mod#ext_kernel' not in schedulerA.items
-
-    assert all(n in schedulerB.items for n in ['ext_driver_mod#ext_driver', 'ext_kernel_mod#ext_kernel'])
+    assert all(
+        n in schedulerB.items
+        for n in ["ext_driver_mod#ext_driver", "ext_kernel_mod#ext_kernel"]
+    )
 
     # Apply dependency injection transformation and ensure only the root driver is not transformed
-    dependency = DependencyTransformation(suffix='_test', mode='module', module_suffix='_mod')
+    dependency = DependencyTransformation(
+        suffix="_test", mode="module", module_suffix="_mod"
+    )
     schedulerA.process(transformation=dependency)
 
-    assert schedulerA.items[0].source.all_subroutines[0].name == 'driverB'
-    assert schedulerA.items[1].source.all_subroutines[0].name == 'kernelB_test'
-    assert schedulerA.items[2].source.all_subroutines[0].name == 'compute_l1_test'
-    assert schedulerA.items[3].source.all_subroutines[0].name == 'compute_l2_test'
+    assert schedulerA.items[0].source.all_subroutines[0].name == "driverB"
+    assert schedulerA.items[1].source.all_subroutines[0].name == "kernelB_test"
+    assert schedulerA.items[2].source.all_subroutines[0].name == "compute_l1_test"
+    assert schedulerA.items[3].source.all_subroutines[0].name == "compute_l2_test"
 
     # For the second target lib, we want the driver to be converted
     schedulerB.process(transformation=dependency)
@@ -781,8 +940,8 @@ def test_scheduler_dependencies_ignore(here, frontend):
     # Repeat processing to ensure DependencyTransform is idempotent
     schedulerB.process(transformation=dependency)
 
-    assert schedulerB.items[0].source.all_subroutines[0].name == 'ext_driver_test'
-    assert schedulerB.items[1].source.all_subroutines[0].name == 'ext_kernel_test'
+    assert schedulerB.items[0].source.all_subroutines[0].name == "ext_driver_test"
+    assert schedulerB.items[1].source.all_subroutines[0].name == "ext_kernel_test"
 
 
 def test_scheduler_cmake_planner(here, frontend):
@@ -795,70 +954,77 @@ def test_scheduler_cmake_planner(here, frontend):
     projB:          ext_driver -> ext_kernel
     """
 
-    sourcedir = here/'sources'
-    proj_a = sourcedir/'projA'
-    proj_b = sourcedir/'projB'
+    sourcedir = here / "sources"
+    proj_a = sourcedir / "projA"
+    proj_b = sourcedir / "projB"
 
-    config = SchedulerConfig.from_dict({
-        'default': {'role': 'kernel', 'expand': True, 'strict': True},
-        'routine': [
-            {'name': 'driverB', 'role': 'driver'},
-            {'name': 'kernelB', 'ignore': ['ext_driver']},
-        ]
-    })
+    config = SchedulerConfig.from_dict(
+        {
+            "default": {"role": "kernel", "expand": True, "strict": True},
+            "routine": [
+                {"name": "driverB", "role": "driver"},
+                {"name": "kernelB", "ignore": ["ext_driver"]},
+            ],
+        }
+    )
 
     # Populate the scheduler
     # (this is the same as SchedulerA in test_scheduler_dependencies_ignore, so no need to
     # check scheduler set-up itself)
     scheduler = Scheduler(
-        paths=[proj_a, proj_b], includes=proj_a/'include',
-        config=config, frontend=frontend
+        paths=[proj_a, proj_b],
+        includes=proj_a / "include",
+        config=config,
+        frontend=frontend,
     )
 
     # Apply the transformation
-    builddir = here/'scheduler_cmake_planner_dummy_dir'
+    builddir = here / "scheduler_cmake_planner_dummy_dir"
     builddir.mkdir(exist_ok=True)
-    planfile = builddir/'loki_plan.cmake'
+    planfile = builddir / "loki_plan.cmake"
 
-    planner = CMakePlanner(rootpath=sourcedir, mode='foobar', build=builddir)
+    planner = CMakePlanner(rootpath=sourcedir, mode="foobar", build=builddir)
     scheduler.process(transformation=planner)
 
     # Validate the generated lists
     expected_files = {
-        proj_a/'module/driverB_mod.f90', proj_a/'module/kernelB_mod.F90',
-        proj_a/'module/compute_l1_mod.f90', proj_a/'module/compute_l2_mod.f90'
+        proj_a / "module/driverB_mod.f90",
+        proj_a / "module/kernelB_mod.F90",
+        proj_a / "module/compute_l1_mod.f90",
+        proj_a / "module/compute_l2_mod.f90",
     }
 
-    assert set(planner.sources_to_remove) == {f.relative_to(sourcedir) for f in expected_files}
-    assert set(planner.sources_to_append) == {
-        (builddir/f.stem).with_suffix('.foobar.F90') for f in expected_files
+    assert set(planner.sources_to_remove) == {
+        f.relative_to(sourcedir) for f in expected_files
     }
-    assert set(planner.sources_to_transform) == {f.relative_to(sourcedir) for f in expected_files}
+    assert set(planner.sources_to_append) == {
+        (builddir / f.stem).with_suffix(".foobar.F90") for f in expected_files
+    }
+    assert set(planner.sources_to_transform) == {
+        f.relative_to(sourcedir) for f in expected_files
+    }
 
     # Write the plan file
     planner.write_planfile(planfile)
 
     # Validate the plan file content
-    plan_pattern = re.compile(r'set\(\s*(\w+)\s*(.*?)\s*\)', re.DOTALL)
+    plan_pattern = re.compile(r"set\(\s*(\w+)\s*(.*?)\s*\)", re.DOTALL)
 
     loki_plan = planfile.read_text()
     plan_dict = {k: v.split() for k, v in plan_pattern.findall(loki_plan)}
     plan_dict = {k: {Path(s).stem for s in v} for k, v in plan_dict.items()}
 
-    expected_files = {
-        'driverB_mod', 'kernelB_mod',
-        'compute_l1_mod', 'compute_l2_mod'
-    }
+    expected_files = {"driverB_mod", "kernelB_mod", "compute_l1_mod", "compute_l2_mod"}
 
-    assert 'LOKI_SOURCES_TO_TRANSFORM' in plan_dict
-    assert plan_dict['LOKI_SOURCES_TO_TRANSFORM'] == expected_files
+    assert "LOKI_SOURCES_TO_TRANSFORM" in plan_dict
+    assert plan_dict["LOKI_SOURCES_TO_TRANSFORM"] == expected_files
 
-    assert 'LOKI_SOURCES_TO_REMOVE' in plan_dict
-    assert plan_dict['LOKI_SOURCES_TO_REMOVE'] == expected_files
+    assert "LOKI_SOURCES_TO_REMOVE" in plan_dict
+    assert plan_dict["LOKI_SOURCES_TO_REMOVE"] == expected_files
 
-    assert 'LOKI_SOURCES_TO_APPEND' in plan_dict
-    assert plan_dict['LOKI_SOURCES_TO_APPEND'] == {
-        f'{name}.foobar' for name in expected_files
+    assert "LOKI_SOURCES_TO_APPEND" in plan_dict
+    assert plan_dict["LOKI_SOURCES_TO_APPEND"] == {
+        f"{name}.foobar" for name in expected_files
     }
 
     planfile.unlink()
@@ -869,92 +1035,104 @@ def test_scheduler_item(here):
     """
     Test the basic regex frontend nodes in :any:`Item` objects for fast dependency detection.
     """
-    filepath = here/'sources/sourcefile_item.f90'
+    filepath = here / "sources/sourcefile_item.f90"
     sourcefile = Sourcefile.from_file(filepath, frontend=REGEX)
 
-    available_names = [f'#{r.name}' for r in sourcefile.subroutines]
-    available_names += [f'{m.name}#{r.name}' for m in sourcefile.modules for r in m.subroutines]
+    available_names = [f"#{r.name}" for r in sourcefile.subroutines]
+    available_names += [
+        f"{m.name}#{r.name}" for m in sourcefile.modules for r in m.subroutines
+    ]
 
-    item_a = SubroutineItem(name='#routine_a', source=sourcefile)
-    assert item_a.calls == ('routine_b',)
+    item_a = SubroutineItem(name="#routine_a", source=sourcefile)
+    assert item_a.calls == ("routine_b",)
     assert not item_a.members
-    assert item_a.children == ('routine_b',)
-    assert item_a.qualify_names(item_a.children, available_names) == ('#routine_b',)
+    assert item_a.children == ("routine_b",)
+    assert item_a.qualify_names(item_a.children, available_names) == ("#routine_b",)
     assert item_a.targets == item_a.children
 
-    item_module = SubroutineItem(name='some_module#module_routine', source=sourcefile)
-    assert item_module.calls == ('routine_b',)
+    item_module = SubroutineItem(name="some_module#module_routine", source=sourcefile)
+    assert item_module.calls == ("routine_b",)
     assert not item_module.members
-    assert item_module.children == ('routine_b',)
-    assert item_module.qualify_names(item_module.children, available_names) == ('#routine_b',)
+    assert item_module.children == ("routine_b",)
+    assert item_module.qualify_names(item_module.children, available_names) == (
+        "#routine_b",
+    )
     assert item_module.targets == item_module.children
 
-    item_b = SubroutineItem(name='#routine_b', source=sourcefile)
-    assert item_b.calls == ('contained_c', 'routine_a')
-    assert 'contained_c' in item_b.members
-    assert 'contained_d' in item_b.members
-    assert item_b.children == ('routine_a',)
-    assert item_b.qualify_names(item_b.children, available_names) == ('#routine_a',)
-    assert item_b.targets == ('contained_c', 'routine_a')
+    item_b = SubroutineItem(name="#routine_b", source=sourcefile)
+    assert item_b.calls == ("contained_c", "routine_a")
+    assert "contained_c" in item_b.members
+    assert "contained_d" in item_b.members
+    assert item_b.children == ("routine_a",)
+    assert item_b.qualify_names(item_b.children, available_names) == ("#routine_a",)
+    assert item_b.targets == ("contained_c", "routine_a")
 
-    item_b = SubroutineItem(name='#routine_b', source=sourcefile, config={'disable': ['routine_a']})
-    assert item_b.calls == ('contained_c', 'routine_a')
-    assert 'contained_c' in item_b.members
-    assert 'contained_d' in item_b.members
+    item_b = SubroutineItem(
+        name="#routine_b", source=sourcefile, config={"disable": ["routine_a"]}
+    )
+    assert item_b.calls == ("contained_c", "routine_a")
+    assert "contained_c" in item_b.members
+    assert "contained_d" in item_b.members
     assert not item_b.children
     assert not item_b.qualify_names(item_b.children, available_names)
-    assert item_b.targets == ('contained_c',)
+    assert item_b.targets == ("contained_c",)
 
-    item_b = SubroutineItem(name='#routine_b', source=sourcefile, config={'ignore': ['routine_a']})
-    assert item_b.calls == ('contained_c', 'routine_a')
-    assert 'contained_c' in item_b.members
-    assert 'contained_d' in item_b.members
-    assert item_b.children == ('routine_a',)
-    assert item_b.qualify_names(item_b.children, available_names) == ('#routine_a',)
-    assert item_b.targets == ('contained_c',)
+    item_b = SubroutineItem(
+        name="#routine_b", source=sourcefile, config={"ignore": ["routine_a"]}
+    )
+    assert item_b.calls == ("contained_c", "routine_a")
+    assert "contained_c" in item_b.members
+    assert "contained_d" in item_b.members
+    assert item_b.children == ("routine_a",)
+    assert item_b.qualify_names(item_b.children, available_names) == ("#routine_a",)
+    assert item_b.targets == ("contained_c",)
 
-    item_b = SubroutineItem(name='#routine_b', source=sourcefile, config={'block': ['routine_a']})
-    assert item_b.calls == ('contained_c', 'routine_a')
-    assert 'contained_c' in item_b.members
-    assert 'contained_d' in item_b.members
-    assert item_b.children == ('routine_a',)
-    assert item_b.qualify_names(item_b.children, available_names) == ('#routine_a',)
-    assert item_b.targets == ('contained_c',)
+    item_b = SubroutineItem(
+        name="#routine_b", source=sourcefile, config={"block": ["routine_a"]}
+    )
+    assert item_b.calls == ("contained_c", "routine_a")
+    assert "contained_c" in item_b.members
+    assert "contained_d" in item_b.members
+    assert item_b.children == ("routine_a",)
+    assert item_b.qualify_names(item_b.children, available_names) == ("#routine_a",)
+    assert item_b.targets == ("contained_c",)
 
 
 def test_scheduler_item_children(here):
     """
     Make sure children are correct and unique for items
     """
-    config = SchedulerConfig.from_dict({
-        'default': {'role': 'kernel', 'expand': True, 'strict': True},
-        'routine': [
-            {'name': 'driver', 'role': 'driver'},
-            {'name': 'another_driver', 'role': 'driver'}
-        ]
-    })
+    config = SchedulerConfig.from_dict(
+        {
+            "default": {"role": "kernel", "expand": True, "strict": True},
+            "routine": [
+                {"name": "driver", "role": "driver"},
+                {"name": "another_driver", "role": "driver"},
+            ],
+        }
+    )
 
-    proj_hoist = here/'sources/projHoist'
+    proj_hoist = here / "sources/projHoist"
 
     scheduler = Scheduler(paths=proj_hoist, config=config)
 
-    assert scheduler.item_map['transformation_module_hoist#driver'].children == (
-        'kernel1', 'kernel2'
+    assert scheduler.item_map["transformation_module_hoist#driver"].children == (
+        "kernel1",
+        "kernel2",
     )
-    assert scheduler.item_map['transformation_module_hoist#another_driver'].children == (
-        'kernel1',
+    assert scheduler.item_map[
+        "transformation_module_hoist#another_driver"
+    ].children == ("kernel1",)
+    assert not scheduler.item_map["subroutines_mod#kernel1"].children
+    assert scheduler.item_map["subroutines_mod#kernel2"].children == (
+        "device1",
+        "device2",
     )
-    assert not scheduler.item_map['subroutines_mod#kernel1'].children
-    assert scheduler.item_map['subroutines_mod#kernel2'].children == (
-        'device1', 'device2'
-    )
-    assert scheduler.item_map['subroutines_mod#device1'].children == (
-        'device2',
-    )
-    assert not scheduler.item_map['subroutines_mod#device2'].children
+    assert scheduler.item_map["subroutines_mod#device1"].children == ("device2",)
+    assert not scheduler.item_map["subroutines_mod#device2"].children
 
 
-@pytest.fixture(name='loki_69_dir')
+@pytest.fixture(name="loki_69_dir")
 def fixture_loki_69_dir(here):
     """
     Fixture to write test file for LOKI-69 test.
@@ -1009,9 +1187,9 @@ implicit none
 end subroutine test
     """.strip()
 
-    dirname = here/'loki69'
+    dirname = here / "loki69"
     dirname.mkdir(exist_ok=True)
-    filename = dirname/'test.F90'
+    filename = dirname / "test.F90"
     filename.write_text(fcode)
     yield dirname
     try:
@@ -1026,26 +1204,30 @@ def test_scheduler_loki_69(loki_69_dir):
     Test compliance of scheduler with edge cases reported in LOKI-69.
     """
     config = {
-        'default': {
-            'expand': True,
-            'strict': True,
+        "default": {
+            "expand": True,
+            "strict": True,
         },
     }
 
-    scheduler = Scheduler(paths=loki_69_dir, seed_routines=['test'], config=config)
-    assert sorted(scheduler.obj_map.keys()) == ['#random_call_0', '#random_call_2', '#test']
-    assert '#random_call_1' not in scheduler.obj_map
+    scheduler = Scheduler(paths=loki_69_dir, seed_routines=["test"], config=config)
+    assert sorted(scheduler.obj_map.keys()) == [
+        "#random_call_0",
+        "#random_call_2",
+        "#test",
+    ]
+    assert "#random_call_1" not in scheduler.obj_map
 
     children_map = {
-        '#test': ('random_call_0', 'random_call_2'),
-        '#random_call_0': (),
-        '#random_call_2': ()
+        "#test": ("random_call_0", "random_call_2"),
+        "#random_call_0": (),
+        "#random_call_2": (),
     }
     assert len(scheduler.items) == len(children_map)
     assert all(item.children == children_map[item.name] for item in scheduler.items)
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_scopes(here, config, frontend):
     """
     Test discovery with import renames and duplicate names in separate scopes
@@ -1054,33 +1236,43 @@ def test_scheduler_scopes(here, config, frontend):
         |
         +--------> kernel2_mod#kernel ----> kernel2_impl#kernel_impl
     """
-    proj = here/'sources/projScopes'
+    proj = here / "sources/projScopes"
 
-    scheduler = Scheduler(paths=proj, seed_routines=['driver'], config=config, frontend=frontend)
+    scheduler = Scheduler(
+        paths=proj, seed_routines=["driver"], config=config, frontend=frontend
+    )
 
     expected_items = {
-        '#driver', 'kernel1_mod#kernel', 'kernel1_impl#kernel_impl',
-        'kernel2_mod#kernel', 'kernel2_impl#kernel_impl'
+        "#driver",
+        "kernel1_mod#kernel",
+        "kernel1_impl#kernel_impl",
+        "kernel2_mod#kernel",
+        "kernel2_impl#kernel_impl",
     }
     expected_dependencies = {
-        ('#driver', 'kernel1_mod#kernel'), ('#driver', 'kernel2_mod#kernel'),
-        ('kernel1_mod#kernel', 'kernel1_impl#kernel_impl'),
-        ('kernel2_mod#kernel', 'kernel2_impl#kernel_impl'),
+        ("#driver", "kernel1_mod#kernel"),
+        ("#driver", "kernel2_mod#kernel"),
+        ("kernel1_mod#kernel", "kernel1_impl#kernel_impl"),
+        ("kernel2_mod#kernel", "kernel2_impl#kernel_impl"),
     }
 
     assert expected_items == {n.name for n in scheduler.items}
-    assert expected_dependencies == {(e[0].name, e[1].name) for e in scheduler.dependencies}
+    assert expected_dependencies == {
+        (e[0].name, e[1].name) for e in scheduler.dependencies
+    }
 
     # Testing of callgraph visualisation
-    cg_path = here/'callgraph_scopes'
+    cg_path = here / "callgraph_scopes"
     scheduler.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
 
     cg_path.unlink()
-    cg_path.with_suffix('.pdf').unlink()
+    cg_path.with_suffix(".pdf").unlink()
 
 
 def test_scheduler_typebound_item(here):
@@ -1088,144 +1280,177 @@ def test_scheduler_typebound_item(here):
     Test the basic regex frontend nodes in :any:`Item` objects for fast dependency detection
     for type-bound procedures.
     """
-    filepath = here/'sources/projTypeBound/typebound_item.F90'
-    headerpath = here/'sources/projTypeBound/typebound_header.F90'
-    otherpath = here/'sources/projTypeBound/typebound_other.F90'
+    filepath = here / "sources/projTypeBound/typebound_item.F90"
+    headerpath = here / "sources/projTypeBound/typebound_header.F90"
+    otherpath = here / "sources/projTypeBound/typebound_other.F90"
     source = Sourcefile.from_file(filepath, frontend=REGEX)
     header = Sourcefile.from_file(headerpath, frontend=REGEX)
     other = Sourcefile.from_file(otherpath, frontend=REGEX)
 
     available_names = []
     for s in [source, header, other]:
-        available_names += [f'#{r.name.lower()}' for r in s.subroutines]
-        available_names += [f'{m.name}#{r.name}'.lower() for m in s.modules for r in m.subroutines]
-        available_names += [f'{m.name}#{t.name}'.lower() for m in s.modules for t in m.typedefs]
+        available_names += [f"#{r.name.lower()}" for r in s.subroutines]
+        available_names += [
+            f"{m.name}#{r.name}".lower() for m in s.modules for r in m.subroutines
+        ]
+        available_names += [
+            f"{m.name}#{t.name}".lower() for m in s.modules for t in m.typedefs
+        ]
 
-    driver = SubroutineItem(name='#driver', source=source)
+    driver = SubroutineItem(name="#driver", source=source)
 
     # Check that calls (= dependencies) are correctly identified
     assert driver.calls == (
-        'some_type%other_routine', 'some_type%some_routine',
-        'header_type%member_routine', 'header_type%routine',
-        'header_type%routine', 'other%member', 'other%var%member_routine'
+        "some_type%other_routine",
+        "some_type%some_routine",
+        "header_type%member_routine",
+        "header_type%routine",
+        "header_type%routine",
+        "other%member",
+        "other%var%member_routine",
     )
 
     # Check that imports are correctly identified
-    assert [i.module for i in driver.imports] == ['typebound_item', 'typebound_header', 'typebound_other']
-    assert driver.unqualified_imports == ('typebound_item', 'typebound_header')
-    assert driver.qualified_imports == {'other': 'typebound_other#other_type'}
+    assert [i.module for i in driver.imports] == [
+        "typebound_item",
+        "typebound_header",
+        "typebound_other",
+    ]
+    assert driver.unqualified_imports == ("typebound_item", "typebound_header")
+    assert driver.qualified_imports == {"other": "typebound_other#other_type"}
 
     # Check that calls are propagated as children
     assert set(driver.children) == set(driver.calls)
 
     # Check that fully-qualified names are correctly picked from the available names
     assert driver.qualify_names(driver.children, available_names) == (
-        'typebound_item#some_type%other_routine', 'typebound_item#some_type%some_routine',
-        'typebound_header#header_type%member_routine', 'typebound_header#header_type%routine',
-        'typebound_other#other_type%member', 'typebound_other#other_type%var%member_routine'
+        "typebound_item#some_type%other_routine",
+        "typebound_item#some_type%some_routine",
+        "typebound_header#header_type%member_routine",
+        "typebound_header#header_type%routine",
+        "typebound_other#other_type%member",
+        "typebound_other#other_type%var%member_routine",
     )
 
-    other_routine = SubroutineItem(name='typebound_item#other_routine', source=source)
+    other_routine = SubroutineItem(name="typebound_item#other_routine", source=source)
     assert isinstance(other_routine, SubroutineItem)
     assert isinstance(other_routine.routine, Subroutine)
-    assert other_routine.calls == ('abor1', 'some_type%routine1', 'some_type%routine2')
+    assert other_routine.calls == ("abor1", "some_type%routine1", "some_type%routine2")
     assert other_routine.children == other_routine.calls
     assert other_routine.qualify_names(other_routine.children, available_names) == (
-        'typebound_header#abor1', 'typebound_item#some_type%routine1', 'typebound_item#some_type%routine2'
+        "typebound_header#abor1",
+        "typebound_item#some_type%routine1",
+        "typebound_item#some_type%routine2",
     )
 
     # Local names (i.e. within the same scope) can be qualified in any case, while non-local names
     # can potentially exist globally or come from one of the unqualified imports, for which we return
     # a tuple of candidates
     assert other_routine.qualify_names(other_routine.children, available_names=[]) == (
-        ('#abor1', 'typebound_header#abor1'), 'typebound_item#some_type%routine1', 'typebound_item#some_type%routine2'
+        ("#abor1", "typebound_header#abor1"),
+        "typebound_item#some_type%routine1",
+        "typebound_item#some_type%routine2",
     )
 
     routine = SubroutineItem(
-        name='typebound_item#routine', source=source, config={'disable': ['some_type%some_routine']}
+        name="typebound_item#routine",
+        source=source,
+        config={"disable": ["some_type%some_routine"]},
     )
     assert isinstance(routine, SubroutineItem)
     assert isinstance(routine.routine, Subroutine)
-    assert routine.calls == ('some_type%some_routine',)
+    assert routine.calls == ("some_type%some_routine",)
     # No children due to `disable` config
     assert not routine.children
     assert not routine.qualify_names(routine.children, available_names)
 
-    routine1 = SubroutineItem(name='typebound_item#routine1', source=source, config={'disable': ['module_routine']})
+    routine1 = SubroutineItem(
+        name="typebound_item#routine1",
+        source=source,
+        config={"disable": ["module_routine"]},
+    )
     assert isinstance(routine1, SubroutineItem)
     assert isinstance(routine1.routine, Subroutine)
-    assert routine1.calls == ('module_routine',)
+    assert routine1.calls == ("module_routine",)
     assert not routine1.children
     assert not routine1.qualify_names(routine1.children, available_names)
 
     some_type_some_routine = ProcedureBindingItem(
-        name='typebound_item#some_type%some_routine', source=source,
-        config={'ignore': ['some_routine']}
+        name="typebound_item#some_type%some_routine",
+        source=source,
+        config={"ignore": ["some_routine"]},
     )
     assert isinstance(some_type_some_routine, ProcedureBindingItem)
     assert some_type_some_routine.routine is None
-    assert some_type_some_routine.calls == ('some_routine',)
+    assert some_type_some_routine.calls == ("some_routine",)
     # Ignored routines still show up as children
     assert some_type_some_routine.children == some_type_some_routine.calls
-    assert some_type_some_routine.qualify_names(some_type_some_routine.children, available_names) == (
-        'typebound_item#some_routine',
-    )
+    assert some_type_some_routine.qualify_names(
+        some_type_some_routine.children, available_names
+    ) == ("typebound_item#some_routine",)
 
     some_type_routine = ProcedureBindingItem(
-        name='typebound_item#some_type%routine', source=source,
-        config={'block': ['module_routine']}
+        name="typebound_item#some_type%routine",
+        source=source,
+        config={"block": ["module_routine"]},
     )
     assert isinstance(some_type_routine, ProcedureBindingItem)
     assert some_type_routine.routine is None
-    assert some_type_routine.calls == ('module_routine',)
+    assert some_type_routine.calls == ("module_routine",)
     # Blocked routines still show up as children
     assert some_type_routine.children == some_type_routine.calls
-    assert some_type_routine.qualify_names(some_type_routine.children, available_names) == (
-        'typebound_item#module_routine',
-    )
+    assert some_type_routine.qualify_names(
+        some_type_routine.children, available_names
+    ) == ("typebound_item#module_routine",)
     assert some_type_routine.qualify_names(some_type_routine.children) == (
-        'typebound_item#module_routine',
+        "typebound_item#module_routine",
     )
 
-    other_type_member = ProcedureBindingItem(name='typebound_other#other_type%member', source=other)
+    other_type_member = ProcedureBindingItem(
+        name="typebound_other#other_type%member", source=other
+    )
     assert isinstance(other_type_member, ProcedureBindingItem)
     assert other_type_member.routine is None
-    assert other_type_member.qualified_imports == {'header': 'typebound_header#header_type'}
-    assert other_type_member.calls == ('other_member',)
+    assert other_type_member.qualified_imports == {
+        "header": "typebound_header#header_type"
+    }
+    assert other_type_member.calls == ("other_member",)
     assert other_type_member.children == other_type_member.calls
-    assert other_type_member.qualify_names(other_type_member.children, available_names) == (
-        'typebound_other#other_member',
-    )
+    assert other_type_member.qualify_names(
+        other_type_member.children, available_names
+    ) == ("typebound_other#other_member",)
 
     other_type_var_member_routine = ProcedureBindingItem(
-        name='typebound_other#other_type%var%member_routine', source=other
+        name="typebound_other#other_type%var%member_routine", source=other
     )
     assert isinstance(other_type_var_member_routine, ProcedureBindingItem)
     assert other_type_var_member_routine.routine is None
-    assert other_type_var_member_routine.qualified_imports == {'header': 'typebound_header#header_type'}
-    assert other_type_var_member_routine.calls == ('header%member_routine',)
+    assert other_type_var_member_routine.qualified_imports == {
+        "header": "typebound_header#header_type"
+    }
+    assert other_type_var_member_routine.calls == ("header%member_routine",)
     assert other_type_var_member_routine.children == other_type_var_member_routine.calls
     # typebound names can also be fully qualified if they are declared in the same scope
-    assert other_type_var_member_routine.qualify_names(other_type_var_member_routine.calls, available_names) == (
-        'typebound_header#header_type%member_routine',
-    )
-    assert other_type_var_member_routine.qualify_names(other_type_var_member_routine.calls) == (
-        'typebound_header#header_type%member_routine',
-    )
+    assert other_type_var_member_routine.qualify_names(
+        other_type_var_member_routine.calls, available_names
+    ) == ("typebound_header#header_type%member_routine",)
+    assert other_type_var_member_routine.qualify_names(
+        other_type_var_member_routine.calls
+    ) == ("typebound_header#header_type%member_routine",)
 
     header_type_member_routine = ProcedureBindingItem(
-        name='typebound_header#header_type%member_routine', source=header
+        name="typebound_header#header_type%member_routine", source=header
     )
     assert isinstance(header_type_member_routine, ProcedureBindingItem)
     assert header_type_member_routine.routine is None
-    assert header_type_member_routine.calls == ('header_member_routine',)
+    assert header_type_member_routine.calls == ("header_member_routine",)
     assert header_type_member_routine.children == header_type_member_routine.calls
-    assert header_type_member_routine.qualify_names(header_type_member_routine.children, available_names) == (
-        'typebound_header#header_member_routine',
-    )
+    assert header_type_member_routine.qualify_names(
+        header_type_member_routine.children, available_names
+    ) == ("typebound_header#header_member_routine",)
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_typebound(here, config, frontend):
     """
     Test correct dependency chasing for typebound procedure calls.
@@ -1243,71 +1468,109 @@ def test_scheduler_typebound(here, config, frontend):
                  |                                                                             |
                  +------------>other_type%var%%member_routine -> header_type%member_routine  --+
     """
-    proj = here/'sources/projTypeBound'
+    proj = here / "sources/projTypeBound"
 
     scheduler = Scheduler(
-        paths=proj, seed_routines=['driver'], config=config,
-        full_parse=False, frontend=frontend
+        paths=proj,
+        seed_routines=["driver"],
+        config=config,
+        full_parse=False,
+        frontend=frontend,
     )
 
     expected_items = {
-        '#driver',
-        'typebound_item#some_type%some_routine', 'typebound_item#some_type%other_routine',
-        'typebound_item#other_routine', 'typebound_item#some_type%routine1',
-        'typebound_item#routine1', 'typebound_item#some_type%routine2', 'typebound_item#routine',
-        'typebound_header#header_type%member_routine',
-        'typebound_header#header_member_routine',
-        'typebound_item#some_type%routine', 'typebound_item#module_routine',
-        'typebound_item#some_routine', 'typebound_header#header_type%routine',
-        'typebound_header#header_type%routine_real', 'typebound_header#header_routine_real',
-        'typebound_header#header_type%routine_integer', 'typebound_header#routine_integer',
-        'typebound_header#abor1', 'typebound_other#other_type%member',
-        'typebound_other#other_member', 'typebound_other#other_type%var%member_routine'
+        "#driver",
+        "typebound_item#some_type%some_routine",
+        "typebound_item#some_type%other_routine",
+        "typebound_item#other_routine",
+        "typebound_item#some_type%routine1",
+        "typebound_item#routine1",
+        "typebound_item#some_type%routine2",
+        "typebound_item#routine",
+        "typebound_header#header_type%member_routine",
+        "typebound_header#header_member_routine",
+        "typebound_item#some_type%routine",
+        "typebound_item#module_routine",
+        "typebound_item#some_routine",
+        "typebound_header#header_type%routine",
+        "typebound_header#header_type%routine_real",
+        "typebound_header#header_routine_real",
+        "typebound_header#header_type%routine_integer",
+        "typebound_header#routine_integer",
+        "typebound_header#abor1",
+        "typebound_other#other_type%member",
+        "typebound_other#other_member",
+        "typebound_other#other_type%var%member_routine",
     }
     expected_dependencies = {
-        ('#driver', 'typebound_item#some_type%other_routine'),
-        ('typebound_item#some_type%other_routine', 'typebound_item#other_routine'),
-        ('typebound_item#other_routine', 'typebound_item#some_type%routine1'),
-        ('typebound_item#some_type%routine1', 'typebound_item#routine1'),
-        ('typebound_item#routine1', 'typebound_item#module_routine'),
-        ('typebound_item#other_routine', 'typebound_item#some_type%routine2'),
-        ('typebound_item#some_type%routine2', 'typebound_item#routine'),
-        ('typebound_item#routine', 'typebound_item#some_type%some_routine'),
-        ('#driver', 'typebound_item#some_type%some_routine'),
-        ('typebound_item#some_type%some_routine', 'typebound_item#some_routine'),
-        ('typebound_item#some_routine', 'typebound_item#some_type%routine'),
-        ('typebound_item#some_type%routine', 'typebound_item#module_routine'),
-        ('#driver', 'typebound_header#header_type%member_routine'),
-        ('typebound_header#header_type%member_routine', 'typebound_header#header_member_routine'),
-        ('#driver', 'typebound_other#other_type%member'),
-        ('typebound_other#other_type%member', 'typebound_other#other_member'),
-        ('typebound_other#other_member', 'typebound_header#header_member_routine'),
-        ('typebound_other#other_member', 'typebound_other#other_type%var%member_routine'),
-        ('#driver', 'typebound_other#other_type%var%member_routine'),
-        ('typebound_other#other_type%var%member_routine', 'typebound_header#header_type%member_routine'),
-        ('typebound_item#other_routine', 'typebound_header#abor1'),
-        ('#driver', 'typebound_header#header_type%routine'),
-        ('typebound_header#header_type%routine', 'typebound_header#header_type%routine_real'),
-        ('typebound_header#header_type%routine_real', 'typebound_header#header_routine_real'),
-        ('typebound_header#header_type%routine', 'typebound_header#header_type%routine_integer'),
-        ('typebound_header#header_type%routine_integer', 'typebound_header#routine_integer')
+        ("#driver", "typebound_item#some_type%other_routine"),
+        ("typebound_item#some_type%other_routine", "typebound_item#other_routine"),
+        ("typebound_item#other_routine", "typebound_item#some_type%routine1"),
+        ("typebound_item#some_type%routine1", "typebound_item#routine1"),
+        ("typebound_item#routine1", "typebound_item#module_routine"),
+        ("typebound_item#other_routine", "typebound_item#some_type%routine2"),
+        ("typebound_item#some_type%routine2", "typebound_item#routine"),
+        ("typebound_item#routine", "typebound_item#some_type%some_routine"),
+        ("#driver", "typebound_item#some_type%some_routine"),
+        ("typebound_item#some_type%some_routine", "typebound_item#some_routine"),
+        ("typebound_item#some_routine", "typebound_item#some_type%routine"),
+        ("typebound_item#some_type%routine", "typebound_item#module_routine"),
+        ("#driver", "typebound_header#header_type%member_routine"),
+        (
+            "typebound_header#header_type%member_routine",
+            "typebound_header#header_member_routine",
+        ),
+        ("#driver", "typebound_other#other_type%member"),
+        ("typebound_other#other_type%member", "typebound_other#other_member"),
+        ("typebound_other#other_member", "typebound_header#header_member_routine"),
+        (
+            "typebound_other#other_member",
+            "typebound_other#other_type%var%member_routine",
+        ),
+        ("#driver", "typebound_other#other_type%var%member_routine"),
+        (
+            "typebound_other#other_type%var%member_routine",
+            "typebound_header#header_type%member_routine",
+        ),
+        ("typebound_item#other_routine", "typebound_header#abor1"),
+        ("#driver", "typebound_header#header_type%routine"),
+        (
+            "typebound_header#header_type%routine",
+            "typebound_header#header_type%routine_real",
+        ),
+        (
+            "typebound_header#header_type%routine_real",
+            "typebound_header#header_routine_real",
+        ),
+        (
+            "typebound_header#header_type%routine",
+            "typebound_header#header_type%routine_integer",
+        ),
+        (
+            "typebound_header#header_type%routine_integer",
+            "typebound_header#routine_integer",
+        ),
     }
     assert expected_items == {n.name for n in scheduler.items}
-    assert expected_dependencies == {(e[0].name, e[1].name) for e in scheduler.dependencies}
+    assert expected_dependencies == {
+        (e[0].name, e[1].name) for e in scheduler.dependencies
+    }
 
     # Testing of callgraph visualisation
-    cg_path = here/'callgraph_typebound'
+    cg_path = here / "callgraph_typebound"
     scheduler.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
 
     cg_path.unlink()
-    cg_path.with_suffix('.pdf').unlink()
+    cg_path.with_suffix(".pdf").unlink()
 
 
-@pytest.mark.skipif(not graphviz_present(), reason='Graphviz is not installed')
+@pytest.mark.skipif(not graphviz_present(), reason="Graphviz is not installed")
 def test_scheduler_typebound_ignore(here, config, frontend):
     """
     Test correct dependency chasing for typebound procedure calls with ignore working for
@@ -1324,112 +1587,149 @@ def test_scheduler_typebound_ignore(here, config, frontend):
                    |                           +---> header_type%routine_integer -> routine_integer
                    +---------->other_type%member -> other_member -> header_member_routine
     """
-    proj = here/'sources/projTypeBound'
+    proj = here / "sources/projTypeBound"
 
     my_config = config.copy()
-    my_config['default']['disable'] += ['some_type%some_routine', 'header_member_routine']
-    my_config['routine'] = [
+    my_config["default"]["disable"] += [
+        "some_type%some_routine",
+        "header_member_routine",
+    ]
+    my_config["routine"] = [
         {
-            'name': 'other_member',
-            'disable': my_config['default']['disable'] + ['member_routine']
+            "name": "other_member",
+            "disable": my_config["default"]["disable"] + ["member_routine"],
         }
     ]
 
     scheduler = Scheduler(
-        paths=proj, seed_routines=['driver'], config=my_config,
-        full_parse=False, frontend=frontend
+        paths=proj,
+        seed_routines=["driver"],
+        config=my_config,
+        full_parse=False,
+        frontend=frontend,
     )
 
     expected_items = {
-        '#driver',
-        'typebound_item#some_type%other_routine', 'typebound_item#other_routine',
-        'typebound_item#some_type%routine1', 'typebound_item#routine1',
-        'typebound_item#some_type%routine2', 'typebound_item#routine',
-        'typebound_header#header_type%member_routine',
-        'typebound_item#module_routine',
-        'typebound_header#header_type%routine',
-        'typebound_header#header_type%routine_real', 'typebound_header#header_routine_real',
-        'typebound_header#header_type%routine_integer', 'typebound_header#routine_integer',
-        'typebound_header#abor1', 'typebound_other#other_type%member',
-        'typebound_other#other_member', 'typebound_other#other_type%var%member_routine'
+        "#driver",
+        "typebound_item#some_type%other_routine",
+        "typebound_item#other_routine",
+        "typebound_item#some_type%routine1",
+        "typebound_item#routine1",
+        "typebound_item#some_type%routine2",
+        "typebound_item#routine",
+        "typebound_header#header_type%member_routine",
+        "typebound_item#module_routine",
+        "typebound_header#header_type%routine",
+        "typebound_header#header_type%routine_real",
+        "typebound_header#header_routine_real",
+        "typebound_header#header_type%routine_integer",
+        "typebound_header#routine_integer",
+        "typebound_header#abor1",
+        "typebound_other#other_type%member",
+        "typebound_other#other_member",
+        "typebound_other#other_type%var%member_routine",
     }
     expected_dependencies = {
-        ('#driver', 'typebound_item#some_type%other_routine'),
-        ('typebound_item#some_type%other_routine', 'typebound_item#other_routine'),
-        ('typebound_item#other_routine', 'typebound_item#some_type%routine1'),
-        ('typebound_item#some_type%routine1', 'typebound_item#routine1'),
-        ('typebound_item#routine1', 'typebound_item#module_routine'),
-        ('typebound_item#other_routine', 'typebound_item#some_type%routine2'),
-        ('typebound_item#some_type%routine2', 'typebound_item#routine'),
-        ('#driver', 'typebound_header#header_type%member_routine'),
-        ('#driver', 'typebound_other#other_type%member'),
-        ('typebound_other#other_type%member', 'typebound_other#other_member'),
-        ('typebound_other#other_member', 'typebound_other#other_type%var%member_routine'),
-        ('#driver', 'typebound_other#other_type%var%member_routine'),
-        ('typebound_other#other_type%var%member_routine', 'typebound_header#header_type%member_routine'),
-        ('typebound_item#other_routine', 'typebound_header#abor1'),
-        ('#driver', 'typebound_header#header_type%routine'),
-        ('typebound_header#header_type%routine', 'typebound_header#header_type%routine_real'),
-        ('typebound_header#header_type%routine_real', 'typebound_header#header_routine_real'),
-        ('typebound_header#header_type%routine', 'typebound_header#header_type%routine_integer'),
-        ('typebound_header#header_type%routine_integer', 'typebound_header#routine_integer')
+        ("#driver", "typebound_item#some_type%other_routine"),
+        ("typebound_item#some_type%other_routine", "typebound_item#other_routine"),
+        ("typebound_item#other_routine", "typebound_item#some_type%routine1"),
+        ("typebound_item#some_type%routine1", "typebound_item#routine1"),
+        ("typebound_item#routine1", "typebound_item#module_routine"),
+        ("typebound_item#other_routine", "typebound_item#some_type%routine2"),
+        ("typebound_item#some_type%routine2", "typebound_item#routine"),
+        ("#driver", "typebound_header#header_type%member_routine"),
+        ("#driver", "typebound_other#other_type%member"),
+        ("typebound_other#other_type%member", "typebound_other#other_member"),
+        (
+            "typebound_other#other_member",
+            "typebound_other#other_type%var%member_routine",
+        ),
+        ("#driver", "typebound_other#other_type%var%member_routine"),
+        (
+            "typebound_other#other_type%var%member_routine",
+            "typebound_header#header_type%member_routine",
+        ),
+        ("typebound_item#other_routine", "typebound_header#abor1"),
+        ("#driver", "typebound_header#header_type%routine"),
+        (
+            "typebound_header#header_type%routine",
+            "typebound_header#header_type%routine_real",
+        ),
+        (
+            "typebound_header#header_type%routine_real",
+            "typebound_header#header_routine_real",
+        ),
+        (
+            "typebound_header#header_type%routine",
+            "typebound_header#header_type%routine_integer",
+        ),
+        (
+            "typebound_header#header_type%routine_integer",
+            "typebound_header#routine_integer",
+        ),
     }
     assert expected_items == {n.name for n in scheduler.items}
-    assert expected_dependencies == {(e[0].name, e[1].name) for e in scheduler.dependencies}
+    assert expected_dependencies == {
+        (e[0].name, e[1].name) for e in scheduler.dependencies
+    }
 
     # Testing of callgraph visualisation
-    cg_path = here/'callgraph_typebound'
+    cg_path = here / "callgraph_typebound"
     scheduler.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
 
     cg_path.unlink()
-    cg_path.with_suffix('.pdf').unlink()
+    cg_path.with_suffix(".pdf").unlink()
 
 
-@pytest.mark.parametrize('use_file_graph', [False, True])
-@pytest.mark.parametrize('reverse', [False, True])
+@pytest.mark.parametrize("use_file_graph", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
 def test_scheduler_traversal_order(here, config, frontend, use_file_graph, reverse):
     """
     Test correct traversal order for scheduler processing
 
     """
-    proj = here/'sources/projHoist'
+    proj = here / "sources/projHoist"
 
     scheduler = Scheduler(
-        paths=proj, seed_routines=['driver'], config=config,
-        full_parse=True, frontend=frontend
+        paths=proj,
+        seed_routines=["driver"],
+        config=config,
+        full_parse=True,
+        frontend=frontend,
     )
 
     if use_file_graph:
-        expected = [
-            'driver_mod.f90', 'subroutines_mod.f90'
-        ]
+        expected = ["driver_mod.f90", "subroutines_mod.f90"]
     else:
         expected = [
-            'transformation_module_hoist#driver::driver', 'subroutines_mod#kernel1::kernel1',
-            'subroutines_mod#kernel2::kernel2', 'subroutines_mod#device1::device1',
-            'subroutines_mod#device2::device2'
+            "transformation_module_hoist#driver::driver",
+            "subroutines_mod#kernel1::kernel1",
+            "subroutines_mod#kernel2::kernel2",
+            "subroutines_mod#device1::device1",
+            "subroutines_mod#device2::device2",
         ]
 
     class LoggingTransformation(Transformation):
-
         def __init__(self):
             self.record = []
 
         def transform_file(self, sourcefile, **kwargs):
-            if 'item' in kwargs:
-                self.record += [kwargs['item'].name + '::' + sourcefile.path.name]
+            if "item" in kwargs:
+                self.record += [kwargs["item"].name + "::" + sourcefile.path.name]
             else:
                 self.record += [sourcefile.path.name]
 
         def transform_module(self, module, **kwargs):
-            self.record += [kwargs['item'].name + '::' + module.name]
+            self.record += [kwargs["item"].name + "::" + module.name]
 
         def transform_subroutine(self, routine, **kwargs):
-            self.record += [kwargs['item'].name + '::' + routine.name]
+            self.record += [kwargs["item"].name + "::" + routine.name]
 
     transformation = LoggingTransformation()
     scheduler.process(
@@ -1442,8 +1742,8 @@ def test_scheduler_traversal_order(here, config, frontend, use_file_graph, rever
         assert transformation.record == flatten(expected)
 
 
-@pytest.mark.parametrize('use_file_graph', [False, True])
-@pytest.mark.parametrize('reverse', [False, True])
+@pytest.mark.parametrize("use_file_graph", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
 def test_scheduler_member_routines(config, frontend, use_file_graph, reverse):
     """
     Make sure that transformation processing works also for contained member routines
@@ -1472,41 +1772,44 @@ contains
 end module member_mod
     """.strip()
 
-    workdir = gettempdir()/'test_scheduler_member_routines'
+    workdir = gettempdir() / "test_scheduler_member_routines"
     workdir.mkdir(exist_ok=True)
-    (workdir/'member_mod.F90').write_text(fcode_mod)
+    (workdir / "member_mod.F90").write_text(fcode_mod)
 
-    scheduler = Scheduler(paths=[workdir], config=config, seed_routines=['driver'], frontend=frontend)
+    scheduler = Scheduler(
+        paths=[workdir], config=config, seed_routines=["driver"], frontend=frontend
+    )
 
     class LoggingTransformation(Transformation):
-
         def __init__(self):
             self.record = []
 
         def transform_file(self, sourcefile, **kwargs):
-            if 'item' in kwargs:
-                self.record += [kwargs['item'].name + '::' + sourcefile.path.name]
+            if "item" in kwargs:
+                self.record += [kwargs["item"].name + "::" + sourcefile.path.name]
             else:
                 self.record += [sourcefile.path.name]
 
         def transform_module(self, module, **kwargs):
-            self.record += [kwargs['item'].name + '::' + module.name]
+            self.record += [kwargs["item"].name + "::" + module.name]
 
         def transform_subroutine(self, routine, **kwargs):
-            self.record += [kwargs['item'].name + '::' + routine.name]
+            self.record += [kwargs["item"].name + "::" + routine.name]
 
     transformation = LoggingTransformation()
     scheduler.process(
-        transformation=transformation, reverse=reverse, use_file_graph=use_file_graph,
+        transformation=transformation,
+        reverse=reverse,
+        use_file_graph=use_file_graph,
     )
 
     if use_file_graph:
-        expected = ['member_mod.F90']
+        expected = ["member_mod.F90"]
     else:
         expected = [
-            'member_mod#driver::driver',
-            'member_mod#driver#my_member::my_member',
-            'member_mod#my_routine::my_routine',
+            "member_mod#driver::driver",
+            "member_mod#driver#my_member::my_member",
+            "member_mod#my_routine::my_routine",
         ]
 
     if not use_file_graph:
@@ -1514,14 +1817,16 @@ end module member_mod
         # not find the call dependencies via the member routine and therefore doesn't process
         # these subroutines with the transformation
         if len(scheduler.items) == 1 and transformation.record == flatten(expected[:1]):
-            pytest.xfail(reason='Scheduler unable to represent contained member routines as graph items')
+            pytest.xfail(
+                reason="Scheduler unable to represent contained member routines as graph items"
+            )
 
     assert transformation.record == flatten(expected)
 
     rmtree(workdir)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_scheduler_nested_type_enrichment(frontend, config):
     """
     Make sure that enrichment works correctly for nested types across
@@ -1627,15 +1932,17 @@ subroutine driver
 end subroutine driver
     """.strip()
 
-    workdir = gettempdir()/'test_scheduler_nested_type_enrichment'
+    workdir = gettempdir() / "test_scheduler_nested_type_enrichment"
     workdir.mkdir(exist_ok=True)
-    (workdir/'typebound_procedure_calls_mod.F90').write_text(fcode1)
-    (workdir/'other_typebound_procedure_calls_mod.F90').write_text(fcode2)
-    (workdir/'driver.F90').write_text(fcode3)
+    (workdir / "typebound_procedure_calls_mod.F90").write_text(fcode1)
+    (workdir / "other_typebound_procedure_calls_mod.F90").write_text(fcode2)
+    (workdir / "driver.F90").write_text(fcode3)
 
-    scheduler = Scheduler(paths=[workdir], config=config, seed_routines=['driver'], frontend=frontend)
+    scheduler = Scheduler(
+        paths=[workdir], config=config, seed_routines=["driver"], frontend=frontend
+    )
 
-    driver = scheduler['#driver'].source['driver']
+    driver = scheduler["#driver"].source["driver"]
     calls = FindNodes(CallStatement).visit(driver.body)
     assert len(calls) == 3
     for call in calls:
@@ -1645,21 +1952,21 @@ end subroutine driver
         assert isinstance(call.name.parent.type.dtype, DerivedType)
 
     assert isinstance(calls[0].name.parent, Scalar)
-    assert calls[0].name.parent.type.dtype.name == 'third_type'
+    assert calls[0].name.parent.type.dtype.name == "third_type"
     assert isinstance(calls[0].name.parent.type.dtype.typedef, TypeDef)
 
     assert isinstance(calls[1].name.parent, Array)
-    assert calls[1].name.parent.type.dtype.name == 'my_type'
+    assert calls[1].name.parent.type.dtype.name == "my_type"
     assert isinstance(calls[1].name.parent.type.dtype.typedef, TypeDef)
 
     assert isinstance(calls[1].name.parent.parent, Array)
     assert isinstance(calls[1].name.parent.parent.type.dtype, DerivedType)
-    assert calls[1].name.parent.parent.type.dtype.name == 'other_type'
+    assert calls[1].name.parent.parent.type.dtype.name == "other_type"
     assert isinstance(calls[1].name.parent.parent.type.dtype.typedef, TypeDef)
 
     assert isinstance(calls[1].name.parent.parent.parent, Scalar)
     assert isinstance(calls[1].name.parent.parent.parent.type.dtype, DerivedType)
-    assert calls[1].name.parent.parent.parent.type.dtype.name == 'third_type'
+    assert calls[1].name.parent.parent.parent.type.dtype.name == "third_type"
     assert isinstance(calls[1].name.parent.parent.parent.type.dtype.typedef, TypeDef)
 
     inline_calls = FindInlineCalls().visit(driver.body)
@@ -1671,13 +1978,13 @@ end subroutine driver
         assert call.function.parent
         assert isinstance(call.function.parent, Array)
         assert isinstance(call.function.parent.type.dtype, DerivedType)
-        assert call.function.parent.type.dtype.name == 'other_type'
+        assert call.function.parent.type.dtype.name == "other_type"
         assert isinstance(call.function.parent.type.dtype.typedef, TypeDef)
 
         assert call.function.parent.parent
         assert isinstance(call.function.parent.parent, Scalar)
         assert isinstance(call.function.parent.parent.type.dtype, DerivedType)
-        assert call.function.parent.parent.type.dtype.name == 'third_type'
+        assert call.function.parent.parent.type.dtype.name == "third_type"
         assert isinstance(call.function.parent.parent.type.dtype.typedef, TypeDef)
 
     rmtree(workdir)
@@ -1710,101 +2017,137 @@ end module some_mod
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=REGEX)
-    item = SubroutineItem(name='some_mod#driver', source=source)
+    item = SubroutineItem(name="some_mod#driver", source=source)
     assert item.qualify_names(item.children) == (
-        ('#routine', 'yet_another_mod#routine', 'other_mod#routine', 'more_mod#routine'),
+        (
+            "#routine",
+            "yet_another_mod#routine",
+            "other_mod#routine",
+            "more_mod#routine",
+        ),
     )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_scheduler_inline_call(here, config, frontend):
     """
     Test that inline function calls declared via an explicit interface are added as dependencies.
     """
 
     my_config = config.copy()
-    my_config['default']['enable_imports'] = True
-    my_config['routine'] = [
+    my_config["default"]["enable_imports"] = True
+    my_config["routine"] = [
         {
-            'name': 'driver',
-            'role': 'driver',
-            'disable': ['return_one', 'some_var', 'add_args', 'some_type']
+            "name": "driver",
+            "role": "driver",
+            "disable": ["return_one", "some_var", "add_args", "some_type"],
         }
     ]
 
-    scheduler = Scheduler(paths=here/'sources/projInlineCalls', config=my_config, frontend=frontend)
+    scheduler = Scheduler(
+        paths=here / "sources/projInlineCalls", config=my_config, frontend=frontend
+    )
 
-    expected_items = {'#driver', '#double_real', 'some_module#some_type%do_something',
-                      'some_module#add_const', 'vars_module#vara', 'vars_module#varb'}
-    expected_dependencies = {('#driver', '#double_real'),
-                             ('#driver', 'some_module#some_type%do_something'),
-                             ('some_module#some_type%do_something', 'some_module#add_const'),
-                             ('#driver', 'vars_module#vara'), ('#driver', 'vars_module#varb'),
-                             ('#double_real', 'vars_module#vara'), ('#double_real', 'vars_module#varb')}
+    expected_items = {
+        "#driver",
+        "#double_real",
+        "some_module#some_type%do_something",
+        "some_module#add_const",
+        "vars_module#vara",
+        "vars_module#varb",
+    }
+    expected_dependencies = {
+        ("#driver", "#double_real"),
+        ("#driver", "some_module#some_type%do_something"),
+        ("some_module#some_type%do_something", "some_module#add_const"),
+        ("#driver", "vars_module#vara"),
+        ("#driver", "vars_module#varb"),
+        ("#double_real", "vars_module#vara"),
+        ("#double_real", "vars_module#varb"),
+    }
 
     assert expected_items == {i.name for i in scheduler.items}
-    assert expected_dependencies == {(d[0].name, d[1].name) for d in scheduler.dependencies}
+    assert expected_dependencies == {
+        (d[0].name, d[1].name) for d in scheduler.dependencies
+    }
 
     for i in scheduler.items:
-        if i.name == '#double_real':
+        if i.name == "#double_real":
             assert isinstance(i, SubroutineItem)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_scheduler_import_dependencies(here, config, frontend):
     """
     Test that import dependencies are correctly classified.
     """
 
     my_config = config.copy()
-    my_config['default']['enable_imports'] = True
-    my_config['routine'] = [
-        {
-            'name': 'driver',
-            'role': 'driver'
-        }
-    ]
+    my_config["default"]["enable_imports"] = True
+    my_config["routine"] = [{"name": "driver", "role": "driver"}]
 
-    scheduler = Scheduler(paths=here/'sources/projInlineCalls', config=my_config, frontend=frontend)
+    scheduler = Scheduler(
+        paths=here / "sources/projInlineCalls", config=my_config, frontend=frontend
+    )
 
     expected_items = {
-        '#driver', '#double_real', 'some_module#return_one', 'some_module#some_var', 'some_module#add_args',
-        'some_module#some_type', 'some_module#add_two_args', 'some_module#add_three_args',
-        'some_module#some_type%do_something', 'some_module#add_const', 'vars_module#vara', 'vars_module#varb'
+        "#driver",
+        "#double_real",
+        "some_module#return_one",
+        "some_module#some_var",
+        "some_module#add_args",
+        "some_module#some_type",
+        "some_module#add_two_args",
+        "some_module#add_three_args",
+        "some_module#some_type%do_something",
+        "some_module#add_const",
+        "vars_module#vara",
+        "vars_module#varb",
     }
     expected_dependencies = {
-     ('#driver', '#double_real'), ('#driver', 'some_module#return_one'), ('#driver', 'some_module#some_var'),
-     ('#driver', 'some_module#add_args'), ('#driver', 'some_module#some_type'),
-     ('#driver', 'vars_module#vara'), ('#driver', 'vars_module#varb'),
-     ('#double_real', 'vars_module#vara'), ('#double_real', 'vars_module#varb'),
-     ('#driver', 'some_module#some_type%do_something'), ('some_module#some_type%do_something', 'some_module#add_const'),
-     ('some_module#add_args', 'some_module#add_two_args'), ('some_module#add_args', 'some_module#add_three_args'),
+        ("#driver", "#double_real"),
+        ("#driver", "some_module#return_one"),
+        ("#driver", "some_module#some_var"),
+        ("#driver", "some_module#add_args"),
+        ("#driver", "some_module#some_type"),
+        ("#driver", "vars_module#vara"),
+        ("#driver", "vars_module#varb"),
+        ("#double_real", "vars_module#vara"),
+        ("#double_real", "vars_module#varb"),
+        ("#driver", "some_module#some_type%do_something"),
+        ("some_module#some_type%do_something", "some_module#add_const"),
+        ("some_module#add_args", "some_module#add_two_args"),
+        ("some_module#add_args", "some_module#add_three_args"),
     }
 
     assert expected_items == {i.name for i in scheduler.items}
-    assert expected_dependencies == {(d[0].name, d[1].name) for d in scheduler.dependencies}
+    assert expected_dependencies == {
+        (d[0].name, d[1].name) for d in scheduler.dependencies
+    }
 
     for i in scheduler.items:
-        if i.name == 'some_module#add_args':
+        if i.name == "some_module#add_args":
             assert isinstance(i, GenericImportItem)
-        if i.name == 'some_module#some_type':
+        if i.name == "some_module#some_type":
             assert isinstance(i, GenericImportItem)
-        elif i.name == 'some_module#some_var':
+        elif i.name == "some_module#some_var":
             assert isinstance(i, GlobalVarImportItem)
-        elif i.name in ('some_module#add_two_args', 'some_module#add_three_args'):
+        elif i.name in ("some_module#add_two_args", "some_module#add_three_args"):
             assert isinstance(i, SubroutineItem)
-        elif i.name == '#double_real':
+        elif i.name == "#double_real":
             assert isinstance(i, SubroutineItem)
 
     # Testing of callgraph visualisation with imports
-    workdir = gettempdir()/'test_scheduler_import_dependencies'
+    workdir = gettempdir() / "test_scheduler_import_dependencies"
     workdir.mkdir(exist_ok=True)
-    cg_path = workdir/'callgraph'
+    cg_path = workdir / "callgraph"
     scheduler.callgraph(cg_path)
 
     vgraph = VisGraphWrapper(cg_path)
     assert all(n.upper() in vgraph.nodes for n in expected_items)
-    assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
+    assert all(
+        (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+    )
 
     rmtree(workdir)
 
@@ -1815,19 +2158,16 @@ def test_scheduler_globalvarimportitem_id(here, config, frontend):
     """
 
     my_config = config.copy()
-    my_config['default']['enable_imports'] = True
-    my_config['routine'] = [
-        {
-            'name': 'driver',
-            'role': 'driver'
-        }
-    ]
+    my_config["default"]["enable_imports"] = True
+    my_config["routine"] = [{"name": "driver", "role": "driver"}]
 
-    scheduler = Scheduler(paths=here/'sources/projInlineCalls', config=my_config, frontend=frontend)
-    importA_item = scheduler.item_map['vars_module#vara']
-    importB_item = scheduler.item_map['vars_module#varb']
-    driver_item = scheduler.item_map['#driver']
-    kernel_item = scheduler.item_map['#double_real']
+    scheduler = Scheduler(
+        paths=here / "sources/projInlineCalls", config=my_config, frontend=frontend
+    )
+    importA_item = scheduler.item_map["vars_module#vara"]
+    importB_item = scheduler.item_map["vars_module#varb"]
+    driver_item = scheduler.item_map["#driver"]
+    kernel_item = scheduler.item_map["#double_real"]
 
     idA = id(importA_item)
     idB = id(importB_item)
@@ -1873,20 +2213,29 @@ end subroutine some_routine
     """
 
     my_config = config.copy()
-    my_config['default']['enable_imports'] = True
+    my_config["default"]["enable_imports"] = True
 
     kernel = Sourcefile.from_source(fcode_kernel, frontend=REGEX)
-    kernel_item = SubroutineItem(name='#some_routine', source=kernel, config=my_config['default'])
+    kernel_item = SubroutineItem(
+        name="#some_routine", source=kernel, config=my_config["default"]
+    )
 
     var_mod = Sourcefile.from_source(fcode_mod, frontend=REGEX)
-    var_item = GlobalVarImportItem(name='some_mod#var', source=var_mod, config=my_config['default'])
+    var_item = GlobalVarImportItem(
+        name="some_mod#var", source=var_mod, config=my_config["default"]
+    )
 
     type_mod = Sourcefile.from_source(fcode_type, frontend=REGEX)
-    type_item = GenericImportItem(name='parkind1#jprb', source=type_mod, config=my_config['default'])
+    type_item = GenericImportItem(
+        name="parkind1#jprb", source=type_mod, config=my_config["default"]
+    )
 
     assert len(kernel_item.children) == 2
     assert kernel_item.children[0] != kernel_item.children[1]
-    assert all(item in [i.local_name for i in (var_item, type_item)] for item in kernel_item.children)
+    assert all(
+        item in [i.local_name for i in (var_item, type_item)]
+        for item in kernel_item.children
+    )
     assert not var_item.children
 
 
@@ -1940,51 +2289,54 @@ end subroutine caller
     """.strip()
 
     class SuccessorTransformation(Transformation):
-
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
             self.counter = {}
 
         def transform_subroutine(self, routine, **kwargs):
-            item = kwargs.get('item')
-            assert item.local_name in ('caller', 'routine', 'some_procedure', 'other')
+            item = kwargs.get("item")
+            assert item.local_name in ("caller", "routine", "some_procedure", "other")
             self.counter[item.local_name] = self.counter.get(item.local_name, 0) + 1
 
-            successors = kwargs.get('successors')
+            successors = kwargs.get("successors")
             assert isinstance(successors, list)
-            if item.local_name == 'caller':
+            if item.local_name == "caller":
                 expected_successors = {
-                    'some_mod#some_type%routine', 'some_mod#some_type%do',
-                    'some_mod#some_type%procedure', 'some_mod#some_procedure', 'some_mod#routine',
-                    'some_mod#some_type%other', 'some_mod#other'
+                    "some_mod#some_type%routine",
+                    "some_mod#some_type%do",
+                    "some_mod#some_type%procedure",
+                    "some_mod#some_procedure",
+                    "some_mod#routine",
+                    "some_mod#some_type%other",
+                    "some_mod#other",
                 }
-            elif item.local_name == 'routine':
-                expected_successors = {'some_mod#some_type%other', 'some_mod#other'}
+            elif item.local_name == "routine":
+                expected_successors = {"some_mod#some_type%other", "some_mod#other"}
             else:
                 expected_successors = set()
             assert expected_successors == set(successors)
 
-    workdir = gettempdir()/'test_scheduler_successors'
+    workdir = gettempdir() / "test_scheduler_successors"
     workdir.mkdir(exist_ok=True)
-    (workdir/'some_mod.F90').write_text(fcode_mod)
-    (workdir/'caller.F90').write_text(fcode)
+    (workdir / "some_mod.F90").write_text(fcode_mod)
+    (workdir / "caller.F90").write_text(fcode)
 
-    scheduler = Scheduler(paths=[workdir], config=config, seed_routines=['caller'])
+    scheduler = Scheduler(paths=[workdir], config=config, seed_routines=["caller"])
 
     transformation = SuccessorTransformation()
     scheduler.process(transformation=transformation)
 
     assert transformation.counter == {
-        'caller': 1,
-        'routine': 1,
-        'some_procedure': 1,
-        'other': 1,
+        "caller": 1,
+        "routine": 1,
+        "some_procedure": 1,
+        "other": 1,
     }
 
     rmtree(workdir)
 
 
-@pytest.mark.parametrize('full_parse', [True, False])
+@pytest.mark.parametrize("full_parse", [True, False])
 def test_scheduler_add_dependencies(config, full_parse):
     fcode_mod = """
 module some_mod
@@ -2020,10 +2372,10 @@ subroutine caller(b)
 end subroutine caller
     """.strip()
 
-    workdir = gettempdir()/'test_scheduler_add_dependencies'
+    workdir = gettempdir() / "test_scheduler_add_dependencies"
     workdir.mkdir(exist_ok=True)
-    (workdir/'some_mod.F90').write_text(fcode_mod)
-    (workdir/'caller.F90').write_text(fcode_caller)
+    (workdir / "some_mod.F90").write_text(fcode_mod)
+    (workdir / "caller.F90").write_text(fcode_caller)
 
     def verify_graph(scheduler, expected_items, expected_dependencies):
         assert len(scheduler.items) == len(expected_items)
@@ -2031,42 +2383,46 @@ end subroutine caller
         assert len(scheduler.dependencies) == len(expected_dependencies)
         assert all(e in scheduler.dependencies for e in expected_dependencies)
 
-        assert all(item.source._incomplete is not full_parse for item in scheduler.items)
+        assert all(
+            item.source._incomplete is not full_parse for item in scheduler.items
+        )
 
         # Testing of callgraph visualisation
-        cg_path = workdir/'callgraph'
+        cg_path = workdir / "callgraph"
         scheduler.callgraph(cg_path)
 
         vgraph = VisGraphWrapper(cg_path)
         assert all(n.upper() in vgraph.nodes for n in expected_items)
-        assert all((e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies)
+        assert all(
+            (e[0].upper(), e[1].upper()) in vgraph.edges for e in expected_dependencies
+        )
 
-    scheduler = Scheduler(paths=[workdir], config=config, seed_routines=['caller'], full_parse=full_parse)
+    scheduler = Scheduler(
+        paths=[workdir], config=config, seed_routines=["caller"], full_parse=full_parse
+    )
 
     expected_items = [
-        '#caller', 'some_mod#some_type%some_routine', 'some_mod#some_routine'
+        "#caller",
+        "some_mod#some_type%some_routine",
+        "some_mod#some_routine",
     ]
     expected_dependencies = [
-        ('#caller', 'some_mod#some_type%some_routine'),
-        ('some_mod#some_type%some_routine', 'some_mod#some_routine')
+        ("#caller", "some_mod#some_type%some_routine"),
+        ("some_mod#some_type%some_routine", "some_mod#some_routine"),
     ]
     verify_graph(scheduler, expected_items, expected_dependencies)
 
     # Function should be in the obj map already
-    assert 'some_mod#some_function' in scheduler.obj_map
+    assert "some_mod#some_function" in scheduler.obj_map
 
     # Add inline call dependency
-    scheduler.add_dependencies(
-        {'#caller': ['some_mod#some_type%some_function']}
-    )
+    scheduler.add_dependencies({"#caller": ["some_mod#some_type%some_function"]})
 
     # Scheduler should have automatically added further relevant dependencies
-    expected_items += [
-        'some_mod#some_type%some_function', 'some_mod#some_function'
-    ]
+    expected_items += ["some_mod#some_type%some_function", "some_mod#some_function"]
     expected_dependencies += [
-        ('#caller', 'some_mod#some_type%some_function'),
-        ('some_mod#some_type%some_function', 'some_mod#some_function')
+        ("#caller", "some_mod#some_type%some_function"),
+        ("some_mod#some_type%some_function", "some_mod#some_function"),
     ]
     verify_graph(scheduler, expected_items, expected_dependencies)
 
@@ -2083,14 +2439,16 @@ end subroutine some_routine
     """.strip()
 
     source = Sourcefile.from_source(fcode)
-    item = SubroutineItem('#some_routine', source=source)
+    item = SubroutineItem("#some_routine", source=source)
 
     assert not item.imports
     assert not item.qualified_imports
 
     # Add a random import...
     item.routine.spec.prepend(
-        Import(module='some_mod', symbols=(Variable(name='some_var', scope=item.routine),))
+        Import(
+            module="some_mod", symbols=(Variable(name="some_var", scope=item.routine),)
+        )
     )
 
     # ...and see the caching in effect
@@ -2098,12 +2456,12 @@ end subroutine some_routine
     assert not item.qualified_imports
 
     # Clear the cache to update the property
-    item.clear_cached_property('imports')
-    assert item.imports and item.imports[0].module == 'some_mod'
-    assert 'some_var' in item.qualified_imports
+    item.clear_cached_property("imports")
+    assert item.imports and item.imports[0].module == "some_mod"
+    assert "some_var" in item.qualified_imports
 
 
-@pytest.mark.parametrize('full_parse', [False, True])
+@pytest.mark.parametrize("full_parse", [False, True])
 def test_scheduler_cycle(config, full_parse):
     fcode_mod = """
 module some_mod
@@ -2149,21 +2507,41 @@ subroutine caller
 end subroutine caller
     """.strip()
 
-    workdir = gettempdir()/'test_scheduler_cycle'
+    workdir = gettempdir() / "test_scheduler_cycle"
     workdir.mkdir(exist_ok=True)
-    (workdir/'some_mod.F90').write_text(fcode_mod)
-    (workdir/'caller.F90').write_text(fcode_caller)
+    (workdir / "some_mod.F90").write_text(fcode_mod)
+    (workdir / "caller.F90").write_text(fcode_caller)
 
-    scheduler = Scheduler(paths=[workdir], config=config, seed_routines=['caller'], full_parse=full_parse)
+    scheduler = Scheduler(
+        paths=[workdir], config=config, seed_routines=["caller"], full_parse=full_parse
+    )
 
     # Make sure we the outgoing edges from the recursive routine to the procedure binding
     # and itself are removed but the other edge still exists
-    assert (scheduler['#caller'], scheduler['some_mod#some_type%proc']) in scheduler.dependencies
-    assert (scheduler['some_mod#some_type%proc'], scheduler['some_mod#some_proc']) in scheduler.dependencies
-    assert (scheduler['some_mod#some_proc'], scheduler['some_mod#some_type%proc']) not in scheduler.dependencies
-    assert (scheduler['some_mod#some_proc'], scheduler['some_mod#some_proc']) not in scheduler.dependencies
-    assert (scheduler['some_mod#some_proc'], scheduler['some_mod#some_type%other']) in scheduler.dependencies
-    assert (scheduler['some_mod#some_type%other'], scheduler['some_mod#some_other']) in scheduler.dependencies
+    assert (
+        scheduler["#caller"],
+        scheduler["some_mod#some_type%proc"],
+    ) in scheduler.dependencies
+    assert (
+        scheduler["some_mod#some_type%proc"],
+        scheduler["some_mod#some_proc"],
+    ) in scheduler.dependencies
+    assert (
+        scheduler["some_mod#some_proc"],
+        scheduler["some_mod#some_type%proc"],
+    ) not in scheduler.dependencies
+    assert (
+        scheduler["some_mod#some_proc"],
+        scheduler["some_mod#some_proc"],
+    ) not in scheduler.dependencies
+    assert (
+        scheduler["some_mod#some_proc"],
+        scheduler["some_mod#some_type%other"],
+    ) in scheduler.dependencies
+    assert (
+        scheduler["some_mod#some_type%other"],
+        scheduler["some_mod#some_other"],
+    ) in scheduler.dependencies
 
     rmtree(workdir)
 
@@ -2174,7 +2552,7 @@ def test_scheduler_unqualified_imports(config):
     """
 
     my_config = config.copy()
-    my_config['default']['enable_imports'] = True
+    my_config["default"]["enable_imports"] = True
 
     kernel = """
     subroutine kernel()
@@ -2186,7 +2564,7 @@ def test_scheduler_unqualified_imports(config):
     """
 
     source = Sourcefile.from_source(kernel, frontend=REGEX)
-    item = SubroutineItem(name='#kernel', source=source, config=my_config['default'])
+    item = SubroutineItem(name="#kernel", source=source, config=my_config["default"])
 
     assert item.enable_imports
-    assert item.children == ('other_routine',)
+    assert item.children == ("other_routine",)

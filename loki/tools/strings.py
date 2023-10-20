@@ -11,17 +11,17 @@ from copy import deepcopy
 from loki.tools.util import is_iterable
 
 
-__all__ = ['truncate_string', 'JoinableStringList']
+__all__ = ["truncate_string", "JoinableStringList"]
 
 
-def truncate_string(string, length=16, continuation='...'):
+def truncate_string(string, length=16, continuation="..."):
     """
     Truncates a string to have a maximum given number of characters and indicates the
     truncation by continuation characters '...'.
     This is used, for example, in the representation strings of IR nodes.
     """
     if len(string) > length:
-        return string[:length - len(continuation)] + continuation
+        return string[: length - len(continuation)] + continuation
     return string
 
 
@@ -55,7 +55,7 @@ class JoinableStringList:
         if isinstance(cont, str):
             cont = cont.splitlines(keepends=True)
             if len(cont) == 1:
-                cont += ['']
+                cont += [""]
         assert is_iterable(cont) and len(cont) == 2
         assert all(width > len(c) for c in cont)
 
@@ -79,20 +79,23 @@ class JoinableStringList:
         """
         # Let's see if we can fit the current item plus separator
         # onto the line and have enough space left for a line break
-        new_line = f'{line!s}{item!s}'
+        new_line = f"{line!s}{item!s}"
         if len(new_line) + len(self.cont[0]) <= self.width:
             return new_line, []
 
         # Putting the current item plus separator and potential line break
         # onto the current line exceeds the allowed width: we need to break.
-        item_line = f'{self.cont[1]!s}{item!s}'
+        item_line = f"{self.cont[1]!s}{item!s}"
         item_fits_in_line = len(item_line) + len(self.cont[0]) <= self.width
 
         # First, let's see if we have a JoinableStringList object that we can split up.
         # However, we'll split this up only if allowed or if the item won't fit
         # on a line
-        if (isinstance(item, type(self)) and (item.separable or not item_fits_in_line) and
-                len(item.items) > 1):
+        if (
+            isinstance(item, type(self))
+            and (item.separable or not item_fits_in_line)
+            and len(item.items) > 1
+        ):
             line_, new_item = item._to_str(line=line, stop_on_continuation=True)
             if len(new_item.items) < len(item.items):
                 # If we have been able to put at least one entry from item on the line, we
@@ -118,7 +121,9 @@ class JoinableStringList:
             item_str = item.sep.join(str(i) for i in item.items)
         else:
             item_str = str(item)
-        chunk_list = re.split(r'(\s|\)(?!%)|\n)', item_str)  # split on ' ', ')' (unless followed by '%') and '\n'
+        chunk_list = re.split(
+            r"(\s|\)(?!%)|\n)", item_str
+        )  # split on ' ', ')' (unless followed by '%') and '\n'
 
         # First, add as much as possible to the previous line
         next_chunk = 0
@@ -144,7 +149,7 @@ class JoinableStringList:
 
         return line, lines
 
-    def _to_str(self, line='', stop_on_continuation=False):
+    def _to_str(self, line="", stop_on_continuation=False):
         """
         Join all items into a long string using the given separator and wrap lines if
         necessary.
@@ -158,21 +163,26 @@ class JoinableStringList:
         :rtype: (str, JoinableStringList or NoneType)
         """
         if not self.items:
-            return '', None
+            return "", None
         lines = []
         # Add all items one after another
         for idx, item in enumerate(self.items):
-            if str(item) == '':
+            if str(item) == "":
                 # Skip empty items
                 continue
-            sep = self.sep if idx + 1 < len(self.items) else ''
+            sep = self.sep if idx + 1 < len(self.items) else ""
             old_line = line
             line, _lines = self._add_item_to_line(line, item + sep)
             if stop_on_continuation and _lines:
-                return old_line, type(self)(self.items[idx:], sep=self.sep, width=self.width,
-                                            cont=self.cont, separable=self.separable)
+                return old_line, type(self)(
+                    self.items[idx:],
+                    sep=self.sep,
+                    width=self.width,
+                    cont=self.cont,
+                    separable=self.separable,
+                )
             lines += _lines
-        return ''.join([*lines, line]), None
+        return "".join([*lines, line]), None
 
     def __add__(self, other):
         """
@@ -182,8 +192,9 @@ class JoinableStringList:
         :type other: str or JoinableStringList
         """
         if isinstance(other, type(self)):
-            return type(self)([self, other], sep='', width=self.width, cont=self.cont,
-                              separable=False)
+            return type(self)(
+                [self, other], sep="", width=self.width, cont=self.cont, separable=False
+            )
         if isinstance(other, str):
             obj = deepcopy(self)
             if obj.items:
@@ -191,7 +202,7 @@ class JoinableStringList:
             else:
                 obj.items = [other]
             return obj
-        raise TypeError('Concatenation only for strings or items of same type.')
+        raise TypeError("Concatenation only for strings or items of same type.")
 
     def __radd__(self, other):
         """
@@ -207,7 +218,7 @@ class JoinableStringList:
             else:
                 obj.items = [other]
             return obj
-        raise TypeError('Concatenation only for strings.')
+        raise TypeError("Concatenation only for strings.")
 
     def __str__(self):
         """

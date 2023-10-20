@@ -20,8 +20,13 @@ from loki.build import workqueue
 from loki.bulk import Scheduler, SchedulerConfig
 from loki.config import config as loki_config
 from loki.lint.reporter import (
-    FileReport, RuleReport, Reporter, LazyTextfile,
-    DefaultHandler, JunitXmlHandler, ViolationFileHandler
+    FileReport,
+    RuleReport,
+    Reporter,
+    LazyTextfile,
+    DefaultHandler,
+    JunitXmlHandler,
+    ViolationFileHandler,
 )
 from loki.lint.utils import Fixer
 from loki.logging import logger
@@ -30,7 +35,7 @@ from loki.tools import filehash, find_paths, CaseInsensitiveDict
 from loki.transform import Transformation
 
 
-__all__ = ['Linter', 'LinterTransformation', 'lint_files']
+__all__ = ["Linter", "LinterTransformation", "lint_files"]
 
 
 class Linter:
@@ -49,13 +54,16 @@ class Linter:
     config : dict, optional
         Configuration (e.g., from config file) to change behaviour of rules.
     """
+
     def __init__(self, reporter, rules, config=None):
         self.reporter = reporter
         if inspect.ismodule(rules):
-            rule_names = config.get('rules') if config else None
+            rule_names = config.get("rules") if config else None
             self.rules = Linter.lookup_rules(rules, rule_names=rule_names)
-        elif config and config.get('rules') is not None:
-            self.rules = [rule for rule in rules if rule.__name__ in config.get('rules')]
+        elif config and config.get("rules") is not None:
+            self.rules = [
+                rule for rule in rules if rule.__name__ in config.get("rules")
+            ]
         else:
             self.rules = rules
         self.config = self.default_config(self.rules)
@@ -79,7 +87,9 @@ class Linter:
             A list of rule classes.
         """
         rule_list = inspect.getmembers(
-            rules_module, lambda obj: inspect.isclass(obj) and obj.__name__ in rules_module.__all__)
+            rules_module,
+            lambda obj: inspect.isclass(obj) and obj.__name__ in rules_module.__all__,
+        )
         if rule_names is not None:
             rule_list = [r for r in rule_list if r[0] in rule_names]
         return [r[1] for r in rule_list]
@@ -101,7 +111,7 @@ class Linter:
             values for each rule.
         """
         # List of rules
-        config = {'rules': [rule.__name__ for rule in rules]}
+        config = {"rules": [rule.__name__ for rule in rules]}
         # Default options for rules
         for rule in rules:
             config[rule.__name__] = rule.config
@@ -143,13 +153,13 @@ class Linter:
             The report for this file containing any discovered violations.
         """
         if not isinstance(sourcefile, Sourcefile):
-            raise TypeError(f'{type(sourcefile)} given, {Sourcefile} expected')
+            raise TypeError(f"{type(sourcefile)} given, {Sourcefile} expected")
 
         # Prepare config
         config = self.config
         if overwrite_config:
             config.update(overwrite_config)
-        disable_config = config.get('disable')
+        disable_config = config.get("disable")
         if not isinstance(disable_config, dict):
             disable_config = {}
 
@@ -159,11 +169,16 @@ class Linter:
 
         # Check "disable" config section for an entry matching the file name and, if given, filehash
         disabled_rules = CaseInsensitiveDict()
-        disable_file_key = next((key for key in disable_config if sourcefile.path.match(key)), None)
+        disable_file_key = next(
+            (key for key in disable_config if sourcefile.path.match(key)), None
+        )
         if disable_file_key:
             disable_file = disable_config[disable_file_key]
-            if 'filehash' not in disable_file or disable_file['filehash'] == file_report.hash:
-                for rule in disable_file.get('rules', []):
+            if (
+                "filehash" not in disable_file
+                or disable_file["filehash"] == file_report.hash
+            ):
+                for rule in disable_file.get("rules", []):
                     if isinstance(rule, dict):
                         for name, line_hashes in rule.items():
                             disabled_rules[name] = line_hashes
@@ -172,7 +187,9 @@ class Linter:
 
         # Prepare list of rules
         rules = overwrite_rules if overwrite_rules is not None else self.rules
-        rules = [rule for rule in rules if disabled_rules.get(rule.__name__) is not True]
+        rules = [
+            rule for rule in rules if disabled_rules.get(rule.__name__) is not True
+        ]
 
         timer = Timer(logger=None)
 
@@ -205,7 +222,7 @@ class Linter:
             Configuration that is used to update the stored configuration.
         """
         if not isinstance(sourcefile, Sourcefile):
-            raise TypeError(f'{type(sourcefile)} given, {Sourcefile} expected')
+            raise TypeError(f"{type(sourcefile)} given, {Sourcefile} expected")
         file_path = Path(sourcefile.path)
         assert file_path == Path(file_report.filename)
 
@@ -246,7 +263,7 @@ class LinterTransformation(Transformation):
         Lookup key overwrite for stored reports in the ``trafo_data`` of :any:`Item`
     """
 
-    _key = 'LinterTransformation'
+    _key = "LinterTransformation"
 
     def __init__(self, linter, key=None, **kwargs):
         self.linter = linter
@@ -256,13 +273,17 @@ class LinterTransformation(Transformation):
         super().__init__(**kwargs)
 
     def transform_file(self, sourcefile, **kwargs):
-        item = kwargs.get('item')
+        item = kwargs.get("item")
         report = self.linter.check(sourcefile, **kwargs)
         self.counter += 1
         if item:
             item.trafo_data[self._key] = report
-        if self.linter.config.get('fix'):
-            self.linter.fix(sourcefile, report, backup_suffix=self.linter.config.get('backup_suffix'))
+        if self.linter.config.get("fix"):
+            self.linter.fix(
+                sourcefile,
+                report,
+                backup_suffix=self.linter.config.get("backup_suffix"),
+            )
 
 
 def lint_files_scheduler(linter, basedir, config):
@@ -288,30 +309,41 @@ def check_and_fix_file(path, linter, fix=False, backup_suffix=None):
             linter.fix(source, report, backup_suffix=backup_suffix)
     except Exception as exc:  # pylint: disable=broad-except
         linter.reporter.add_file_error(path, type(exc), str(exc))
-        if loki_config['debug']:
+        if loki_config["debug"]:
             raise exc
         return False
     return True
 
 
-def lint_files_glob(linter, basedir, include, exclude=None, max_workers=1, fix=False, backup_suffix=None):
+def lint_files_glob(
+    linter, basedir, include, exclude=None, max_workers=1, fix=False, backup_suffix=None
+):
     """
     Discover files relative to :data:`basedir` using patterns in :data:`include`
     and apply :data:`linter` on each of them.
     """
     files = find_paths(basedir, include, ignore=exclude)
     checked_count = 0
-    if max_workers == 1 or loki_config['debug']:
+    if max_workers == 1 or loki_config["debug"]:
         for path in files:
-            checked_count += check_and_fix_file(path, linter, fix=fix, backup_suffix=backup_suffix)
+            checked_count += check_and_fix_file(
+                path, linter, fix=fix, backup_suffix=backup_suffix
+            )
     else:
         manager = Manager()
         linter.reporter.init_parallel(manager)
 
         with workqueue(workers=max_workers, logger=logger, manager=manager) as q:
-            log_queue = getattr(q, 'log_queue', None)
+            log_queue = getattr(q, "log_queue", None)
             q_tasks = [
-                q.call(check_and_fix_file, f, linter, fix=fix, backup_suffix=backup_suffix, log_queue=log_queue)
+                q.call(
+                    check_and_fix_file,
+                    f,
+                    linter,
+                    fix=fix,
+                    backup_suffix=backup_suffix,
+                    log_queue=log_queue,
+                )
                 for f in files
             ]
             for t in as_completed(q_tasks):
@@ -390,29 +422,36 @@ def lint_files(rules, config, handlers=None):
     int :
         The number of checked files
     """
-    basedir = config['basedir']
+    basedir = config["basedir"]
 
     if not handlers:
         handlers = []
     handlers += [DefaultHandler(basedir=basedir)]
-    if 'junitxml_file' in config:
-        junitxml_file = LazyTextfile(config['junitxml_file'])
+    if "junitxml_file" in config:
+        junitxml_file = LazyTextfile(config["junitxml_file"])
         handlers.append(JunitXmlHandler(target=junitxml_file.write, basedir=basedir))
-    if 'violations_file' in config:
-        violations_file = LazyTextfile(config['violations_file'])
-        handlers.append(ViolationFileHandler(
-            target=violations_file.write, basedir=basedir,
-            use_line_hashes=config.get('use_violations_file_line_hashes', True)
-        ))
+    if "violations_file" in config:
+        violations_file = LazyTextfile(config["violations_file"])
+        handlers.append(
+            ViolationFileHandler(
+                target=violations_file.write,
+                basedir=basedir,
+                use_line_hashes=config.get("use_violations_file_line_hashes", True),
+            )
+        )
 
     linter = Linter(reporter=Reporter(handlers), rules=rules, config=config)
-    if 'scheduler' in config:
-        checked_count = lint_files_scheduler(linter, basedir, config['scheduler'])
+    if "scheduler" in config:
+        checked_count = lint_files_scheduler(linter, basedir, config["scheduler"])
     else:
         checked_count = lint_files_glob(
-            linter, basedir, config['include'],
-            exclude=config.get('exclude'), max_workers=config.get('max_workers', 1),
-            fix=config.get('fix', False), backup_suffix=config.get('backup_suffix')
+            linter,
+            basedir,
+            config["include"],
+            exclude=config.get("exclude"),
+            max_workers=config.get("max_workers", 1),
+            fix=config.get("fix", False),
+            backup_suffix=config.get("backup_suffix"),
         )
 
     linter.reporter.output()

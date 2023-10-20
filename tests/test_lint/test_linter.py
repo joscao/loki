@@ -14,24 +14,30 @@ from fparser.two.utils import FortranSyntaxError
 
 from loki import Sourcefile, Assignment, FindNodes, FindVariables, gettempdir
 from loki.lint import (
-    GenericHandler, Reporter, Linter, GenericRule,
-    LinterTransformation, lint_files, LazyTextfile
+    GenericHandler,
+    Reporter,
+    Linter,
+    GenericRule,
+    LinterTransformation,
+    lint_files,
+    LazyTextfile,
 )
 
-@pytest.fixture(scope='module', name='rules')
+
+@pytest.fixture(scope="module", name="rules")
 def fixture_rules():
-    rules = importlib.import_module('rules')
+    rules = importlib.import_module("rules")
     return rules
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.fixture(scope='module', name='dummy_file')
+@pytest.fixture(scope="module", name="dummy_file")
 def dummy_file_fixture(here):
-    file_path = here/'test_linter_dummy_file.F90'
+    file_path = here / "test_linter_dummy_file.F90"
     fcode = """
 ! dummy file for linter tests
 subroutine dummy
@@ -42,44 +48,43 @@ end subroutine dummy
     file_path.unlink()
 
 
-@pytest.fixture(scope='module', name='dummy_rules')
+@pytest.fixture(scope="module", name="dummy_rules")
 def dummy_rules_fixture():
     class TestRule(GenericRule):
-        config = {'key': 'default_value'}
+        config = {"key": "default_value"}
 
         @classmethod
         def check(cls, ast, rule_report, config, **kwargs):
             assert len(config) == 1
-            assert 'key' in config
-            assert config['key'] == 'default_value'
-            rule_report.add('TestRule', ast)
+            assert "key" in config
+            assert config["key"] == "default_value"
+            rule_report.add("TestRule", ast)
 
     class TestRule2(GenericRule):
-        config = {'key': 'default_value'}
+        config = {"key": "default_value"}
 
         @classmethod
         def check(cls, ast, rule_report, config, **kwargs):
             assert len(config) == 2
-            assert 'key' in config
-            assert config['key'] == 'non_default_value'
-            assert 'other_key' in config
-            assert config['other_key'] == 'other_value'
-            rule_report.add('TestRule2', ast)
+            assert "key" in config
+            assert config["key"] == "non_default_value"
+            assert "other_key" in config
+            assert config["other_key"] == "other_value"
+            rule_report.add("TestRule2", ast)
 
     yield [TestRule2, TestRule]
 
 
-@pytest.fixture(scope='module', name='dummy_handler')
+@pytest.fixture(scope="module", name="dummy_handler")
 def dummy_handler_fixture(dummy_file, dummy_rules):
     class TestHandler(GenericHandler):
-
         def handle(self, file_report):
             assert len(file_report.reports) == 2
             assert len(file_report.reports[0].problem_reports) == 1
-            assert file_report.reports[0].problem_reports[0].msg == 'TestRule2'
+            assert file_report.reports[0].problem_reports[0].msg == "TestRule2"
             assert file_report.reports[0].problem_reports[0].location.path == dummy_file
             assert file_report.reports[0].rule == dummy_rules[0]
-            assert file_report.reports[1].problem_reports[0].msg == 'TestRule'
+            assert file_report.reports[1].problem_reports[0].msg == "TestRule"
             assert file_report.reports[1].problem_reports[0].location.path == dummy_file
             assert file_report.reports[1].rule == dummy_rules[1]
 
@@ -89,74 +94,69 @@ def dummy_handler_fixture(dummy_file, dummy_rules):
     yield TestHandler()
 
 
-@pytest.mark.parametrize('rule_names, num_rules', [
-    (None, 1),
-    (['FooRule'], 0),
-    (['DummyRule'], 1)
-])
+@pytest.mark.parametrize(
+    "rule_names, num_rules", [(None, 1), (["FooRule"], 0), (["DummyRule"], 1)]
+)
 def test_linter_lookup_rules(rules, rule_names, num_rules):
-    '''Make sure that linter picks up all rules by default.'''
+    """Make sure that linter picks up all rules by default."""
     rule_list = Linter.lookup_rules(rules, rule_names=rule_names)
     assert len(rule_list) == num_rules
 
 
 def test_linter_fail(rules):
-    '''Make sure that linter fails if it is not given a source file.'''
-    with pytest.raises(TypeError, match=r'.*Sourcefile.*expected.*'):
+    """Make sure that linter fails if it is not given a source file."""
+    with pytest.raises(TypeError, match=r".*Sourcefile.*expected.*"):
         Linter(None, rules).check(None)
 
 
 def test_linter_check(dummy_file, dummy_rules, dummy_handler):
-    '''Make sure that linter runs through all given rules and hands them
-    the right config.'''
+    """Make sure that linter runs through all given rules and hands them
+    the right config."""
 
-    config = {
-        'TestRule2': {
-            'other_key': 'other_value',
-            'key': 'non_default_value'
-        }
-    }
+    config = {"TestRule2": {"other_key": "other_value", "key": "non_default_value"}}
     reporter = Reporter(handlers=[dummy_handler])
     linter = Linter(reporter, dummy_rules, config=config)
     linter.check(Sourcefile.from_file(dummy_file))
 
 
 def test_linter_transformation(dummy_file, dummy_rules, dummy_handler):
-    '''Make sure that linter runs through all given rules and hands them
-    the right config when called via Transformation.'''
+    """Make sure that linter runs through all given rules and hands them
+    the right config when called via Transformation."""
 
-    config = {
-        'TestRule2': {
-            'other_key': 'other_value',
-            'key': 'non_default_value'
-        }
-    }
+    config = {"TestRule2": {"other_key": "other_value", "key": "non_default_value"}}
     reporter = Reporter(handlers=[dummy_handler])
     linter = Linter(reporter, dummy_rules, config=config)
     transformation = LinterTransformation(linter=linter)
     transformation.apply(Sourcefile.from_file(dummy_file))
 
 
-@pytest.mark.parametrize('file_rule,module_rule,subroutine_rule,assignment_rule,report_counts', [
-    ('', '', '', '', 3),
-    ('', '', '', '13.37', 3),
-    ('', '', '13.37', '', 2),
-    pytest.param('', '13.37', '', '', 1, marks=pytest.mark.xfail()),
-    ('BlubRule', 'FooRule', 'BarRule', 'BazRule', 3),
-    ('', '', '', 'AlwaysComplainRule', 3),
-    ('', '', 'AlwaysComplainRule', '', 2),
-    pytest.param('', 'AlwaysComplainRule', '', '', 1, marks=pytest.mark.xfail()),
-    pytest.param('AlwaysComplainRule', '', '', '', 0, marks=pytest.mark.xfail()),
-    pytest.param('13.37', '', '', '', 0, marks=pytest.mark.xfail()),
-    # Note: Failed tests are due to the fact that rule disable lookup currently works
-    # the wrong way around, see LOKI-64 for details
-])
-def test_linter_disable_per_scope(file_rule, module_rule, subroutine_rule, assignment_rule, report_counts):
+@pytest.mark.parametrize(
+    "file_rule,module_rule,subroutine_rule,assignment_rule,report_counts",
+    [
+        ("", "", "", "", 3),
+        ("", "", "", "13.37", 3),
+        ("", "", "13.37", "", 2),
+        pytest.param("", "13.37", "", "", 1, marks=pytest.mark.xfail()),
+        ("BlubRule", "FooRule", "BarRule", "BazRule", 3),
+        ("", "", "", "AlwaysComplainRule", 3),
+        ("", "", "AlwaysComplainRule", "", 2),
+        pytest.param("", "AlwaysComplainRule", "", "", 1, marks=pytest.mark.xfail()),
+        pytest.param("AlwaysComplainRule", "", "", "", 0, marks=pytest.mark.xfail()),
+        pytest.param("13.37", "", "", "", 0, marks=pytest.mark.xfail()),
+        # Note: Failed tests are due to the fact that rule disable lookup currently works
+        # the wrong way around, see LOKI-64 for details
+    ],
+)
+def test_linter_disable_per_scope(
+    file_rule, module_rule, subroutine_rule, assignment_rule, report_counts
+):
     class AlwaysComplainRule(GenericRule):
-        docs = {'id': '13.37'}
+        docs = {"id": "13.37"}
 
         @classmethod
-        def check_file(cls, sourcefile, rule_report, config, **kwargs):  # pylint: disable=unused-argument
+        def check_file(
+            cls, sourcefile, rule_report, config, **kwargs
+        ):  # pylint: disable=unused-argument
             rule_report.add(cls.__name__, sourcefile)
 
         check_module = check_file
@@ -168,7 +168,6 @@ def test_linter_disable_per_scope(file_rule, module_rule, subroutine_rule, assig
 
         def output(self, handler_reports):
             pass
-
 
     fcode = f"""
 ! loki-lint: disable={file_rule}
@@ -197,36 +196,45 @@ end module linter_mod
     assert reporter.handlers_reports[handler] == [report_counts]
 
 
-@pytest.mark.parametrize('rule_list,count', [
-    ('', 8),
-    ('NonExistentRule', 8),
-    ('13.37', 5),
-    ('AssignmentComplainRule', 5),
-    ('NonExistentRule,AssignmentComplainRule', 5),
-    ('23.42', 3),
-    ('VariableComplainRule', 3),
-    ('23.42,NonExistentRule', 3),
-    ('13.37,23.42', 0),
-    ('VariableComplainRule,13.37', 0),
-    ('23.42,VariableComplainRule,AssignmentComplainRule', 0),
-])
+@pytest.mark.parametrize(
+    "rule_list,count",
+    [
+        ("", 8),
+        ("NonExistentRule", 8),
+        ("13.37", 5),
+        ("AssignmentComplainRule", 5),
+        ("NonExistentRule,AssignmentComplainRule", 5),
+        ("23.42", 3),
+        ("VariableComplainRule", 3),
+        ("23.42,NonExistentRule", 3),
+        ("13.37,23.42", 0),
+        ("VariableComplainRule,13.37", 0),
+        ("23.42,VariableComplainRule,AssignmentComplainRule", 0),
+    ],
+)
 def test_linter_disable_inline(rule_list, count):
     class AssignmentComplainRule(GenericRule):
-        docs = {'id': '13.37'}
+        docs = {"id": "13.37"}
 
         @classmethod
-        def check_subroutine(cls, subroutine, rule_report, config, **kwargs):  # pylint: disable=unused-argument
+        def check_subroutine(
+            cls, subroutine, rule_report, config, **kwargs
+        ):  # pylint: disable=unused-argument
             for node in FindNodes(Assignment).visit(subroutine.ir):
-                rule_report.add(cls.__name__ + '_' + str(node.source.lines[0]), node)
+                rule_report.add(cls.__name__ + "_" + str(node.source.lines[0]), node)
 
     class VariableComplainRule(GenericRule):
-        docs = {'id': '23.42'}
+        docs = {"id": "23.42"}
 
         @classmethod
-        def check_subroutine(cls, subroutine, rule_report, config, **kwargs):  # pylint: disable=unused-argument
-            for node, variables in FindVariables(with_ir_node=True).visit(subroutine.body):
+        def check_subroutine(
+            cls, subroutine, rule_report, config, **kwargs
+        ):  # pylint: disable=unused-argument
+            for node, variables in FindVariables(with_ir_node=True).visit(
+                subroutine.body
+            ):
                 for var in variables:
-                    rule_report.add(cls.__name__ + '_' + str(var), node)
+                    rule_report.add(cls.__name__ + "_" + str(var), node)
 
     class TestHandler(GenericHandler):
         def handle(self, file_report):
@@ -245,7 +253,7 @@ c = a + b!     loki-lint       :      disable=###
 end subroutine linter_disable_inline
     """.strip()
 
-    fcode = fcode.replace('###', rule_list)
+    fcode = fcode.replace("###", rule_list)
     sourcefile = Sourcefile.from_source(fcode)
 
     handler = TestHandler()
@@ -257,39 +265,67 @@ end subroutine linter_disable_inline
     assert reporter.handlers_reports[handler] == [count]
 
 
-@pytest.mark.parametrize('disable_config,count', [
-    ({}, 8),  # Empty 'disable' section in config should work
-    ({'file.F90': {'rules': ['MyMadeUpRule']}}, 8),  # Disables non-existent rule, no effect
-    ({'file.F90': {'rules': ['AssignmentComplainRule']}}, 5),  # Disables one rule
-    ({'file.f90': {'rules': ['AssignmentComplainRule']}}, 8),  # Filename spelled wrong, no effect
-    ({'file.F90': {'rules': ['VariableComplainRule']}}, 3),  # Disables another rule
-    ({'file.F90': {'rules': ['AssignmentComplainRule', 'VariableComplainRule']}}, 0),  # Disables all rules
-    ({'file.F90': {  # Disables rule with correct filehash
-        'filehash': 'd0d8dd935d0e98a951cbd6c703847bac',
-        'rules': ['AssignmentComplainRule']
-    }}, 5),
-    ({'file.F90': {  # Wrong filehash, no effect
-        'filehash': 'd0d8dd935d0e98a951cbd6c703847baa',
-        'rules': ['AssignmentComplainRule']
-    }}, 8)
-])
+@pytest.mark.parametrize(
+    "disable_config,count",
+    [
+        ({}, 8),  # Empty 'disable' section in config should work
+        (
+            {"file.F90": {"rules": ["MyMadeUpRule"]}},
+            8,
+        ),  # Disables non-existent rule, no effect
+        ({"file.F90": {"rules": ["AssignmentComplainRule"]}}, 5),  # Disables one rule
+        (
+            {"file.f90": {"rules": ["AssignmentComplainRule"]}},
+            8,
+        ),  # Filename spelled wrong, no effect
+        ({"file.F90": {"rules": ["VariableComplainRule"]}}, 3),  # Disables another rule
+        (
+            {"file.F90": {"rules": ["AssignmentComplainRule", "VariableComplainRule"]}},
+            0,
+        ),  # Disables all rules
+        (
+            {
+                "file.F90": {  # Disables rule with correct filehash
+                    "filehash": "d0d8dd935d0e98a951cbd6c703847bac",
+                    "rules": ["AssignmentComplainRule"],
+                }
+            },
+            5,
+        ),
+        (
+            {
+                "file.F90": {  # Wrong filehash, no effect
+                    "filehash": "d0d8dd935d0e98a951cbd6c703847baa",
+                    "rules": ["AssignmentComplainRule"],
+                }
+            },
+            8,
+        ),
+    ],
+)
 def test_linter_disable_config(disable_config, count):
     class AssignmentComplainRule(GenericRule):
-        docs = {'id': '13.37'}
+        docs = {"id": "13.37"}
 
         @classmethod
-        def check_subroutine(cls, subroutine, rule_report, config, **kwargs):  # pylint: disable=unused-argument
+        def check_subroutine(
+            cls, subroutine, rule_report, config, **kwargs
+        ):  # pylint: disable=unused-argument
             for node in FindNodes(Assignment).visit(subroutine.ir):
-                rule_report.add(cls.__name__ + '_' + str(node.source.lines[0]), node)
+                rule_report.add(cls.__name__ + "_" + str(node.source.lines[0]), node)
 
     class VariableComplainRule(GenericRule):
-        docs = {'id': '23.42'}
+        docs = {"id": "23.42"}
 
         @classmethod
-        def check_subroutine(cls, subroutine, rule_report, config, **kwargs):  # pylint: disable=unused-argument
-            for node, variables in FindVariables(with_ir_node=True).visit(subroutine.body):
+        def check_subroutine(
+            cls, subroutine, rule_report, config, **kwargs
+        ):  # pylint: disable=unused-argument
+            for node, variables in FindVariables(with_ir_node=True).visit(
+                subroutine.body
+            ):
                 for var in variables:
-                    rule_report.add(cls.__name__ + '_' + str(var), node)
+                    rule_report.add(cls.__name__ + "_" + str(var), node)
 
     class TestHandler(GenericHandler):
         def handle(self, file_report):
@@ -317,11 +353,11 @@ end module linter_disable_config_mod
     """.strip()
 
     sourcefile = Sourcefile.from_source(fcode)
-    sourcefile.path = Path('file.F90')  # specify a dummy filename
+    sourcefile.path = Path("file.F90")  # specify a dummy filename
     rule_list = [AssignmentComplainRule, VariableComplainRule]
 
     config = Linter.default_config(rules=rule_list)
-    config['disable'] = disable_config
+    config["disable"] = disable_config
 
     handler = TestHandler()
     reporter = Reporter(handlers=[handler])
@@ -330,8 +366,8 @@ end module linter_disable_config_mod
 
     assert reporter.handlers_reports[handler] == [count]
 
-class PicklableTestHandler(GenericHandler):
 
+class PicklableTestHandler(GenericHandler):
     def __init__(self, basedir, target):
         super().__init__(basedir)
         self.target = target
@@ -340,75 +376,94 @@ class PicklableTestHandler(GenericHandler):
         return str(self.get_relative_filename(file_report.filename))
 
     def output(self, handler_reports):
-        self.target('\n'.join(handler_reports))
+        self.target("\n".join(handler_reports))
 
 
-@pytest.mark.parametrize('max_workers', [None, 1, 4])
-@pytest.mark.parametrize('counter,exclude,files', [
-    (15, None, [
-        'projA/module/compute_l1_mod.f90',
-        'projA/module/compute_l2_mod.f90',
-        'projA/module/driverA_mod.f90',
-        'projA/module/driverB_mod.f90',
-        'projA/module/driverC_mod.f90',
-        'projA/module/driverD_mod.f90',
-        'projA/module/driverE_mod.f90',
-        'projA/module/header_mod.f90',
-        'projA/module/kernelA_mod.F90',
-        'projA/module/kernelB_mod.F90',
-        'projA/module/kernelC_mod.f90',
-        'projA/module/kernelD_mod.f90',
-        'projA/module/kernelE_mod.f90',
-        'projA/source/another_l1.F90',
-        'projA/source/another_l2.F90'
-    ]),
-    (15, [], [
-        'projA/module/compute_l1_mod.f90',
-        'projA/module/compute_l2_mod.f90',
-        'projA/module/driverA_mod.f90',
-        'projA/module/driverB_mod.f90',
-        'projA/module/driverC_mod.f90',
-        'projA/module/driverD_mod.f90',
-        'projA/module/driverE_mod.f90',
-        'projA/module/header_mod.f90',
-        'projA/module/kernelA_mod.F90',
-        'projA/module/kernelB_mod.F90',
-        'projA/module/kernelC_mod.f90',
-        'projA/module/kernelD_mod.f90',
-        'projA/module/kernelE_mod.f90',
-        'projA/source/another_l1.F90',
-        'projA/source/another_l2.F90'
-    ]),
-    (5, ['**/kernel*', '**/driver*'], [
-        'projA/module/compute_l1_mod.f90',
-        'projA/module/compute_l2_mod.f90',
-        'projA/module/header_mod.f90',
-        'projA/source/another_l1.F90',
-        'projA/source/another_l2.F90'
-    ]),
-    (4, ['*.f90'], [
-        'projA/module/kernelA_mod.F90',
-        'projA/module/kernelB_mod.F90',
-        'projA/source/another_l1.F90',
-        'projA/source/another_l2.F90'
-    ])
-])
+@pytest.mark.parametrize("max_workers", [None, 1, 4])
+@pytest.mark.parametrize(
+    "counter,exclude,files",
+    [
+        (
+            15,
+            None,
+            [
+                "projA/module/compute_l1_mod.f90",
+                "projA/module/compute_l2_mod.f90",
+                "projA/module/driverA_mod.f90",
+                "projA/module/driverB_mod.f90",
+                "projA/module/driverC_mod.f90",
+                "projA/module/driverD_mod.f90",
+                "projA/module/driverE_mod.f90",
+                "projA/module/header_mod.f90",
+                "projA/module/kernelA_mod.F90",
+                "projA/module/kernelB_mod.F90",
+                "projA/module/kernelC_mod.f90",
+                "projA/module/kernelD_mod.f90",
+                "projA/module/kernelE_mod.f90",
+                "projA/source/another_l1.F90",
+                "projA/source/another_l2.F90",
+            ],
+        ),
+        (
+            15,
+            [],
+            [
+                "projA/module/compute_l1_mod.f90",
+                "projA/module/compute_l2_mod.f90",
+                "projA/module/driverA_mod.f90",
+                "projA/module/driverB_mod.f90",
+                "projA/module/driverC_mod.f90",
+                "projA/module/driverD_mod.f90",
+                "projA/module/driverE_mod.f90",
+                "projA/module/header_mod.f90",
+                "projA/module/kernelA_mod.F90",
+                "projA/module/kernelB_mod.F90",
+                "projA/module/kernelC_mod.f90",
+                "projA/module/kernelD_mod.f90",
+                "projA/module/kernelE_mod.f90",
+                "projA/source/another_l1.F90",
+                "projA/source/another_l2.F90",
+            ],
+        ),
+        (
+            5,
+            ["**/kernel*", "**/driver*"],
+            [
+                "projA/module/compute_l1_mod.f90",
+                "projA/module/compute_l2_mod.f90",
+                "projA/module/header_mod.f90",
+                "projA/source/another_l1.F90",
+                "projA/source/another_l2.F90",
+            ],
+        ),
+        (
+            4,
+            ["*.f90"],
+            [
+                "projA/module/kernelA_mod.F90",
+                "projA/module/kernelB_mod.F90",
+                "projA/source/another_l1.F90",
+                "projA/source/another_l2.F90",
+            ],
+        ),
+    ],
+)
 def test_linter_lint_files_glob(here, rules, counter, exclude, files, max_workers):
-    basedir = here.parent/'sources'
+    basedir = here.parent / "sources"
     config = {
-        'basedir': str(basedir),
-        'include': ['projA/**/*.f90', 'projA/**/*.F90'],
+        "basedir": str(basedir),
+        "include": ["projA/**/*.f90", "projA/**/*.F90"],
     }
     if exclude is not None:
-        config['exclude'] = exclude
+        config["exclude"] = exclude
     if max_workers is not None:
-        config['max_workers'] = max_workers
+        config["max_workers"] = max_workers
 
-    target_file_name = gettempdir()/'linter_lint_files_glob.log'
+    target_file_name = gettempdir() / "linter_lint_files_glob.log"
     if max_workers and max_workers > 1:
         target = LazyTextfile(target_file_name)
     else:
-        target = target_file_name.open('w')
+        target = target_file_name.open("w")
     handler = PicklableTestHandler(basedir=basedir, target=target.write)
     checked = lint_files(rules, config, handlers=[handler])
 
@@ -428,31 +483,41 @@ def test_linter_lint_files_glob(here, rules, counter, exclude, files, max_worker
     target_file_name.unlink(missing_ok=True)
 
 
-@pytest.mark.parametrize('counter,routines,files', [
-    (5, [{'name': 'driverA', 'role': 'driver'}], [
-        'module/driverA_mod.f90',
-        'module/kernelA_mod.F90',
-        'module/compute_l1_mod.f90',
-        'source/another_l1.F90',
-        'source/another_l2.F90'
-    ]),
-    (3, [
-        {'name': 'another_l1', 'role': 'driver'},
-        {'name': 'compute_l1', 'role': 'driver'}
-    ], [
-        'source/another_l1.F90',
-        'module/compute_l1_mod.f90',
-        'source/another_l2.F90',
-    ]),
-    (2, [
-        {'name': 'another_l1', 'role': 'driver'}
-    ], [
-        'source/another_l1.F90',
-        'source/another_l2.F90'
-    ]),
-])
+@pytest.mark.parametrize(
+    "counter,routines,files",
+    [
+        (
+            5,
+            [{"name": "driverA", "role": "driver"}],
+            [
+                "module/driverA_mod.f90",
+                "module/kernelA_mod.F90",
+                "module/compute_l1_mod.f90",
+                "source/another_l1.F90",
+                "source/another_l2.F90",
+            ],
+        ),
+        (
+            3,
+            [
+                {"name": "another_l1", "role": "driver"},
+                {"name": "compute_l1", "role": "driver"},
+            ],
+            [
+                "source/another_l1.F90",
+                "module/compute_l1_mod.f90",
+                "source/another_l2.F90",
+            ],
+        ),
+        (
+            2,
+            [{"name": "another_l1", "role": "driver"}],
+            ["source/another_l1.F90", "source/another_l2.F90"],
+        ),
+    ],
+)
 def test_linter_lint_files_scheduler(here, rules, counter, routines, files):
-    basedir = here.parent/'sources/projA'
+    basedir = here.parent / "sources/projA"
 
     class TestHandler(GenericHandler):
         def __init__(self, **kwargs):
@@ -468,17 +533,17 @@ def test_linter_lint_files_scheduler(here, rules, counter, routines, files):
             pass
 
     config = {
-        'basedir': str(basedir),
-        'scheduler': {
-            'default': {
-                'mode': 'lint',
-                'role': 'kernel',
-                'expand': True,
-                'strict': False,
-                'block': ['compute_l2']
+        "basedir": str(basedir),
+        "scheduler": {
+            "default": {
+                "mode": "lint",
+                "role": "kernel",
+                "expand": True,
+                "strict": False,
+                "block": ["compute_l2"],
             },
-            'routine': routines
-        }
+            "routine": routines,
+        },
     }
 
     handler = TestHandler()
@@ -489,23 +554,29 @@ def test_linter_lint_files_scheduler(here, rules, counter, routines, files):
     assert handler.files == files
 
 
-@pytest.mark.parametrize('config', [
-    {'scheduler': {
-        'default': {
-            'mode': 'lint',
-            'role': 'kernel',
-            'expand': True,
-            'strict': True,
+@pytest.mark.parametrize(
+    "config",
+    [
+        {
+            "scheduler": {
+                "default": {
+                    "mode": "lint",
+                    "role": "kernel",
+                    "expand": True,
+                    "strict": True,
+                },
+                "routine": [
+                    {
+                        "name": "other_routine",
+                    }
+                ],
+            }
         },
-        'routine': [{
-            'name': 'other_routine',
-        }]
-    }},
-    {'include': ['linter_lint_files_fix.F90']}
-])
-@pytest.mark.parametrize('backup_suffix', [None, '.bak'])
+        {"include": ["linter_lint_files_fix.F90"]},
+    ],
+)
+@pytest.mark.parametrize("backup_suffix", [None, ".bak"])
 def test_linter_lint_files_fix(config, backup_suffix):
-
     class TestRule(GenericRule):
 
         fixable = True
@@ -513,7 +584,9 @@ def test_linter_lint_files_fix(config, backup_suffix):
         @classmethod
         def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
             if not subroutine.name.isupper():
-                rule_report.add(f'Subroutine name "{subroutine.name}" is not upper case', subroutine)
+                rule_report.add(
+                    f'Subroutine name "{subroutine.name}" is not upper case', subroutine
+                )
 
         @classmethod
         def fix_sourcefile(cls, sourcefile, rule_report, config):
@@ -538,47 +611,54 @@ implicit none
 call some_routine
 end subroutine OTHER_ROUTINE
     """.strip()
-    assert fcode.count('some_routine') == 3
-    assert fcode.count('SOME_ROUTINE') == 0
+    assert fcode.count("some_routine") == 3
+    assert fcode.count("SOME_ROUTINE") == 0
 
-    basedir = gettempdir()/'lint_files_fix'
+    basedir = gettempdir() / "lint_files_fix"
     basedir.mkdir(exist_ok=True)
-    filename = basedir/'linter_lint_files_fix.F90'
+    filename = basedir / "linter_lint_files_fix.F90"
     filename.write_text(fcode)
 
-    config['basedir'] = basedir
-    config['fix'] = True
+    config["basedir"] = basedir
+    config["fix"] = True
     if backup_suffix:
-        config['backup_suffix'] = backup_suffix
+        config["backup_suffix"] = backup_suffix
 
     checked_files = lint_files([TestRule], config)
     assert checked_files == 1
 
     fixed_fcode = filename.read_text()
-    assert fixed_fcode.count('some_routine') == 1  # call statement
-    assert fixed_fcode.count('SOME_ROUTINE') == 2
+    assert fixed_fcode.count("some_routine") == 1  # call statement
+    assert fixed_fcode.count("SOME_ROUTINE") == 2
 
     if backup_suffix:
-        backup_file = filename.with_suffix('.bak.F90')
+        backup_file = filename.with_suffix(".bak.F90")
         assert backup_file.read_text() == fcode
 
     rmtree(basedir)
 
 
-@pytest.mark.parametrize('config', [
-    {'scheduler': {
-        'default': {
-            'mode': 'lint',
-            'role': 'kernel',
-            'expand': True,
-            'strict': True
+@pytest.mark.parametrize(
+    "config",
+    [
+        {
+            "scheduler": {
+                "default": {
+                    "mode": "lint",
+                    "role": "kernel",
+                    "expand": True,
+                    "strict": True,
+                },
+                "routine": [
+                    {
+                        "name": "other_routine",
+                    }
+                ],
+            }
         },
-        'routine': [{
-            'name': 'other_routine',
-        }]
-    }},
-    {'include': ['*.F90']}
-])
+        {"include": ["*.F90"]},
+    ],
+)
 def test_linter_fortran_syntax_error(config, rules):
     fcode = """
 subroutine some_routine
@@ -592,18 +672,15 @@ call some_routine
 end subroutine OTHER_ROUTINE
     """.strip()
 
-    basedir = gettempdir()/'lint_files_syntax_error'
+    basedir = gettempdir() / "lint_files_syntax_error"
     basedir.mkdir(exist_ok=True)
-    filename = basedir/'linter_lint_files_syntax_error.F90'
+    filename = basedir / "linter_lint_files_syntax_error.F90"
     filename.write_text(fcode)
-    junitxml_file = basedir/'junitxml.xml'
+    junitxml_file = basedir / "junitxml.xml"
 
-    config.update({
-        'basedir': basedir,
-        'junitxml_file': str(junitxml_file)
-    })
+    config.update({"basedir": basedir, "junitxml_file": str(junitxml_file)})
 
-    if 'scheduler' in config:
+    if "scheduler" in config:
         with pytest.raises(FortranSyntaxError):
             lint_files(rules, config)
     else:
@@ -612,9 +689,9 @@ end subroutine OTHER_ROUTINE
 
         # Sanity check that this ends up in reports
         xml = ET.parse(junitxml_file).getroot()
-        assert xml.attrib['tests'] == '1'
-        assert xml.attrib['failures'] == '1'
-        report = xml.find('testsuite/testcase/failure')
-        assert 'This is invalid Fortran syntax' in report.attrib['message']
+        assert xml.attrib["tests"] == "1"
+        assert xml.attrib["failures"] == "1"
+        report = xml.find("testsuite/testcase/failure")
+        assert "This is invalid Fortran syntax" in report.attrib["message"]
 
     rmtree(basedir)

@@ -10,58 +10,75 @@ import pytest
 
 from conftest import available_frontends
 from loki import (
-    Scheduler, Subroutine, Dimension, FindNodes, Loop, Assignment,
-    CallStatement, Allocation, Deallocation, VariableDeclaration, Import, FindVariables
+    Scheduler,
+    Subroutine,
+    Dimension,
+    FindNodes,
+    Loop,
+    Assignment,
+    CallStatement,
+    Allocation,
+    Deallocation,
+    VariableDeclaration,
+    Import,
+    FindVariables,
 )
 from loki.transform import HoistTemporaryArraysAnalysis, ParametriseTransformation
 from loki.expression import symbols as sym
-from transformations import SccCufTransformation, HoistTemporaryArraysDeviceAllocatableTransformation
+from transformations import (
+    SccCufTransformation,
+    HoistTemporaryArraysDeviceAllocatableTransformation,
+)
 
 
-@pytest.fixture(scope='module', name='horizontal')
+@pytest.fixture(scope="module", name="horizontal")
 def fixture_horizontal():
-    return Dimension(name='horizontal', size='nlon', index='jl', bounds=('start', 'end'))
+    return Dimension(
+        name="horizontal", size="nlon", index="jl", bounds=("start", "end")
+    )
 
 
-@pytest.fixture(scope='module', name='vertical')
+@pytest.fixture(scope="module", name="vertical")
 def fixture_vertical():
-    return Dimension(name='vertical', size='nz', index='jk')
+    return Dimension(name="vertical", size="nz", index="jk")
 
 
-@pytest.fixture(scope='module', name='blocking')
+@pytest.fixture(scope="module", name="blocking")
 def fixture_blocking():
-    return Dimension(name='blocking', size='nb', index='b')
+    return Dimension(name="blocking", size="nb", index="b")
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.fixture(name='config')
+@pytest.fixture(name="config")
 def fixture_config():
     """
     Default configuration dict with basic options.
     """
     return {
-        'default': {
-            'mode': 'idem',
-            'role': 'kernel',
-            'expand': True,
-            'strict': True,
+        "default": {
+            "mode": "idem",
+            "role": "kernel",
+            "expand": True,
+            "strict": True,
         },
-        'routine': [
+        "routine": [
             {
-                'name': 'driver',
-                'role': 'driver',
+                "name": "driver",
+                "role": "driver",
             },
-        ]
+        ],
     }
 
 
 def check_subroutine_driver(routine, blocking, disable=()):
     # use of "use cudafor"
-    imports = [_import.module.lower() for _import in FindNodes(Import).visit(routine.spec)]
+    imports = [
+        _import.module.lower() for _import in FindNodes(Import).visit(routine.spec)
+    ]
     assert "cudafor" in imports
     # device arrays
     # device arrays: declaration
@@ -99,25 +116,50 @@ def check_subroutine_driver(routine, blocking, disable=()):
     assignments = FindNodes(Assignment).visit(routine.body)
     cuda_device_synchronize = sym.InlineCall(
         function=sym.ProcedureSymbol(name="cudaDeviceSynchronize", scope=routine),
-        parameters=())
+        parameters=(),
+    )
     assert cuda_device_synchronize in [assignment.rhs for assignment in assignments]
     for device_array in device_arrays:
         if array_map[device_array].type.intent == "inout":
-            assert Assignment(lhs=device_array.clone(dimensions=None),
-                              rhs=array_map[device_array].clone(dimensions=None)) in assignments
-            assert Assignment(rhs=device_array.clone(dimensions=None),
-                              lhs=array_map[device_array].clone(dimensions=None)) in assignments
+            assert (
+                Assignment(
+                    lhs=device_array.clone(dimensions=None),
+                    rhs=array_map[device_array].clone(dimensions=None),
+                )
+                in assignments
+            )
+            assert (
+                Assignment(
+                    rhs=device_array.clone(dimensions=None),
+                    lhs=array_map[device_array].clone(dimensions=None),
+                )
+                in assignments
+            )
         elif array_map[device_array].type.intent == "in":
-            assert Assignment(lhs=device_array.clone(dimensions=None),
-                              rhs=array_map[device_array].clone(dimensions=None)) in assignments
+            assert (
+                Assignment(
+                    lhs=device_array.clone(dimensions=None),
+                    rhs=array_map[device_array].clone(dimensions=None),
+                )
+                in assignments
+            )
         elif array_map[device_array].type.intent == "out":
-            assert Assignment(rhs=device_array.clone(dimensions=None),
-                              lhs=array_map[device_array].clone(dimensions=None)) in assignments
+            assert (
+                Assignment(
+                    rhs=device_array.clone(dimensions=None),
+                    lhs=array_map[device_array].clone(dimensions=None),
+                )
+                in assignments
+            )
     # definition of block and griddim
     assert "GRIDDIM" in routine.variables
     assert "BLOCKDIM" in routine.variables
     # kernel launch configuration
-    calls = [call for call in FindNodes(CallStatement).visit(routine.body) if str(call.name) not in disable]
+    calls = [
+        call
+        for call in FindNodes(CallStatement).visit(routine.body)
+        if str(call.name) not in disable
+    ]
     for call in calls:
         assert call.chevron[0] == "GRIDDIM"
         assert call.chevron[1] == "BLOCKDIM"
@@ -144,7 +186,9 @@ def _check_subroutine_kernel(routine, horizontal, vertical, blocking):
 
 
 def check_subroutine_kernel(routine, horizontal, vertical, blocking):
-    _check_subroutine_kernel(routine=routine, horizontal=horizontal, vertical=vertical, blocking=blocking)
+    _check_subroutine_kernel(
+        routine=routine, horizontal=horizontal, vertical=vertical, blocking=blocking
+    )
     assert "ATTRIBUTES(GLOBAL)" in routine.prefix
     assignments = FindNodes(Assignment).visit(routine.body)
     assert "THREADIDX%X" in [_.rhs for _ in assignments]
@@ -152,7 +196,9 @@ def check_subroutine_kernel(routine, horizontal, vertical, blocking):
 
 
 def check_subroutine_device(routine, horizontal, vertical, blocking):
-    _check_subroutine_kernel(routine=routine, horizontal=horizontal, vertical=vertical, blocking=blocking)
+    _check_subroutine_kernel(
+        routine=routine, horizontal=horizontal, vertical=vertical, blocking=blocking
+    )
     assert "ATTRIBUTES(DEVICE)" in routine.prefix
     assert horizontal.index in routine.arguments
     assert blocking.index in routine.arguments
@@ -163,7 +209,7 @@ def check_subroutine_elemental_device(routine):
     assert "ELEMENTAL" not in routine.prefix
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_scc_cuf_simple(frontend, horizontal, vertical, blocking):
 
     fcode_driver = """
@@ -215,121 +261,192 @@ def test_scc_cuf_simple(frontend, horizontal, vertical, blocking):
   END SUBROUTINE kernel
 """
     kernel = Subroutine.from_source(fcode_kernel, frontend=frontend)
-    driver = Subroutine.from_source(fcode_driver, frontend=frontend, definitions=[kernel])
+    driver = Subroutine.from_source(
+        fcode_driver, frontend=frontend, definitions=[kernel]
+    )
 
     cuf_transform = SccCufTransformation(
         horizontal=horizontal, vertical=vertical, block_dim=blocking
     )
 
-    cuf_transform.apply(driver, role='driver', targets=['kernel'])
-    cuf_transform.apply(kernel, role='kernel')
+    cuf_transform.apply(driver, role="driver", targets=["kernel"])
+    cuf_transform.apply(kernel, role="kernel")
 
     check_subroutine_driver(routine=driver, blocking=blocking)
-    check_subroutine_kernel(routine=kernel, horizontal=horizontal, vertical=vertical, blocking=blocking)
+    check_subroutine_kernel(
+        routine=kernel, horizontal=horizontal, vertical=vertical, blocking=blocking
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_scc_cuf_parametrise(here, frontend, config, horizontal, vertical, blocking):
     """
     Test SCC-CUF transformation type 0, thus including parametrising (array dimension(s))
     """
 
-    proj = here / 'sources/projSccCuf/module'
+    proj = here / "sources/projSccCuf/module"
 
-    scheduler = Scheduler(paths=[proj], config=config, seed_routines=['driver'], frontend=frontend)
+    scheduler = Scheduler(
+        paths=[proj], config=config, seed_routines=["driver"], frontend=frontend
+    )
 
     cuf_transform = SccCufTransformation(
-        horizontal=horizontal, vertical=vertical, block_dim=blocking,
-        transformation_type='parametrise'
+        horizontal=horizontal,
+        vertical=vertical,
+        block_dim=blocking,
+        transformation_type="parametrise",
     )
     scheduler.process(transformation=cuf_transform)
 
-    dic2p = {'nz': 137}
+    dic2p = {"nz": 137}
     scheduler.process(transformation=ParametriseTransformation(dic2p=dic2p))
 
     # check for correct CUF transformation
-    check_subroutine_driver(routine=scheduler.item_map["driver_mod#driver"].routine, blocking=blocking)
-    check_subroutine_kernel(routine=scheduler.item_map["kernel_mod#kernel"].routine, horizontal=horizontal,
-                            vertical=vertical, blocking=blocking)
-    check_subroutine_device(routine=scheduler.item_map["kernel_mod#device"].routine, horizontal=horizontal,
-                            vertical=vertical, blocking=blocking)
-    check_subroutine_elemental_device(routine=scheduler.item_map["kernel_mod#elemental_device"].routine)
+    check_subroutine_driver(
+        routine=scheduler.item_map["driver_mod#driver"].routine, blocking=blocking
+    )
+    check_subroutine_kernel(
+        routine=scheduler.item_map["kernel_mod#kernel"].routine,
+        horizontal=horizontal,
+        vertical=vertical,
+        blocking=blocking,
+    )
+    check_subroutine_device(
+        routine=scheduler.item_map["kernel_mod#device"].routine,
+        horizontal=horizontal,
+        vertical=vertical,
+        blocking=blocking,
+    )
+    check_subroutine_elemental_device(
+        routine=scheduler.item_map["kernel_mod#elemental_device"].routine
+    )
 
     # check for parametrised variables
     vars2p = list(dic2p.keys())
-    routine_parameters = [var for var in scheduler.item_map["driver_mod#driver"].routine.variables
-                          if var.type.parameter]
+    routine_parameters = [
+        var
+        for var in scheduler.item_map["driver_mod#driver"].routine.variables
+        if var.type.parameter
+    ]
     assert routine_parameters == vars2p
-    routine_parameters = [var for var in scheduler.item_map["kernel_mod#kernel"].routine.variables
-                          if var.type.parameter]
+    routine_parameters = [
+        var
+        for var in scheduler.item_map["kernel_mod#kernel"].routine.variables
+        if var.type.parameter
+    ]
     assert routine_parameters == vars2p
-    routine_parameters = [var for var in scheduler.item_map["kernel_mod#device"].routine.variables
-                          if var.type.parameter]
+    routine_parameters = [
+        var
+        for var in scheduler.item_map["kernel_mod#device"].routine.variables
+        if var.type.parameter
+    ]
     assert routine_parameters == vars2p
 
     # local arrays
     routine = scheduler.item_map["kernel_mod#kernel"].routine
     argument_arrays = [arg for arg in routine.arguments if isinstance(arg, sym.Array)]
-    local_arrays = [var for var in routine.variables if isinstance(var, sym.Array) and var not in argument_arrays]
+    local_arrays = [
+        var
+        for var in routine.variables
+        if isinstance(var, sym.Array) and var not in argument_arrays
+    ]
     for local_array in local_arrays:
         assert local_array.type.device
     routine = scheduler.item_map["kernel_mod#device"].routine
     argument_arrays = [arg for arg in routine.arguments if isinstance(arg, sym.Array)]
-    local_arrays = [var for var in routine.variables if isinstance(var, sym.Array) and var not in argument_arrays]
+    local_arrays = [
+        var
+        for var in routine.variables
+        if isinstance(var, sym.Array) and var not in argument_arrays
+    ]
     for local_array in local_arrays:
         assert local_array.type.device
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_scc_cuf_hoist(here, frontend, config, horizontal, vertical, blocking):
     """
     Test SCC-CUF transformation type 1, thus including host side hoisting
     """
 
-    proj = here / 'sources/projSccCuf/module'
+    proj = here / "sources/projSccCuf/module"
 
-    scheduler = Scheduler(paths=[proj], config=config, seed_routines=['driver'], frontend=frontend)
+    scheduler = Scheduler(
+        paths=[proj], config=config, seed_routines=["driver"], frontend=frontend
+    )
 
     cuf_transform = SccCufTransformation(
-        horizontal=horizontal, vertical=vertical, block_dim=blocking,
-        transformation_type='hoist'
+        horizontal=horizontal,
+        vertical=vertical,
+        block_dim=blocking,
+        transformation_type="hoist",
     )
     scheduler.process(transformation=cuf_transform)
 
     # Transformation: Analysis
     scheduler.process(transformation=HoistTemporaryArraysAnalysis(), reverse=True)
     # Transformation: Synthesis
-    scheduler.process(transformation=HoistTemporaryArraysDeviceAllocatableTransformation())
+    scheduler.process(
+        transformation=HoistTemporaryArraysDeviceAllocatableTransformation()
+    )
 
-    check_subroutine_driver(routine=scheduler.item_map["driver_mod#driver"].routine, blocking=blocking)
-    check_subroutine_kernel(routine=scheduler.item_map["kernel_mod#kernel"].routine, horizontal=horizontal,
-                            vertical=vertical, blocking=blocking)
-    check_subroutine_device(routine=scheduler.item_map["kernel_mod#device"].routine, horizontal=horizontal,
-                            vertical=vertical, blocking=blocking)
-    check_subroutine_elemental_device(routine=scheduler.item_map["kernel_mod#elemental_device"].routine)
+    check_subroutine_driver(
+        routine=scheduler.item_map["driver_mod#driver"].routine, blocking=blocking
+    )
+    check_subroutine_kernel(
+        routine=scheduler.item_map["kernel_mod#kernel"].routine,
+        horizontal=horizontal,
+        vertical=vertical,
+        blocking=blocking,
+    )
+    check_subroutine_device(
+        routine=scheduler.item_map["kernel_mod#device"].routine,
+        horizontal=horizontal,
+        vertical=vertical,
+        blocking=blocking,
+    )
+    check_subroutine_elemental_device(
+        routine=scheduler.item_map["kernel_mod#elemental_device"].routine
+    )
 
     # check driver
-    for call in FindNodes(CallStatement).visit(scheduler.item_map["driver_mod#driver"].routine.body):
+    for call in FindNodes(CallStatement).visit(
+        scheduler.item_map["driver_mod#driver"].routine.body
+    ):
         argnames = [arg.name.lower() for arg in call.arguments]
-        assert 'kernel_local_z' in argnames
-        assert 'device_local_x' in argnames
+        assert "kernel_local_z" in argnames
+        assert "device_local_x" in argnames
     # check kernel
-    argnames = [arg.name.lower() for arg in scheduler.item_map["kernel_mod#kernel"].routine.arguments]
-    assert 'local_z' in argnames
-    assert 'device_local_x' in argnames
-    calls = [call for call in FindNodes(CallStatement).visit(scheduler.item_map["kernel_mod#kernel"].routine.body)
-             if str(call.name) == "DEVICE"]
+    argnames = [
+        arg.name.lower()
+        for arg in scheduler.item_map["kernel_mod#kernel"].routine.arguments
+    ]
+    assert "local_z" in argnames
+    assert "device_local_x" in argnames
+    calls = [
+        call
+        for call in FindNodes(CallStatement).visit(
+            scheduler.item_map["kernel_mod#kernel"].routine.body
+        )
+        if str(call.name) == "DEVICE"
+    ]
     for call in calls:
-        assert 'DEVICE_local_x' in call.arguments
+        assert "DEVICE_local_x" in call.arguments
     # check device
-    assert all(_ in [arg.name for arg in scheduler.item_map["kernel_mod#device"].routine.arguments]
-               for _ in ['local_x'])
+    assert all(
+        _
+        in [
+            arg.name
+            for arg in scheduler.item_map["kernel_mod#device"].routine.arguments
+        ]
+        for _ in ["local_x"]
+    )
 
     # local arrays
     routine = scheduler.item_map["kernel_mod#kernel"].routine
     local_arrays = [routine.variable_map["local_z"]]
     for local_array in local_arrays:
-        assert local_array.type.intent == 'inout'
+        assert local_array.type.intent == "inout"
         dims = FindVariables().visit(local_array.dimensions)
         assert horizontal.size in dims
         assert vertical.size in dims
@@ -337,35 +454,51 @@ def test_scc_cuf_hoist(here, frontend, config, horizontal, vertical, blocking):
     routine = scheduler.item_map["kernel_mod#device"].routine
     local_arrays = [routine.variable_map["local_x"]]
     for local_array in local_arrays:
-        assert local_array.type.intent == 'inout'
+        assert local_array.type.intent == "inout"
         dims = FindVariables().visit(local_array.dimensions)
         assert horizontal.size in dims
         assert vertical.size in dims
         assert blocking.size in dims
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_scc_cuf_dynamic_memory(here, frontend, config, horizontal, vertical, blocking):
     """
     Test SCC-CUF transformation type 2, thus including dynamic memory allocation on the device (for local arrays)
     """
 
-    proj = here / 'sources/projSccCuf/module'
+    proj = here / "sources/projSccCuf/module"
 
-    scheduler = Scheduler(paths=[proj], config=config, seed_routines=['driver'], frontend=frontend)
+    scheduler = Scheduler(
+        paths=[proj], config=config, seed_routines=["driver"], frontend=frontend
+    )
 
     cuf_transform = SccCufTransformation(
-        horizontal=horizontal, vertical=vertical, block_dim=blocking,
-        transformation_type='dynamic'
+        horizontal=horizontal,
+        vertical=vertical,
+        block_dim=blocking,
+        transformation_type="dynamic",
     )
     scheduler.process(transformation=cuf_transform)
 
-    check_subroutine_driver(routine=scheduler.item_map["driver_mod#driver"].routine, blocking=blocking)
-    check_subroutine_kernel(routine=scheduler.item_map["kernel_mod#kernel"].routine, horizontal=horizontal,
-                            vertical=vertical, blocking=blocking)
-    check_subroutine_device(routine=scheduler.item_map["kernel_mod#device"].routine, horizontal=horizontal,
-                            vertical=vertical, blocking=blocking)
-    check_subroutine_elemental_device(routine=scheduler.item_map["kernel_mod#elemental_device"].routine)
+    check_subroutine_driver(
+        routine=scheduler.item_map["driver_mod#driver"].routine, blocking=blocking
+    )
+    check_subroutine_kernel(
+        routine=scheduler.item_map["kernel_mod#kernel"].routine,
+        horizontal=horizontal,
+        vertical=vertical,
+        blocking=blocking,
+    )
+    check_subroutine_device(
+        routine=scheduler.item_map["kernel_mod#device"].routine,
+        horizontal=horizontal,
+        vertical=vertical,
+        blocking=blocking,
+    )
+    check_subroutine_elemental_device(
+        routine=scheduler.item_map["kernel_mod#elemental_device"].routine
+    )
 
     # kernel
     routine = scheduler.item_map["kernel_mod#kernel"].routine
@@ -385,14 +518,22 @@ def test_scc_cuf_dynamic_memory(here, frontend, config, horizontal, vertical, bl
     # local arrays
     routine = scheduler.item_map["kernel_mod#kernel"].routine
     argument_arrays = [arg for arg in routine.arguments if isinstance(arg, sym.Array)]
-    local_arrays = [var for var in routine.variables if isinstance(var, sym.Array) and var not in argument_arrays]
+    local_arrays = [
+        var
+        for var in routine.variables
+        if isinstance(var, sym.Array) and var not in argument_arrays
+    ]
     for local_array in local_arrays:
         assert local_array.type.allocatable
         assert local_array.type.device
         assert len(local_array.dimensions) == 1
     routine = scheduler.item_map["kernel_mod#device"].routine
     argument_arrays = [arg for arg in routine.arguments if isinstance(arg, sym.Array)]
-    local_arrays = [var for var in routine.variables if isinstance(var, sym.Array) and var not in argument_arrays]
+    local_arrays = [
+        var
+        for var in routine.variables
+        if isinstance(var, sym.Array) and var not in argument_arrays
+    ]
     for local_array in local_arrays:
         assert local_array.type.allocatable
         assert local_array.type.device

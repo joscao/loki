@@ -13,7 +13,7 @@ from loki.sourcefile import Sourcefile
 from loki.subroutine import Subroutine
 
 
-__all__ = ['Transformation']
+__all__ = ["Transformation"]
 
 
 class Transformation:
@@ -128,10 +128,14 @@ class Transformation:
             Keyword arguments that are passed on to transformation methods.
         """
         if not isinstance(sourcefile, Sourcefile):
-            raise TypeError('Transformation.apply_file can only be applied to Sourcefile object')
+            raise TypeError(
+                "Transformation.apply_file can only be applied to Sourcefile object"
+            )
 
         if sourcefile._incomplete:
-            raise RuntimeError('Transformation.apply_file requires Sourcefile to be complete')
+            raise RuntimeError(
+                "Transformation.apply_file requires Sourcefile to be complete"
+            )
 
         # Apply file-level transformations
         self.transform_file(sourcefile, **kwargs)
@@ -150,10 +154,14 @@ class Transformation:
             Keyword arguments that are passed on to transformation methods.
         """
         if not isinstance(subroutine, Subroutine):
-            raise TypeError('Transformation.apply_subroutine can only be applied to Subroutine object')
+            raise TypeError(
+                "Transformation.apply_subroutine can only be applied to Subroutine object"
+            )
 
         if subroutine._incomplete:
-            raise RuntimeError('Transformation.apply_subroutine requires Subroutine to be complete')
+            raise RuntimeError(
+                "Transformation.apply_subroutine requires Subroutine to be complete"
+            )
 
         # Apply the actual transformation for subroutines
         self.transform_subroutine(subroutine, **kwargs)
@@ -172,10 +180,14 @@ class Transformation:
             Keyword arguments that are passed on to transformation methods.
         """
         if not isinstance(module, Module):
-            raise TypeError('Transformation.apply_module can only be applied to Module object')
+            raise TypeError(
+                "Transformation.apply_module can only be applied to Module object"
+            )
 
         if module._incomplete:
-            raise RuntimeError('Transformation.apply_module requires Module to be complete')
+            raise RuntimeError(
+                "Transformation.apply_module requires Module to be complete"
+            )
 
         # Apply the actual transformation for modules
         self.transform_module(module, **kwargs)
@@ -216,14 +228,15 @@ class Transformation:
             Call ``rescope_symbols`` on modules and subroutines in :data:`sourcefile`
         """
         if not isinstance(sourcefile, Sourcefile):
-            raise TypeError('Transformation.post_apply_file can only be applied to Sourcefile object')
+            raise TypeError(
+                "Transformation.post_apply_file can only be applied to Sourcefile object"
+            )
 
         for module in sourcefile.modules:
             self.post_apply_module(module, rescope_symbols)
 
         for routine in sourcefile.subroutines:
             self.post_apply_subroutine(routine, rescope_symbols)
-
 
     def post_apply_subroutine(self, subroutine, rescope_symbols):
         """
@@ -237,7 +250,9 @@ class Transformation:
             Call ``rescope_symbols`` on :data:`subroutine`
         """
         if not isinstance(subroutine, Subroutine):
-            raise TypeError('Transformation.post_apply_subroutine can only be applied to Subroutine object')
+            raise TypeError(
+                "Transformation.post_apply_subroutine can only be applied to Subroutine object"
+            )
 
         for routine in subroutine.members:
             self.post_apply_subroutine(routine, False)
@@ -258,7 +273,9 @@ class Transformation:
             Call ``rescope_symbols`` on :data:`module`
         """
         if not isinstance(module, Module):
-            raise TypeError('Transformation.post_apply_module can only be applied to Module object')
+            raise TypeError(
+                "Transformation.post_apply_module can only be applied to Module object"
+            )
 
         for routine in module.subroutines:
             self.post_apply_subroutine(routine, False)

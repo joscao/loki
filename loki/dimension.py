@@ -7,7 +7,7 @@
 
 from loki.tools import as_tuple
 
-__all__ = ['Dimension']
+__all__ = ["Dimension"]
 
 
 class Dimension:
@@ -70,7 +70,7 @@ class Dimension:
         """
         String that matches the range expression of an iteration space (loop).
         """
-        return f'{self._bounds[0]}:{self._bounds[1]}'
+        return f"{self._bounds[0]}:{self._bounds[1]}"
 
     @property
     def size_expressions(self):
@@ -82,7 +82,7 @@ class Dimension:
         exprs = as_tuple(self.size)
         if self._aliases:
             exprs += as_tuple(self._aliases)
-        exprs += (f'1:{self.size}', )
+        exprs += (f"1:{self.size}",)
         if self._bounds:
-            exprs += (f'{self._bounds[1]} - {self._bounds[0]} + 1', )
+            exprs += (f"{self._bounds[1]} - {self._bounds[0]} + 1",)
         return exprs

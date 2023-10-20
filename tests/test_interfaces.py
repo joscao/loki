@@ -10,17 +10,25 @@ import pytest
 
 from conftest import available_frontends
 from loki import (
-    Module, Subroutine, FindNodes, Interface, Import, fgen, OMNI, REGEX,
-    ProcedureSymbol, ProcedureType
+    Module,
+    Subroutine,
+    FindNodes,
+    Interface,
+    Import,
+    fgen,
+    OMNI,
+    REGEX,
+    ProcedureSymbol,
+    ProcedureType,
 )
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.mark.parametrize('frontend', available_frontends(include_regex=True))
+@pytest.mark.parametrize("frontend", available_frontends(include_regex=True))
 def test_interface_spec(frontend):
     """
     Test basic functionality of interface representation
@@ -44,7 +52,7 @@ end module interface_spec_mod
 
     # Make sure basic properties are right
     assert interface.abstract is False
-    assert interface.symbols == ('sub',)
+    assert interface.symbols == ("sub",)
 
     # Check the subroutine is there
     assert len(interface.body) == 1
@@ -52,12 +60,12 @@ end module interface_spec_mod
 
     # Sanity check fgen
     code = module.to_fortran().lower()
-    assert 'interface' in code
-    assert 'end interface' in code
-    assert 'subroutine sub' in code
+    assert "interface" in code
+    assert "end interface" in code
+    assert "subroutine sub" in code
 
 
-@pytest.mark.parametrize('frontend', available_frontends(include_regex=True))
+@pytest.mark.parametrize("frontend", available_frontends(include_regex=True))
 def test_interface_module_integration(frontend):
     """
     Test correct integration of interfaces into modules
@@ -80,20 +88,20 @@ end module interface_module_integration_mod
     assert isinstance(interface, Interface)
 
     # Make sure declared symbols are accessible through various properties
-    assert interface.symbols == ('sub',)
-    assert module.interface_symbols == ('sub',)
-    assert module.interface_map['sub'] is interface
-    assert module.interface_symbol_map == {'sub': interface.symbols[0]}
-    assert 'sub' in module.symbols
-    assert module.symbol_map['sub'] == interface.symbols[0]
+    assert interface.symbols == ("sub",)
+    assert module.interface_symbols == ("sub",)
+    assert module.interface_map["sub"] is interface
+    assert module.interface_symbol_map == {"sub": interface.symbols[0]}
+    assert "sub" in module.symbols
+    assert module.symbol_map["sub"] == interface.symbols[0]
 
     # Sanity check fgen
     code = module.to_fortran().lower()
-    assert 'abstract interface' in code
-    assert 'subroutine sub' in code
+    assert "abstract interface" in code
+    assert "subroutine sub" in code
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_interface_subroutine_integration(frontend):
     """
     Test correct integration of interfaces into subroutines
@@ -123,23 +131,23 @@ end subroutine interface_subroutine_integration
     assert isinstance(interface, Interface)
 
     # Make sure the declared symbols are accessible through various properties
-    assert interface.symbols == ('proc',)
-    assert routine.interface_symbols == ('proc',)
-    assert routine.interface_map['proc'] is interface
-    assert routine.interface_symbol_map == {'proc': interface.symbols[0]}
-    assert 'proc' in routine.symbols
-    assert routine.symbol_map['proc'] == interface.symbols[0]
-    assert 'proc' in routine.arguments
-    assert 'proc' in [arg.lower() for arg in routine.argnames]
-    assert routine.symbol_map['proc'].type.dtype.procedure is interface.body[0]
+    assert interface.symbols == ("proc",)
+    assert routine.interface_symbols == ("proc",)
+    assert routine.interface_map["proc"] is interface
+    assert routine.interface_symbol_map == {"proc": interface.symbols[0]}
+    assert "proc" in routine.symbols
+    assert routine.symbol_map["proc"] == interface.symbols[0]
+    assert "proc" in routine.arguments
+    assert "proc" in [arg.lower() for arg in routine.argnames]
+    assert routine.symbol_map["proc"].type.dtype.procedure is interface.body[0]
 
     # Sanity check fgen
     code = routine.to_fortran().lower()
-    assert 'interface' in code
-    assert 'subroutine proc' in code
+    assert "interface" in code
+    assert "subroutine proc" in code
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_interface_import(frontend):
     """
     Test correct representation of ``IMPORT`` statements in interfaces
@@ -171,7 +179,7 @@ end module interface_import_mod
 
     # Parse the source and find the interface
     module = Module.from_source(fcode, frontend=frontend)
-    interface = module['process'].interface_map['monitor']
+    interface = module["process"].interface_map["monitor"]
 
     # Find the import statement and test its properties
     assert len(interface.body) == 1
@@ -179,11 +187,11 @@ end module interface_import_mod
     assert len(imprts) == 1
 
     # Sanity check fgen
-    assert fgen(imprts[0]).lower() == 'import t'
-    assert 'import t' in fgen(interface).lower()
+    assert fgen(imprts[0]).lower() == "import t"
+    assert "import t" in fgen(interface).lower()
 
 
-@pytest.mark.parametrize('frontend', available_frontends(include_regex=True))
+@pytest.mark.parametrize("frontend", available_frontends(include_regex=True))
 def test_interface_multiple_routines(frontend):
     """
     Test interfaces with multiple subroutine/function declarations
@@ -228,21 +236,23 @@ end module interface_multiple_routines_mod
         intf = module.interfaces[0]
 
         # Make sure interface is found under all names
-        assert all(module.interface_map[name] is intf for name in ['ext1', 'ext2', 'ext3'])
+        assert all(
+            module.interface_map[name] is intf for name in ["ext1", "ext2", "ext3"]
+        )
 
         # Make sure declared names end up in the right places
-        assert intf.symbols == ('ext1', 'ext2', 'ext3')
+        assert intf.symbols == ("ext1", "ext2", "ext3")
 
-    assert all(name in module.symbols for name in ('ext1', 'ext2', 'ext3'))
+    assert all(name in module.symbols for name in ("ext1", "ext2", "ext3"))
 
     # Sanity check fgen
     code = module.to_fortran().lower()
-    assert 'subroutine ext1' in code
-    assert 'subroutine ext2' in code
-    assert 'function ext3' in code
+    assert "subroutine ext1" in code
+    assert "subroutine ext2" in code
+    assert "function ext3" in code
 
 
-@pytest.mark.parametrize('frontend', available_frontends(include_regex=True))
+@pytest.mark.parametrize("frontend", available_frontends(include_regex=True))
 def test_interface_generic_spec(frontend):
     """
     Test interfaces with a generic identifier
@@ -274,7 +284,12 @@ end module interface_generic_spec_mod
     else:
         assert len(module.interfaces) == 1
 
-    assert set(module.interfaces[-1].symbols) == {'switch', 'int_switch', 'real_switch', 'complex_switch'}
+    assert set(module.interfaces[-1].symbols) == {
+        "switch",
+        "int_switch",
+        "real_switch",
+        "complex_switch",
+    }
 
     # This applies only to OMNI
     for intf in module.interfaces[:-1]:
@@ -284,14 +299,17 @@ end module interface_generic_spec_mod
     intf = module.interfaces[-1]
     assert isinstance(intf.spec, ProcedureSymbol)
     assert intf.spec.scope is module
-    assert intf.spec == 'switch'
+    assert intf.spec == "switch"
     assert intf.spec.type.dtype.is_generic is True
-    assert 'INTERFACE SWITCH' in fgen(intf).upper()
+    assert "INTERFACE SWITCH" in fgen(intf).upper()
 
-    assert all(s in module.symbols for s in ('switch', 'int_switch', 'real_switch', 'complex_switch'))
+    assert all(
+        s in module.symbols
+        for s in ("switch", "int_switch", "real_switch", "complex_switch")
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends(include_regex=True))
+@pytest.mark.parametrize("frontend", available_frontends(include_regex=True))
 def test_interface_operator_module_procedure(frontend):
     """
     Test interfaces that declare generic operators and refer to module procedures
@@ -361,16 +379,22 @@ END MODULE SPECTRAL_FIELDS_MOD
     mod = Module.from_source(fcode, frontend=frontend)
     assert len(mod.interfaces) == 2
 
-    assign_intf = mod.interface_map['assignment(=)']
-    assert assign_intf.spec == 'assignment(=)'
-    assert set(assign_intf.symbols) == {'assignment(=)', 'assign_scalar_sp', 'assign_sp_ar'}
+    assign_intf = mod.interface_map["assignment(=)"]
+    assert assign_intf.spec == "assignment(=)"
+    assert set(assign_intf.symbols) == {
+        "assignment(=)",
+        "assign_scalar_sp",
+        "assign_sp_ar",
+    }
 
     assign_map = {s.name.lower(): s for s in assign_intf.symbols}
-    assert assign_map['assignment(=)'].type.dtype.is_generic is True
-    assert assign_map['assign_scalar_sp'].type.dtype.procedure is mod['assign_scalar_sp']
-    assert assign_map['assign_scalar_sp'].type.dtype.is_generic is False
-    assert assign_map['assign_sp_ar'].type.dtype.procedure is mod['assign_sp_ar']
-    assert assign_map['assign_sp_ar'].type.dtype.is_generic is False
+    assert assign_map["assignment(=)"].type.dtype.is_generic is True
+    assert (
+        assign_map["assign_scalar_sp"].type.dtype.procedure is mod["assign_scalar_sp"]
+    )
+    assert assign_map["assign_scalar_sp"].type.dtype.is_generic is False
+    assert assign_map["assign_sp_ar"].type.dtype.procedure is mod["assign_sp_ar"]
+    assert assign_map["assign_sp_ar"].type.dtype.is_generic is False
 
     if frontend == OMNI:  # One declaration per line... :eyeroll:
         assert len(assign_intf.body) == 2
@@ -379,14 +403,14 @@ END MODULE SPECTRAL_FIELDS_MOD
     assign_decl = assign_intf.body[0]
     assert assign_decl.module is True
 
-    op_intf = mod.interface_map['operator(.eqv.)']
-    assert op_intf.spec == 'operator(.eqv.)'
-    assert set(op_intf.symbols) == {'operator(.eqv.)', 'equiv_spec'}
+    op_intf = mod.interface_map["operator(.eqv.)"]
+    assert op_intf.spec == "operator(.eqv.)"
+    assert set(op_intf.symbols) == {"operator(.eqv.)", "equiv_spec"}
 
     op_map = {s.name.lower(): s for s in op_intf.symbols}
-    assert op_map['operator(.eqv.)'].type.dtype.is_generic is True
-    assert op_map['equiv_spec'].type.dtype.procedure is mod['equiv_spec']
-    assert op_map['equiv_spec'].type.dtype.is_generic is False
+    assert op_map["operator(.eqv.)"].type.dtype.is_generic is True
+    assert op_map["equiv_spec"].type.dtype.procedure is mod["equiv_spec"]
+    assert op_map["equiv_spec"].type.dtype.is_generic is False
 
     assert len(op_intf.body) == 1
     op_decl = op_intf.body[0]
@@ -395,16 +419,16 @@ END MODULE SPECTRAL_FIELDS_MOD
         assert op_decl.module is False
 
     assign_code = fgen(assign_intf).lower().strip()
-    assert assign_code.startswith('interface assignment(=)')
-    assert assign_code.endswith('end interface assignment(=)')
-    assert 'module procedure' in assign_code
+    assert assign_code.startswith("interface assignment(=)")
+    assert assign_code.endswith("end interface assignment(=)")
+    assert "module procedure" in assign_code
 
     op_code = fgen(op_intf).lower().strip()
-    assert op_code.startswith('interface operator(.eqv.)')
-    assert op_code.endswith('end interface operator(.eqv.)')
+    assert op_code.startswith("interface operator(.eqv.)")
+    assert op_code.endswith("end interface operator(.eqv.)")
 
     if frontend != OMNI:  # *...*
-        assert 'module' not in op_code
+        assert "module" not in op_code
 
     other_code = """
 module use_spectral_fields_mod
@@ -413,16 +437,18 @@ end module use_spectral_fields_mod
     """.strip()
 
     other_mod = Module.from_source(other_code, frontend=frontend, definitions=[mod])
-    assert set(other_mod.symbols) == {'assignment(=)', 'operator(.eqv.)'}
-    assert other_mod.imported_symbols == ('assignment(=)', 'operator(.eqv.)')
+    assert set(other_mod.symbols) == {"assignment(=)", "operator(.eqv.)"}
+    assert other_mod.imported_symbols == ("assignment(=)", "operator(.eqv.)")
 
-    assign_sym = other_mod.imported_symbol_map['assignment(=)']
-    op_sym = other_mod.imported_symbol_map['operator(.eqv.)']
+    assign_sym = other_mod.imported_symbol_map["assignment(=)"]
+    op_sym = other_mod.imported_symbol_map["operator(.eqv.)"]
 
     assert assign_sym.type.imported is True
     assert op_sym.type.imported is True
 
-    if frontend != REGEX:  # REGEX frontend doesn't use definitions and therefore doesn't import types
+    if (
+        frontend != REGEX
+    ):  # REGEX frontend doesn't use definitions and therefore doesn't import types
         assert isinstance(assign_sym, ProcedureSymbol)
         assert isinstance(assign_sym.type.dtype, ProcedureType)
         assert assign_sym.type.dtype.is_generic is True
@@ -436,7 +462,7 @@ end module use_spectral_fields_mod
     assert other_code.splitlines()[1].strip() in fgen(other_mod).lower()
 
 
-@pytest.mark.parametrize('frontend', available_frontends(include_regex=True))
+@pytest.mark.parametrize("frontend", available_frontends(include_regex=True))
 def test_interface_procedure_pointer(frontend):
     fcode = """
 module my_interface_mod
@@ -459,11 +485,11 @@ end module my_interface_mod
 
     mod = Module.from_source(fcode, frontend=frontend)
 
-    intf_sim_func = mod.interface_map['sim_func']
+    intf_sim_func = mod.interface_map["sim_func"]
     assert intf_sim_func.abstract
     assert intf_sim_func.symbols[0].type.dtype.procedure is intf_sim_func.body[0]
 
-    intf_sub2 = mod.interface_map['sub2']
+    intf_sub2 = mod.interface_map["sub2"]
     assert intf_sub2.symbols[0].type.dtype.procedure is intf_sub2.body[0]
     sub2 = intf_sub2.body[0]
 

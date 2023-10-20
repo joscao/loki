@@ -5,9 +5,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from loki.backend.fgen import * # noqa
-from loki.backend.cgen import * # noqa
-from loki.backend.maxgen import * # noqa
-from loki.backend.pygen import * # noqa
-from loki.backend.dacegen import * # noqa
-from loki.backend.cufgen import * # noqa
+from loki.backend.fgen import *  # noqa
+from loki.backend.cgen import *  # noqa
+from loki.backend.maxgen import *  # noqa
+from loki.backend.pygen import *  # noqa
+from loki.backend.dacegen import *  # noqa
+from loki.backend.cufgen import *  # noqa

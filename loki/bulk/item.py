@@ -6,14 +6,17 @@
 # nor does it submit to any jurisdiction.
 
 from abc import abstractmethod
+
 try:
     from functools import cached_property
 except ImportError:
     try:
         from cached_property import cached_property
     except ImportError:
+
         def cached_property(func):
             return func
+
 
 from loki.logging import warning
 from loki.tools import as_tuple
@@ -23,7 +26,13 @@ from loki.ir import CallStatement, TypeDef, ProcedureDeclaration
 from loki.subroutine import Subroutine
 
 
-__all__ = ['Item', 'SubroutineItem', 'ProcedureBindingItem', 'GlobalVarImportItem', 'GenericImportItem']
+__all__ = [
+    "Item",
+    "SubroutineItem",
+    "ProcedureBindingItem",
+    "GlobalVarImportItem",
+    "GenericImportItem",
+]
 
 
 class Item:
@@ -90,14 +99,14 @@ class Item:
     """
 
     def __init__(self, name, source, config=None):
-        assert '#' in name
+        assert "#" in name
         self.name = name
         self.source = source
         self.config = config or {}
         self.trafo_data = {}
 
     def __repr__(self):
-        return f'loki.bulk.Item<{self.name}>'
+        return f"loki.bulk.Item<{self.name}>"
 
     def __eq__(self, other):
         """
@@ -127,14 +136,14 @@ class Item:
         """
         The name of this item's scope
         """
-        return self.name[:self.name.index('#')] or None
+        return self.name[: self.name.index("#")] or None
 
     @property
     def local_name(self):
         """
         The item name without the scope
         """
-        return self.name[self.name.index('#')+1:]
+        return self.name[self.name.index("#") + 1 :]
 
     @cached_property
     def scope(self):
@@ -185,9 +194,10 @@ class Item:
         or rename-list) to their fully qualified name
         """
         return CaseInsensitiveDict(
-            (symbol.name, f'{import_.module}#{symbol.type.use_name or symbol.name}')
+            (symbol.name, f"{import_.module}#{symbol.type.use_name or symbol.name}")
             for import_ in self.imports
-            for symbol in import_.symbols + tuple(s for _, s in as_tuple(import_.rename_list))
+            for symbol in import_.symbols
+            + tuple(s for _, s in as_tuple(import_.rename_list))
         )
 
     @property
@@ -230,42 +240,42 @@ class Item:
         """
         Role in the transformation chain, for example ``'driver'`` or ``'kernel'``
         """
-        return self.config.get('role', None)
+        return self.config.get("role", None)
 
     @property
     def mode(self):
         """
         Transformation "mode" to pass to the transformation
         """
-        return self.config.get('mode', None)
+        return self.config.get("mode", None)
 
     @property
     def expand(self):
         """
         Flag to trigger expansion of children under this node
         """
-        return self.config.get('expand', False)
+        return self.config.get("expand", False)
 
     @property
     def strict(self):
         """
         Flag controlling whether to strictly fail if source file cannot be parsed
         """
-        return self.config.get('strict', True)
+        return self.config.get("strict", True)
 
     @property
     def replicate(self):
         """
         Flag indicating whether to mark item as "replicated" in call graphs
         """
-        return self.config.get('replicate', False)
+        return self.config.get("replicate", False)
 
     @property
     def disable(self):
         """
         List of sources to completely exclude from expansion and the source tree.
         """
-        return self.config.get('disable', tuple())
+        return self.config.get("disable", tuple())
 
     @property
     def block(self):
@@ -273,21 +283,21 @@ class Item:
         List of sources to block from processing, but add to the
         source tree for visualisation.
         """
-        return self.config.get('block', tuple())
+        return self.config.get("block", tuple())
 
     @property
     def ignore(self):
         """
         List of sources to expand but ignore during processing
         """
-        return self.config.get('ignore', tuple())
+        return self.config.get("ignore", tuple())
 
     @property
     def enrich(self):
         """
         List of sources to to use for IPA enrichment
         """
-        return self.config.get('enrich', tuple())
+        return self.config.get("enrich", tuple())
 
     @property
     def enable_imports(self):
@@ -295,7 +305,7 @@ class Item:
         Configurable option to enable the addition of module imports as children.
         """
 
-        return self.config.get('enable_imports', False)
+        return self.config.get("enable_imports", False)
 
     @property
     def children(self):
@@ -367,18 +377,18 @@ class Item:
         """
         qualified_names = []
 
-        if all('#' in name for name in as_tuple(names)):
+        if all("#" in name for name in as_tuple(names)):
             return as_tuple(names)
 
         scope = self.scope
         qualified_imports = self.qualified_imports
 
         for name in as_tuple(names):
-            if '#' in name:
+            if "#" in name:
                 qualified_names += [name]
                 continue
 
-            pos = name.find('%')
+            pos = name.find("%")
             if pos != -1:
                 # Search for named import of the derived type
                 type_name = name[:pos]
@@ -388,7 +398,7 @@ class Item:
 
                 # Search for definition of the type in parent scope
                 if scope is not None and type_name in scope.typedef_map:
-                    qualified_names += [f'{self.scope_name}#{name}']
+                    qualified_names += [f"{self.scope_name}#{name}"]
                     continue
             else:
                 # Search for named import of the subroutine
@@ -399,39 +409,44 @@ class Item:
                 # Search for subroutine in parent scope
                 scope = self.scope
                 if scope is not None and name in scope:
-                    qualified_names += [f'{self.scope_name}#{name}']
+                    qualified_names += [f"{self.scope_name}#{name}"]
                     continue
 
             # This name has to come from an unqualified import or exists in the global
             # scope (i.e. defined directly in a source file). We add all
             # possibilities, of which only one should match (otherwise we would
             # have duplicate symbols in this compilation unit)
-            candidates = [f'#{name}'.lower()]
-            candidates += [f'{import_}#{name}'.lower() for import_ in self.unqualified_imports]
+            candidates = [f"#{name}".lower()]
+            candidates += [
+                f"{import_}#{name}".lower() for import_ in self.unqualified_imports
+            ]
             qualified_names += [as_tuple(candidates)]
 
         if available_names is None:
             return as_tuple(qualified_names)
 
         available_names = set(available_names)
+
         def map_to_available_name(candidates):
             # Resolve a tuple of candidate names by picking the matching name
             # from available_names
-            pos = candidates[0].find('%')
+            pos = candidates[0].find("%")
             if pos != -1:
-                candidate_types = {c[:c.index('%')] for c in candidates}
+                candidate_types = {c[: c.index("%")] for c in candidates}
                 member_name = candidates[0][pos:]
                 matched_names = candidate_types & available_names
             else:
-                member_name = ''
+                member_name = ""
                 matched_names = set(candidates) & available_names
 
             if not matched_names:
-                warning(f'{candidates} not found in available_names')
+                warning(f"{candidates} not found in available_names")
                 return candidates
             if len(matched_names) != 1:
                 name = matched_names[0]
-                warning(f'Duplicate symbol: {name[name.find("#")+1:]}, can be one of {matched_names}')
+                warning(
+                    f'Duplicate symbol: {name[name.find("#")+1:]}, can be one of {matched_names}'
+                )
                 return tuple(name + member_name for name in matched_names)
             return matched_names.pop() + member_name
 
@@ -483,7 +498,7 @@ class SubroutineItem(Item):
     """
 
     def __init__(self, name, source, config=None):
-        assert '%' not in name
+        assert "%" not in name
         super().__init__(name, source, config)
 
     @cached_property
@@ -538,17 +553,20 @@ class SubroutineItem(Item):
 
         These are identified via :any:`CallStatement` nodes within the associated routine's IR.
         """
-        return tuple(
-            self._variable_to_type_name(call.name).lower()
-            for call in FindNodes(CallStatement).visit(self.routine.ir)
-        ) + self.function_interfaces
+        return (
+            tuple(
+                self._variable_to_type_name(call.name).lower()
+                for call in FindNodes(CallStatement).visit(self.routine.ir)
+            )
+            + self.function_interfaces
+        )
 
     def _variable_to_type_name(self, var):
         """
         For type bound procedure calls, map the variable symbol to the type name, otherwise
         return the name unchanged
         """
-        pos = var.name.find('%')
+        pos = var.name.find("%")
         if pos == -1:
             return var.name
         # Find the type name for the outermost derived type parent
@@ -572,7 +590,9 @@ class SubroutineItem(Item):
             interfaces += as_tuple(i for i in scope.interfaces if not i.spec)
 
         names = tuple(
-            s.name.lower() for intf in interfaces for s in intf.symbols
+            s.name.lower()
+            for intf in interfaces
+            for s in intf.symbols
             if s.type.dtype.is_function
         )
 
@@ -590,7 +610,7 @@ class ProcedureBindingItem(Item):
     """
 
     def __init__(self, name, source, config=None):
-        assert '%' in name
+        assert "%" in name
         super().__init__(name, source, config)
 
     @property
@@ -641,23 +661,23 @@ class ProcedureBindingItem(Item):
         For a generic binding, this returns all local names of type bound procedures
         that are combined under a generic binding.
         """
-        if '%' not in self.name:
+        if "%" not in self.name:
             return ()
         module = self.source[self.scope_name]
-        name_parts = self.local_name.split('%')
+        name_parts = self.local_name.split("%")
         typedef = module[name_parts[0]]
         symbol = typedef.variable_map[name_parts[1]]
         type_ = symbol.type
         if len(name_parts) > 2:
             # This is a type-bound procedure in a derived type member of a derived type
-            return ('%'.join([type_.dtype.name, *name_parts[2:]]),)
+            return ("%".join([type_.dtype.name, *name_parts[2:]]),)
         if type_.dtype.is_generic:
             # This is a generic binding, so we need to refer to other type-bound procedures
             # in this type
-            return tuple(f'{name_parts[0]}%{name!s}' for name in type_.bind_names)
+            return tuple(f"{name_parts[0]}%{name!s}" for name in type_.bind_names)
         if type_.initial is not None:
             # This has a bind name explicitly specified:
-            return (type_.initial.name.lower(), )
+            return (type_.initial.name.lower(),)
         if type_.bind_names is not None and len(type_.bind_names) == 1:
             return (type_.bind_names[0].name.lower(),)
         # The name of the procedure is identical to the name of the binding
@@ -675,8 +695,10 @@ class GenericImportItem(Item):
     """
 
     def __init__(self, name, source, config=None):
-        name_parts = name.split('#')
-        assert len(name_parts) > 1 and all(name_parts) #only accept fully-qualified module imports
+        name_parts = name.split("#")
+        assert len(name_parts) > 1 and all(
+            name_parts
+        )  # only accept fully-qualified module imports
         super().__init__(name, source, config)
         assert self.scope
 
@@ -754,8 +776,10 @@ class GlobalVarImportItem(Item):
     """
 
     def __init__(self, name, source, config=None):
-        name_parts = name.split('#')
-        assert len(name_parts) > 1 and all(name_parts) #only accept fully-qualified module imports
+        name_parts = name.split("#")
+        assert len(name_parts) > 1 and all(
+            name_parts
+        )  # only accept fully-qualified module imports
         super().__init__(name, source, config)
         assert self.scope
 

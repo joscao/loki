@@ -11,7 +11,7 @@ from loki.transform.transform_utilities import recursive_expression_map_update
 from loki.visitors import NestedTransformer
 
 
-__all__ = ['resolve_associates', 'ResolveAssociatesTransformer']
+__all__ = ["resolve_associates", "ResolveAssociatesTransformer"]
 
 
 def resolve_associates(routine):
@@ -53,7 +53,7 @@ class ResolveAssociatesTransformer(NestedTransformer):
             if v.name in invert_assoc:
                 # Clone the expression to update its parentage and scoping
                 inv = invert_assoc[v.name]
-                if hasattr(v, 'dimensions'):
+                if hasattr(v, "dimensions"):
                     vmap[v] = inv.clone(dimensions=v.dimensions)
                 else:
                     vmap[v] = inv

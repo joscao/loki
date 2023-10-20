@@ -15,20 +15,19 @@ from conftest import jit_compile, clean_test, available_frontends
 from loki import Subroutine, FortranPythonTransformation
 
 
-
 pytestmark = [
     # Skip tests if dace is not installed
     pytest.mark.skipif(
-      importlib.util.find_spec('dace') is None,
-      reason='DaCe is not installed'
+        importlib.util.find_spec("dace") is None, reason="DaCe is not installed"
     ),
     # Disable warnings from Dace about np.bool being deprecated
     pytest.mark.filterwarnings(
         "ignore:`np.bool` is a deprecated alias:DeprecationWarning"
-    )
+    ),
 ]
 
-@pytest.fixture(scope='module', name='here')
+
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
@@ -46,7 +45,7 @@ def load_module(path):
 
 
 def create_sdfg(routine, here):
-    trafo = FortranPythonTransformation(with_dace=True, suffix='_py')
+    trafo = FortranPythonTransformation(with_dace=True, suffix="_py")
     routine.apply(trafo, path=here)
 
     mod = load_module(trafo.py_path)
@@ -54,7 +53,7 @@ def create_sdfg(routine, here):
     return function.to_sdfg()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sdfg_routine_copy(here, frontend):
 
     fcode = """
@@ -75,8 +74,8 @@ end subroutine routine_copy
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
     # Test the reference solution
-    filepath = here/(f'routine_copy_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_copy')
+    filepath = here / (f"routine_copy_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="routine_copy")
 
     n = 64
     x_ref = np.array(range(n), dtype=np.float64)
@@ -99,12 +98,14 @@ end subroutine routine_copy
     assert all(x_ref == y)
 
     clean_test(filepath)
-    (here / (routine.name + '.py')).unlink()
+    (here / (routine.name + ".py")).unlink()
 
 
-@pytest.mark.xfail(reason='Scalar inout arguments do not work in dace')
-@pytest.mark.filterwarnings('ignore:The value of the smallest subnormal.*class \'numpy.float64\':UserWarning')
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.xfail(reason="Scalar inout arguments do not work in dace")
+@pytest.mark.filterwarnings(
+    "ignore:The value of the smallest subnormal.*class 'numpy.float64':UserWarning"
+)
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sdfg_routine_axpy_scalar(here, frontend):
 
     fcode = """
@@ -122,8 +123,8 @@ end subroutine routine_axpy_scalar
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
     # Test the reference solution
-    filepath = here/(f'sdfg_routine_axpy_scalar_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_axpy_scalar')
+    filepath = here / (f"sdfg_routine_axpy_scalar_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="routine_axpy_scalar")
 
     a = np.float64(23)
     x = np.float64(42)
@@ -145,10 +146,10 @@ end subroutine routine_axpy_scalar
     assert x_out == a * x + y
 
     clean_test(filepath)
-    (here / (routine.name + '.py')).unlink()
+    (here / (routine.name + ".py")).unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sdfg_routine_copy_stream(here, frontend):
 
     fcode = """
@@ -170,13 +171,13 @@ end subroutine routine_copy_stream
     # TODO: make alpha a true scalar, which doesn't seem to work with SDFG at the moment???
 
     # Test the reference solution
-    filepath = here/(f'sdfg_routine_copy_stream_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_copy_stream')
+    filepath = here / (f"sdfg_routine_copy_stream_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="routine_copy_stream")
 
     length = 32
     alpha = np.array([7], dtype=np.int32)
-    vector_in = np.array(range(length), order='F', dtype=np.int32)
-    vector_out = np.zeros(length, order='F', dtype=np.int32)
+    vector_in = np.array(range(length), order="F", dtype=np.int32)
+    vector_out = np.zeros(length, order="F", dtype=np.int32)
     function(length=length, alpha=alpha, vector_in=vector_in, vector_out=vector_out)
     assert np.all(vector_out == np.array(range(length)) + alpha)
 
@@ -188,16 +189,16 @@ end subroutine routine_copy_stream
     assert csdfg
 
     # Run the SDFG
-    vec_in = np.array(range(length), order='F', dtype=np.intc)
-    vec_out = np.zeros(length, order='F', dtype=np.intc)
+    vec_in = np.array(range(length), order="F", dtype=np.intc)
+    vec_out = np.zeros(length, order="F", dtype=np.intc)
     csdfg(length=length, alpha=alpha, vector_in=vec_in, vector_out=vec_out)
     assert np.all(vec_out == np.array(range(length)) + alpha)
 
     clean_test(filepath)
-    (here / (routine.name + '.py')).unlink()
+    (here / (routine.name + ".py")).unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sdfg_routine_fixed_loop(here, frontend):
 
     fcode = """
@@ -222,18 +223,26 @@ subroutine routine_fixed_loop(scalar, vector, vector_out, tensor, tensor_out)
 end subroutine routine_fixed_loop
     """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'sdfg_routine_fixed_loop_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_fixed_loop')
+    filepath = here / (f"sdfg_routine_fixed_loop_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="routine_fixed_loop")
 
     # Test the reference solution
     n, m = 6, 4
     scalar = np.array([2.0], dtype=np.float64)
-    vector = np.zeros(shape=(n,), order='F') + 3.
-    tensor = np.array([list(range(i, i+m)) for i in range(n)], order='F', dtype=np.float64)
-    tensor_out = np.zeros(shape=(m, n), order='F')
-    ref_vector = vector + np.array(list(range(n)), dtype=np.float64) + 1.
+    vector = np.zeros(shape=(n,), order="F") + 3.0
+    tensor = np.array(
+        [list(range(i, i + m)) for i in range(n)], order="F", dtype=np.float64
+    )
+    tensor_out = np.zeros(shape=(m, n), order="F")
+    ref_vector = vector + np.array(list(range(n)), dtype=np.float64) + 1.0
     ref_tensor = np.transpose(tensor)
-    function(scalar=scalar, vector=vector, vector_out=vector, tensor=tensor, tensor_out=tensor_out)
+    function(
+        scalar=scalar,
+        vector=vector,
+        vector_out=vector,
+        tensor=tensor,
+        tensor_out=tensor_out,
+    )
     assert np.all(vector == ref_vector)
     assert np.all(tensor_out == ref_tensor)
 
@@ -247,22 +256,34 @@ end subroutine routine_fixed_loop
     # Test the transpiled kernel
     n, m = 6, 4
     scalar = np.array([2.0], dtype=np.float64)
-    vector = np.zeros(shape=(n,), order='F') + 3.
-    tensor = np.zeros(shape=(n, m), order='F') + 4.
-    tensor = np.array([list(range(i, i+m)) for i in range(n)], order='F', dtype=np.float64)
-    tensor_out = np.zeros(shape=(m, n), order='F')
-    csdfg(scalar=scalar, vector=vector, vector_out=vector, tensor=tensor, tensor_out=tensor_out)
+    vector = np.zeros(shape=(n,), order="F") + 3.0
+    tensor = np.zeros(shape=(n, m), order="F") + 4.0
+    tensor = np.array(
+        [list(range(i, i + m)) for i in range(n)], order="F", dtype=np.float64
+    )
+    tensor_out = np.zeros(shape=(m, n), order="F")
+    csdfg(
+        scalar=scalar,
+        vector=vector,
+        vector_out=vector,
+        tensor=tensor,
+        tensor_out=tensor_out,
+    )
     assert np.all(vector == ref_vector)
     assert np.all(tensor_out == ref_tensor)
 
     clean_test(filepath)
-    (here / (routine.name + '.py')).unlink()
+    (here / (routine.name + ".py")).unlink()
 
 
-@pytest.mark.skip(reason=('This translates successfully but the generated OpenMP code does not '
-                          'honour the loop-carried dependency, thus creating data races for more '
-                          'than 1 thread.'))
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.skip(
+    reason=(
+        "This translates successfully but the generated OpenMP code does not "
+        "honour the loop-carried dependency, thus creating data races for more "
+        "than 1 thread."
+    )
+)
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sdfg_routine_loop_carried_dependency(here, frontend):
 
     fcode = """
@@ -279,12 +300,14 @@ subroutine routine_loop_carried_dependency(vector)
 end subroutine routine_loop_carried_dependency
     """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'sdfg_routine_loop_carried_dependency_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_loop_carried_dependency')
+    filepath = here / (f"sdfg_routine_loop_carried_dependency_{frontend}.f90")
+    function = jit_compile(
+        routine, filepath=filepath, objname="routine_loop_carried_dependency"
+    )
 
     # Test the reference solution
     n = 32
-    vector = np.zeros(shape=(n,), order='F') + 3.
+    vector = np.zeros(shape=(n,), order="F") + 3.0
     ref_vector = np.array(list(itertools.accumulate(vector)))
     function(vector=vector)
     assert np.all(vector == ref_vector)
@@ -298,16 +321,16 @@ end subroutine routine_loop_carried_dependency
 
     # Test the transpiled kernel
     n = 32
-    vector = np.zeros(shape=(n,), order='F') + 3.
+    vector = np.zeros(shape=(n,), order="F") + 3.0
     ref_vector = np.array(list(itertools.accumulate(vector)))
     csdfg(vector=vector)
     assert np.all(vector == ref_vector)
 
     clean_test(filepath)
-    (here / (routine.name + '.py')).unlink()
+    (here / (routine.name + ".py")).unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sdfg_routine_moving_average(here, frontend):
     # TODO: This needs more work to properly handle boundary values.
     # In the current form, these values seem to be handled in a way
@@ -352,21 +375,21 @@ subroutine routine_moving_average(length, data_in, data_out)
 end subroutine routine_moving_average
     """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'sdfg_routine_moving_average_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_moving_average')
+    filepath = here / (f"sdfg_routine_moving_average_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="routine_moving_average")
 
     # Create random input data
     n = 32
-    data_in = np.array(np.random.rand(n), order='F')
+    data_in = np.array(np.random.rand(n), order="F")
 
     # Compute reference solution
-    expected = np.zeros(shape=(n,), order='F')
-    expected[0] = (data_in[0] + data_in[1]) / 2.
-    expected[1:-1] = (data_in[:-2] + data_in[1:-1] + data_in[2:]) / 3.
-    expected[-1] = (data_in[-2] + data_in[-1]) / 2.
+    expected = np.zeros(shape=(n,), order="F")
+    expected[0] = (data_in[0] + data_in[1]) / 2.0
+    expected[1:-1] = (data_in[:-2] + data_in[1:-1] + data_in[2:]) / 3.0
+    expected[-1] = (data_in[-2] + data_in[-1]) / 2.0
 
     # Test the Fortran kernel
-    data_out = np.zeros(shape=(n,), order='F')
+    data_out = np.zeros(shape=(n,), order="F")
     function(length=n, data_in=data_in, data_out=data_out)
     assert np.all(data_out[1:-1] == expected[1:-1])
 
@@ -378,9 +401,9 @@ end subroutine routine_moving_average
     assert csdfg
 
     # Test the transpiled kernel
-    data_out = np.zeros(shape=(n,), order='F')
+    data_out = np.zeros(shape=(n,), order="F")
     csdfg(length=n, data_in=data_in, data_out=data_out)
     assert np.all(data_out[1:-1] == expected[1:-1])
 
     clean_test(filepath)
-    (here / (routine.name + '.py')).unlink()
+    (here / (routine.name + ".py")).unlink()

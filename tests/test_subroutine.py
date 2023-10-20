@@ -12,26 +12,48 @@ import numpy as np
 
 from conftest import available_frontends, jit_compile, jit_compile_lib, clean_test
 from loki import (
-    Sourcefile, Module, Subroutine, OFP, OMNI, REGEX, FindVariables, FindNodes,
-    Section, CallStatement, BasicType, Array, Scalar, Variable,
-    SymbolAttributes, StringLiteral, fgen, fexprgen, VariableDeclaration,
-    Transformer, FindTypedSymbols, ProcedureSymbol, ProcedureType,
-    StatementFunction, normalize_range_indexing, DeferredTypeSymbol,
-    Assignment, Interface
+    Sourcefile,
+    Module,
+    Subroutine,
+    OFP,
+    OMNI,
+    REGEX,
+    FindVariables,
+    FindNodes,
+    Section,
+    CallStatement,
+    BasicType,
+    Array,
+    Scalar,
+    Variable,
+    SymbolAttributes,
+    StringLiteral,
+    fgen,
+    fexprgen,
+    VariableDeclaration,
+    Transformer,
+    FindTypedSymbols,
+    ProcedureSymbol,
+    ProcedureType,
+    StatementFunction,
+    normalize_range_indexing,
+    DeferredTypeSymbol,
+    Assignment,
+    Interface,
 )
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.fixture(scope='module', name='header_path')
+@pytest.fixture(scope="module", name="header_path")
 def fixture_header_path(here):
-    return here/'sources/header.f90'
+    return here / "sources/header.f90"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_simple(here, frontend):
     """
     A simple standard looking routine to test argument declarations.
@@ -57,28 +79,30 @@ end subroutine routine_simple
     assert isinstance(routine.body, Section)
     assert isinstance(routine.spec, Section)
     assert len(routine.docstring) == 1
-    assert routine.docstring[0].text == '! This is the docstring'
+    assert routine.docstring[0].text == "! This is the docstring"
 
     routine_args = [str(arg) for arg in routine.arguments]
-    assert routine_args in (['x', 'y', 'scalar', 'vector(x)', 'matrix(x, y)'],
-                            ['x', 'y', 'scalar', 'vector(1:x)', 'matrix(1:x, 1:y)'])  # OMNI
+    assert routine_args in (
+        ["x", "y", "scalar", "vector(x)", "matrix(x, y)"],
+        ["x", "y", "scalar", "vector(1:x)", "matrix(1:x, 1:y)"],
+    )  # OMNI
 
     # Generate code, compile and load
-    filepath = here/(f'routine_simple_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_simple')
+    filepath = here / (f"routine_simple_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="routine_simple")
 
     # Test the generated identity results
     x, y = 2, 3
-    vector = np.zeros(x, order='F')
-    matrix = np.zeros((x, y), order='F')
-    function(x=x, y=y, scalar=5., vector=vector, matrix=matrix)
-    assert np.all(vector == 5.)
-    assert np.all(matrix[0, :] == 5.)
-    assert np.all(matrix[1, :] == 10.)
+    vector = np.zeros(x, order="F")
+    matrix = np.zeros((x, y), order="F")
+    function(x=x, y=y, scalar=5.0, vector=vector, matrix=matrix)
+    assert np.all(vector == 5.0)
+    assert np.all(matrix[0, :] == 5.0)
+    assert np.all(matrix[1, :] == 10.0)
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_arguments(here, frontend):
     """
     A set of test to test internalisation and handling of arguments.
@@ -111,30 +135,51 @@ end subroutine routine_arguments
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
     routine_vars = [str(arg) for arg in routine.variables]
-    assert routine_vars in (['jprb', 'x', 'y', 'vector(x)', 'matrix(x, y)',
-                             'i', 'j', 'local_vector(x)', 'local_matrix(x, y)'],
-                            ['jprb', 'x', 'y', 'vector(1:x)', 'matrix(1:x, 1:y)',
-                             'i', 'j', 'local_vector(1:x)', 'local_matrix(1:x, 1:y)'])
+    assert routine_vars in (
+        [
+            "jprb",
+            "x",
+            "y",
+            "vector(x)",
+            "matrix(x, y)",
+            "i",
+            "j",
+            "local_vector(x)",
+            "local_matrix(x, y)",
+        ],
+        [
+            "jprb",
+            "x",
+            "y",
+            "vector(1:x)",
+            "matrix(1:x, 1:y)",
+            "i",
+            "j",
+            "local_vector(1:x)",
+            "local_matrix(1:x, 1:y)",
+        ],
+    )
     routine_args = [str(arg) for arg in routine.arguments]
-    assert routine_args in (['x', 'y', 'vector(x)', 'matrix(x, y)'],
-                            ['x', 'y', 'vector(1:x)', 'matrix(1:x, 1:y)'])
+    assert routine_args in (
+        ["x", "y", "vector(x)", "matrix(x, y)"],
+        ["x", "y", "vector(1:x)", "matrix(1:x, 1:y)"],
+    )
 
     # Generate code, compile and load
-    filepath = here/(f'routine_arguments_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_arguments')
+    filepath = here / (f"routine_arguments_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="routine_arguments")
 
     # Test results of the generated and compiled code
     x, y = 2, 3
-    vector = np.zeros(x, order='F')
-    matrix = np.zeros((x, y), order='F')
+    vector = np.zeros(x, order="F")
+    matrix = np.zeros((x, y), order="F")
     function(x=x, y=y, vector=vector, matrix=matrix)
-    assert np.all(vector == [10., 20.])
-    assert np.all(matrix == [[12., 14., 16.],
-                             [22., 24., 26.]])
+    assert np.all(vector == [10.0, 20.0])
+    assert np.all(matrix == [[12.0, 14.0, 16.0], [22.0, 24.0, 26.0]])
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_arguments_multiline(here, frontend):
     """
     Test argument declarations with comments interjectected between dummies.
@@ -162,25 +207,29 @@ end subroutine routine_arguments_multiline
     # Test the internals of the subroutine
     routine = Subroutine.from_source(fcode, frontend=frontend)
     routine_args = [str(arg) for arg in routine.arguments]
-    assert routine_args in (['x', 'y', 'scalar', 'vector(x)', 'matrix(x, y)'],
-                            ['x', 'y', 'scalar', 'vector(1:x)', 'matrix(1:x, 1:y)'])
+    assert routine_args in (
+        ["x", "y", "scalar", "vector(x)", "matrix(x, y)"],
+        ["x", "y", "scalar", "vector(1:x)", "matrix(1:x, 1:y)"],
+    )
 
     # Generate code, compile and load
-    filepath = here/(f'routine_arguments_multiline_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_arguments_multiline')
+    filepath = here / (f"routine_arguments_multiline_{frontend}.f90")
+    function = jit_compile(
+        routine, filepath=filepath, objname="routine_arguments_multiline"
+    )
 
     # Test results of the generated and compiled code
     x, y = 2, 3
-    vector = np.zeros(x, order='F')
-    matrix = np.zeros((x, y), order='F')
-    function(x=x, y=y, scalar=5., vector=vector, matrix=matrix)
-    assert np.all(vector == 5.)
-    assert np.all(matrix[0, :] == 5.)
-    assert np.all(matrix[1, :] == 10.)
+    vector = np.zeros(x, order="F")
+    matrix = np.zeros((x, y), order="F")
+    function(x=x, y=y, scalar=5.0, vector=vector, matrix=matrix)
+    assert np.all(vector == 5.0)
+    assert np.all(matrix[0, :] == 5.0)
+    assert np.all(matrix[1, :] == 10.0)
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_arguments_order(frontend):
     """
     Test argument ordering honours singateu (dummy list) instead of
@@ -199,11 +248,13 @@ end subroutine routine_arguments_order
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
     routine_args = [str(arg) for arg in routine.arguments]
-    assert routine_args in (['x', 'y', 'scalar', 'vector(x)', 'matrix(x, y)'],
-                            ['x', 'y', 'scalar', 'vector(1:x)', 'matrix(1:x, 1:y)'])
+    assert routine_args in (
+        ["x", "y", "scalar", "vector(x)", "matrix(x, y)"],
+        ["x", "y", "scalar", "vector(1:x)", "matrix(1:x, 1:y)"],
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_arguments_add_remove(frontend):
     """
     Test addition and removal of subroutine arguments.
@@ -218,25 +269,38 @@ end subroutine routine_arguments_add_remove
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
     routine_args = [str(arg) for arg in routine.arguments]
-    assert routine_args in (['x', 'y', 'scalar', 'vector(x)', 'matrix(x, y)'],
-                            ['x', 'y', 'scalar', 'vector(1:x)', 'matrix(1:x, 1:y)'])
+    assert routine_args in (
+        ["x", "y", "scalar", "vector(x)", "matrix(x, y)"],
+        ["x", "y", "scalar", "vector(1:x)", "matrix(1:x, 1:y)"],
+    )
 
     # Create a new set of variables and add to local routine variables
     x = routine.variables[1]  # That's the symbol for variable 'x'
-    real_type = routine.symbol_attrs['scalar']  # Type of variable 'maximum'
-    a = Scalar(name='a', type=real_type, scope=routine)
-    b = Array(name='b', dimensions=(x, ), type=real_type, scope=routine)
-    c = Variable(name='c', type=x.type, scope=routine)
+    real_type = routine.symbol_attrs["scalar"]  # Type of variable 'maximum'
+    a = Scalar(name="a", type=real_type, scope=routine)
+    b = Array(name="b", dimensions=(x,), type=real_type, scope=routine)
+    c = Variable(name="c", type=x.type, scope=routine)
 
     # Add new arguments and check that they are all in the routine spec
     routine.arguments += (a, b, c)
     routine_args = [str(arg) for arg in routine.arguments]
     assert routine_args in (
-        ['x', 'y', 'scalar', 'vector(x)', 'matrix(x, y)', 'a', 'b(x)', 'c'],
-        ['x', 'y', 'scalar', 'vector(1:x)', 'matrix(1:x, 1:y)', 'a', 'b(x)', 'c', ]
+        ["x", "y", "scalar", "vector(x)", "matrix(x, y)", "a", "b(x)", "c"],
+        [
+            "x",
+            "y",
+            "scalar",
+            "vector(1:x)",
+            "matrix(1:x, 1:y)",
+            "a",
+            "b(x)",
+            "c",
+        ],
     )
     if frontend == OMNI:
-        assert fgen(routine.spec).lower() == """
+        assert (
+            fgen(routine.spec).lower()
+            == """
 implicit none
 integer, parameter :: jprb = selected_real_kind(13, 300)
 integer, intent(in) :: x
@@ -248,8 +312,11 @@ real(kind=selected_real_kind(13, 300)), intent(in) :: a
 real(kind=selected_real_kind(13, 300)), intent(in) :: b(x)
 integer, intent(in) :: c
 """.strip().lower()
+        )
     else:
-        assert fgen(routine.spec).lower() == """
+        assert (
+            fgen(routine.spec).lower()
+            == """
 integer, parameter :: jprb = selected_real_kind(13, 300)
 integer, intent(in) :: x, y
 real(kind=jprb), intent(in) :: scalar
@@ -258,20 +325,26 @@ real(kind=jprb), intent(in) :: a
 real(kind=jprb), intent(in) :: b(x)
 integer, intent(in) :: c
 """.strip().lower()
+        )
 
     # Remove a select number of arguments
-    routine.arguments = [arg for arg in routine.arguments if 'x' not in str(arg)]
+    routine.arguments = [arg for arg in routine.arguments if "x" not in str(arg)]
     routine_args = [str(arg) for arg in routine.arguments]
-    assert routine_args == ['y', 'scalar', 'a', 'c', ]
+    assert routine_args == [
+        "y",
+        "scalar",
+        "a",
+        "c",
+    ]
 
     # Check that removed args still exist as variables
     routine_vars = [str(arg) for arg in routine.variables]
-    assert 'vector(x)' in routine_vars or 'vector(1:x)' in routine_vars
-    assert 'matrix(x, y)' in routine_vars or 'matrix(1:x, 1:y)' in routine_vars
-    assert 'b(x)' in routine_vars
+    assert "vector(x)" in routine_vars or "vector(1:x)" in routine_vars
+    assert "matrix(x, y)" in routine_vars or "matrix(1:x, 1:y)" in routine_vars
+    assert "b(x)" in routine_vars
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_variables_local(here, frontend):
     """
     Test local variables and types
@@ -301,20 +374,23 @@ end subroutine routine_variables_local
     routine = Subroutine.from_source(fcode, frontend=frontend)
     routine_vars = [str(arg) for arg in routine.variables]
     assert routine_vars in (
-        ['jprb', 'x', 'y', 'maximum', 'i', 'j', 'vector(x)', 'matrix(x, y)'],
-        ['jprb', 'x', 'y', 'maximum', 'i', 'j', 'vector(1:x)', 'matrix(1:x, 1:y)'])
+        ["jprb", "x", "y", "maximum", "i", "j", "vector(x)", "matrix(x, y)"],
+        ["jprb", "x", "y", "maximum", "i", "j", "vector(1:x)", "matrix(1:x, 1:y)"],
+    )
 
     # Generate code, compile and load
-    filepath = here/(f'routine_variables_local_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_variables_local')
+    filepath = here / (f"routine_variables_local_{frontend}.f90")
+    function = jit_compile(
+        routine, filepath=filepath, objname="routine_variables_local"
+    )
 
     # Test results of the generated and compiled code
     maximum = function(x=3, y=4)
-    assert np.all(maximum == 38.)  # 10*x + 2*y
+    assert np.all(maximum == 38.0)  # 10*x + 2*y
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_variable_caching(frontend):
     """
     Test that equivalent names in distinct routines don't cache.
@@ -355,21 +431,25 @@ end subroutine routine_simple_caching
     # Test the internals of the subroutine
     routine = Subroutine.from_source(fcode_real, frontend=frontend)
     routine_args = [str(arg) for arg in routine.arguments]
-    assert routine_args in (['x', 'y', 'scalar', 'vector(x)', 'matrix(x, y)'],
-                            ['x', 'y', 'scalar', 'vector(1:x)', 'matrix(1:x, 1:y)'])
+    assert routine_args in (
+        ["x", "y", "scalar", "vector(x)", "matrix(x, y)"],
+        ["x", "y", "scalar", "vector(1:x)", "matrix(1:x, 1:y)"],
+    )
     assert routine.arguments[2].type.dtype == BasicType.REAL
     assert routine.arguments[3].type.dtype == BasicType.REAL
 
     routine = Subroutine.from_source(fcode_int, frontend=frontend)
     routine_args = [str(arg) for arg in routine.arguments]
-    assert routine_args in (['x', 'y', 'scalar', 'vector(y)', 'matrix(x, y)'],
-                            ['x', 'y', 'scalar', 'vector(1:y)', 'matrix(1:x, 1:y)'])
+    assert routine_args in (
+        ["x", "y", "scalar", "vector(y)", "matrix(x, y)"],
+        ["x", "y", "scalar", "vector(1:y)", "matrix(1:x, 1:y)"],
+    )
     # Ensure that the types in the second routine have been picked up
     assert routine.arguments[2].type.dtype == BasicType.INTEGER
     assert routine.arguments[3].type.dtype == BasicType.INTEGER
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_variables_add_remove(frontend):
     """
     Test local variable addition and removal.
@@ -386,23 +466,25 @@ end subroutine routine_variables_add_remove
     routine = Subroutine.from_source(fcode, frontend=frontend)
     routine_vars = [str(arg) for arg in routine.variables]
     assert routine_vars in (
-        ['jprb', 'x', 'y', 'maximum', 'vector(x)', 'matrix(x, y)'],
-        ['jprb', 'x', 'y', 'maximum', 'vector(1:x)', 'matrix(1:x, 1:y)']
+        ["jprb", "x", "y", "maximum", "vector(x)", "matrix(x, y)"],
+        ["jprb", "x", "y", "maximum", "vector(1:x)", "matrix(1:x, 1:y)"],
     )
 
     # Create a new set of variables and add to local routine variables
-    x = routine.variable_map['x']  # That's the symbol for variable 'x'
-    real_type = SymbolAttributes('real', kind=routine.variable_map['jprb'])
-    int_type = SymbolAttributes('integer')
-    a = Scalar(name='a', type=real_type, scope=routine)
-    b = Array(name='b', dimensions=(x, ), type=real_type, scope=routine)
-    c = Variable(name='c', type=int_type, scope=routine)
+    x = routine.variable_map["x"]  # That's the symbol for variable 'x'
+    real_type = SymbolAttributes("real", kind=routine.variable_map["jprb"])
+    int_type = SymbolAttributes("integer")
+    a = Scalar(name="a", type=real_type, scope=routine)
+    b = Array(name="b", dimensions=(x,), type=real_type, scope=routine)
+    c = Variable(name="c", type=int_type, scope=routine)
 
     # Add new variables and check that they are all in the routine spec
     routine.variables += (a, b, c)
     if frontend == OMNI:
         # OMNI frontend inserts a few peculiarities
-        assert fgen(routine.spec).lower() == """
+        assert (
+            fgen(routine.spec).lower()
+            == """
 implicit none
 integer, parameter :: jprb = selected_real_kind(13, 300)
 integer, intent(in) :: x
@@ -414,9 +496,12 @@ real(kind=jprb) :: a
 real(kind=jprb) :: b(x)
 integer :: c
 """.strip().lower()
+        )
 
     else:
-        assert fgen(routine.spec).lower() == """
+        assert (
+            fgen(routine.spec).lower()
+            == """
 integer, parameter :: jprb = selected_real_kind(13, 300)
 integer, intent(in) :: x, y
 real(kind=jprb), intent(out) :: maximum
@@ -426,23 +511,24 @@ real(kind=jprb) :: a
 real(kind=jprb) :: b(x)
 integer :: c
 """.strip().lower()
+        )
 
     # Now remove the `maximum` variable and make sure it's gone
-    routine.variables = [v for v in routine.variables if v.name != 'maximum']
-    assert 'maximum' not in fgen(routine.spec).lower()
+    routine.variables = [v for v in routine.variables if v.name != "maximum"]
+    assert "maximum" not in fgen(routine.spec).lower()
     routine_vars = [str(arg) for arg in routine.variables]
     assert routine_vars in (
-        ['jprb', 'x', 'y', 'vector(x)', 'matrix(x, y)', 'a', 'b(x)', 'c'],
-        ['jprb', 'x', 'y', 'vector(1:x)', 'matrix(1:x, 1:y)', 'a', 'b(x)', 'c']
+        ["jprb", "x", "y", "vector(x)", "matrix(x, y)", "a", "b(x)", "c"],
+        ["jprb", "x", "y", "vector(1:x)", "matrix(1:x, 1:y)", "a", "b(x)", "c"],
     )
     # Ensure `maximum` has been removed from arguments, but they are otherwise unharmed
     assert [str(arg) for arg in routine.arguments] in (
-        ['x', 'y', 'vector(x)'],
-        ['x', 'y', 'vector(1:x)']
+        ["x", "y", "vector(x)"],
+        ["x", "y", "vector(1:x)"],
     )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_variables_find(frontend):
     """
     Tests the `FindVariables` utility (not the best place to put this).
@@ -471,27 +557,27 @@ end subroutine routine_variables_find
 
     vars_all = FindVariables(unique=False).visit(routine.body)
     # Note, we are not counting declarations here
-    assert sum(1 for s in vars_all if str(s) == 'i') == 6
-    assert sum(1 for s in vars_all if str(s) == 'j') == 3
-    assert sum(1 for s in vars_all if str(s) == 'matrix(i, j)') == 1
-    assert sum(1 for s in vars_all if str(s) == 'matrix(x, y)') == 1
-    assert sum(1 for s in vars_all if str(s) == 'maximum') == 1
-    assert sum(1 for s in vars_all if str(s) == 'vector(i)') == 2
-    assert sum(1 for s in vars_all if str(s) == 'x') == 3
-    assert sum(1 for s in vars_all if str(s) == 'y') == 2
+    assert sum(1 for s in vars_all if str(s) == "i") == 6
+    assert sum(1 for s in vars_all if str(s) == "j") == 3
+    assert sum(1 for s in vars_all if str(s) == "matrix(i, j)") == 1
+    assert sum(1 for s in vars_all if str(s) == "matrix(x, y)") == 1
+    assert sum(1 for s in vars_all if str(s) == "maximum") == 1
+    assert sum(1 for s in vars_all if str(s) == "vector(i)") == 2
+    assert sum(1 for s in vars_all if str(s) == "x") == 3
+    assert sum(1 for s in vars_all if str(s) == "y") == 2
 
     vars_unique = FindVariables(unique=True).visit(routine.ir)
-    assert sum(1 for s in vars_unique if str(s) == 'i') == 1
-    assert sum(1 for s in vars_unique if str(s) == 'j') == 1
-    assert sum(1 for s in vars_unique if str(s) == 'matrix(i, j)') == 1
-    assert sum(1 for s in vars_unique if str(s) == 'matrix(x, y)') == 1
-    assert sum(1 for s in vars_unique if str(s) == 'maximum') == 1
-    assert sum(1 for s in vars_unique if str(s) == 'vector(i)') == 1
-    assert sum(1 for s in vars_unique if str(s) == 'x') == 1
-    assert sum(1 for s in vars_unique if str(s) == 'y') == 1
+    assert sum(1 for s in vars_unique if str(s) == "i") == 1
+    assert sum(1 for s in vars_unique if str(s) == "j") == 1
+    assert sum(1 for s in vars_unique if str(s) == "matrix(i, j)") == 1
+    assert sum(1 for s in vars_unique if str(s) == "matrix(x, y)") == 1
+    assert sum(1 for s in vars_unique if str(s) == "maximum") == 1
+    assert sum(1 for s in vars_unique if str(s) == "vector(i)") == 1
+    assert sum(1 for s in vars_unique if str(s) == "x") == 1
+    assert sum(1 for s in vars_unique if str(s) == "y") == 1
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_variables_dim_shapes(frontend):
     """
     A set of test to ensure matching different dimension and shape
@@ -515,22 +601,31 @@ end subroutine routine_dim_shapes
     # TODO: Need a named subroutine lookup
     routine = Subroutine.from_source(fcode, frontend=frontend)
     routine_args = [fexprgen(arg) for arg in routine.arguments]
-    assert routine_args in (['v1', 'v2', 'v3(:)', 'v4(v1, v2)', 'v5(1:v1, v2 - 1)'],
-                            ['v1', 'v2', 'v3(:)', 'v4(1:v1, 1:v2)', 'v5(1:v1, 1:v2 - 1)'])
+    assert routine_args in (
+        ["v1", "v2", "v3(:)", "v4(v1, v2)", "v5(1:v1, v2 - 1)"],
+        ["v1", "v2", "v3(:)", "v4(1:v1, 1:v2)", "v5(1:v1, 1:v2 - 1)"],
+    )
 
     # Make sure variable/argument shapes on the routine work
     shapes = [fexprgen(v.shape) for v in routine.arguments if isinstance(v, Array)]
-    assert shapes in (['(v1,)', '(v1, v2)', '(1:v1, v2 - 1)'],
-                      ['(v1,)', '(1:v1, 1:v2)', '(1:v1, 1:v2 - 1)'])
+    assert shapes in (
+        ["(v1,)", "(v1, v2)", "(1:v1, v2 - 1)"],
+        ["(v1,)", "(1:v1, 1:v2)", "(1:v1, 1:v2 - 1)"],
+    )
 
     # Ensure shapes of body variables are ok
-    b_shapes = [fexprgen(v.shape) for v in FindVariables(unique=False).visit(routine.body)
-                if isinstance(v, Array)]
-    assert b_shapes in (['(v1,)', '(v1,)', '(v1, v2)', '(1:v1, v2 - 1)'],
-                        ['(v1,)', '(v1,)', '(1:v1, 1:v2)', '(1:v1, 1:v2 - 1)'])
+    b_shapes = [
+        fexprgen(v.shape)
+        for v in FindVariables(unique=False).visit(routine.body)
+        if isinstance(v, Array)
+    ]
+    assert b_shapes in (
+        ["(v1,)", "(v1,)", "(v1, v2)", "(1:v1, v2 - 1)"],
+        ["(v1,)", "(v1,)", "(1:v1, 1:v2)", "(1:v1, 1:v2 - 1)"],
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_variables_shape_propagation(header_path, frontend):
     """
     Test for the correct identification and forward propagation of variable shapes
@@ -538,7 +633,9 @@ def test_routine_variables_shape_propagation(header_path, frontend):
     """
 
     # Parse simple kernel routine to check plain array arguments
-    routine = Subroutine.from_source(frontend=frontend, source="""
+    routine = Subroutine.from_source(
+        frontend=frontend,
+        source="""
 subroutine routine_shape(x, y, scalar, vector, matrix)
   integer, parameter :: jprb = selected_real_kind(13,300)
   integer, intent(in) :: x, y
@@ -551,23 +648,24 @@ subroutine routine_shape(x, y, scalar, vector, matrix)
      matrix(i, :) = i * vector(i)
   end do
 end subroutine routine_shape
-""")
+""",
+    )
 
     # Check shapes on the internalized variable and argument lists
     # x, y, = routine.arguments[0], routine.arguments[1]
     # TODO: The string comparison here is due to the fact that shapes are actually
     # `RangeIndex(upper=Scalar)` objects, instead of the raw dimension variables.
     # This needs some more thorough conceptualisation of dimensions and indices!
-    assert fexprgen(routine.arguments[3].shape) in ['(x,)', '(1:x,)']
-    assert fexprgen(routine.arguments[4].shape) in ['(x, y)', '(1:x, 1:y)']
+    assert fexprgen(routine.arguments[3].shape) in ["(x,)", "(1:x,)"]
+    assert fexprgen(routine.arguments[4].shape) in ["(x, y)", "(1:x, 1:y)"]
 
     # Verify that all variable instances have type and shape information
     variables = FindVariables().visit(routine.body)
     assert all(v.shape is not None for v in variables if isinstance(v, Array))
 
     vmap = {v.name: v for v in variables}
-    assert fexprgen(vmap['vector'].shape) in ['(x,)', '(1:x,)']
-    assert fexprgen(vmap['matrix'].shape) in ['(x, y)', '(1:x, 1:y)']
+    assert fexprgen(vmap["vector"].shape) in ["(x,)", "(1:x,)"]
+    assert fexprgen(vmap["matrix"].shape) in ["(x, y)", "(1:x, 1:y)"]
 
     # Parse kernel with external typedefs to test shape inferred from
     # external derived type definition
@@ -594,7 +692,7 @@ subroutine routine_typedefs_simple(item)
 
 end subroutine routine_typedefs_simple
 """
-    header = Sourcefile.from_file(header_path, frontend=frontend)['header']
+    header = Sourcefile.from_file(header_path, frontend=frontend)["header"]
     routine = Subroutine.from_source(fcode, frontend=frontend, definitions=header)
 
     # Verify that all derived type variables have shape info
@@ -603,11 +701,14 @@ end subroutine routine_typedefs_simple
 
     # Verify shape info from imported derived type is propagated
     vmap = {v.name: v for v in variables}
-    assert fexprgen(vmap['item%vector'].shape) in ['(3,)', '(1:3,)']
-    assert fexprgen(vmap['item%matrix'].shape) in ['(3, 3)', '(1:3, 1:3)']
+    assert fexprgen(vmap["item%vector"].shape) in ["(3,)", "(1:3,)"]
+    assert fexprgen(vmap["item%matrix"].shape) in ["(3, 3)", "(1:3, 1:3)"]
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'OMNI does not like Loki pragmas, yet!')]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OMNI, "OMNI does not like Loki pragmas, yet!")]),
+)
 def test_routine_variables_dimension_pragmas(frontend):
     """
     Test that `!$loki dimension` pragmas can be used to verride the
@@ -631,15 +732,15 @@ subroutine routine_variables_dimensions(x, y, v1, v2, v3, v4)
 end subroutine routine_variables_dimensions
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    assert fexprgen(routine.variable_map['v1'].shape) == '(x, :)'
-    assert fexprgen(routine.variable_map['v2'].shape) == '(x, y, :)'
-    assert fexprgen(routine.variable_map['v3'].shape) == '(x, y, :)'
-    assert fexprgen(routine.variable_map['v4'].shape) == '(x, y)'
-    assert fexprgen(routine.variable_map['v5'].shape) == '(y, :)'
-    assert fexprgen(routine.variable_map['v6'].shape) == '(x+y,)'
+    assert fexprgen(routine.variable_map["v1"].shape) == "(x, :)"
+    assert fexprgen(routine.variable_map["v2"].shape) == "(x, y, :)"
+    assert fexprgen(routine.variable_map["v3"].shape) == "(x, y, :)"
+    assert fexprgen(routine.variable_map["v4"].shape) == "(x, y)"
+    assert fexprgen(routine.variable_map["v5"].shape) == "(y, :)"
+    assert fexprgen(routine.variable_map["v6"].shape) == "(x+y,)"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_type_propagation(header_path, frontend):
     """
     Test for the forward propagation of derived-type information from
@@ -652,7 +753,9 @@ def test_routine_type_propagation(header_path, frontend):
     # the subroutine in the same f90wrap execution.
 
     # Parse simple kernel routine to check plain array arguments
-    routine = Subroutine.from_source(frontend=frontend, source="""
+    routine = Subroutine.from_source(
+        frontend=frontend,
+        source="""
 subroutine routine_simple (x, y, scalar, vector, matrix)
   integer, parameter :: jprb = selected_real_kind(13,300)
   integer, intent(in) :: x, y
@@ -665,30 +768,40 @@ subroutine routine_simple (x, y, scalar, vector, matrix)
      matrix(i, :) = i * vector(i)
   end do
 end subroutine routine_simple
-""")
+""",
+    )
 
     # Check types on the internalized variable and argument lists
     assert routine.arguments[0].type.dtype == BasicType.INTEGER
     assert routine.arguments[1].type.dtype == BasicType.INTEGER
     assert routine.arguments[2].type.dtype == BasicType.REAL
-    assert str(routine.arguments[2].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
+    assert str(routine.arguments[2].type.kind) in (
+        "jprb",
+        "selected_real_kind(13, 300)",
+    )
     assert routine.arguments[3].type.dtype == BasicType.REAL
-    assert str(routine.arguments[3].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
+    assert str(routine.arguments[3].type.kind) in (
+        "jprb",
+        "selected_real_kind(13, 300)",
+    )
     assert routine.arguments[4].type.dtype == BasicType.REAL
-    assert str(routine.arguments[4].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
+    assert str(routine.arguments[4].type.kind) in (
+        "jprb",
+        "selected_real_kind(13, 300)",
+    )
 
     # Verify that all variable instances have type information
     variables = FindVariables().visit(routine.body)
     assert all(v.type is not None for v in variables if isinstance(v, (Scalar, Array)))
 
     vmap = {v.name: v for v in variables}
-    assert vmap['x'].type.dtype == BasicType.INTEGER
-    assert vmap['scalar'].type.dtype == BasicType.REAL
-    assert str(vmap['scalar'].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
-    assert vmap['vector'].type.dtype == BasicType.REAL
-    assert str(vmap['vector'].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
-    assert vmap['matrix'].type.dtype == BasicType.REAL
-    assert str(vmap['matrix'].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
+    assert vmap["x"].type.dtype == BasicType.INTEGER
+    assert vmap["scalar"].type.dtype == BasicType.REAL
+    assert str(vmap["scalar"].type.kind) in ("jprb", "selected_real_kind(13, 300)")
+    assert vmap["vector"].type.dtype == BasicType.REAL
+    assert str(vmap["vector"].type.kind) in ("jprb", "selected_real_kind(13, 300)")
+    assert vmap["matrix"].type.dtype == BasicType.REAL
+    assert str(vmap["matrix"].type.kind) in ("jprb", "selected_real_kind(13, 300)")
 
     # Parse kernel routine and provide external typedefs
     fcode = """
@@ -714,13 +827,13 @@ subroutine routine_typedefs_simple(item)
 
 end subroutine routine_typedefs_simple
 """
-    header = Sourcefile.from_file(header_path, frontend=frontend)['header']
+    header = Sourcefile.from_file(header_path, frontend=frontend)["header"]
     routine = Subroutine.from_source(fcode, frontend=frontend, definitions=header)
 
     # Check that external typedefs have been propagated to kernel variables
     # First check that the declared parent variable has the correct type
-    assert routine.arguments[0].name == 'item'
-    assert routine.arguments[0].type.dtype.name == 'derived_type'
+    assert routine.arguments[0].name == "item"
+    assert routine.arguments[0].type.dtype.name == "derived_type"
 
     # Verify that all variable instances have type and shape information
     variables = FindVariables().visit(routine.body)
@@ -728,15 +841,15 @@ end subroutine routine_typedefs_simple
 
     # Verify imported derived type info explicitly
     vmap = {v.name: v for v in variables}
-    assert vmap['item%scalar'].type.dtype == BasicType.REAL
-    assert str(vmap['item%scalar'].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
-    assert vmap['item%vector'].type.dtype == BasicType.REAL
-    assert str(vmap['item%vector'].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
-    assert vmap['item%matrix'].type.dtype == BasicType.REAL
-    assert str(vmap['item%matrix'].type.kind) in ('jprb', 'selected_real_kind(13, 300)')
+    assert vmap["item%scalar"].type.dtype == BasicType.REAL
+    assert str(vmap["item%scalar"].type.kind) in ("jprb", "selected_real_kind(13, 300)")
+    assert vmap["item%vector"].type.dtype == BasicType.REAL
+    assert str(vmap["item%vector"].type.kind) in ("jprb", "selected_real_kind(13, 300)")
+    assert vmap["item%matrix"].type.dtype == BasicType.REAL
+    assert str(vmap["item%matrix"].type.kind) in ("jprb", "selected_real_kind(13, 300)")
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_routine_call_arrays(header_path, frontend):
     """
     Test that arrays passed down a subroutine call are treated as arrays.
@@ -757,15 +870,15 @@ subroutine routine_call_caller(x, y, vector, matrix, item)
 
 end subroutine routine_call_caller
 """
-    header = Sourcefile.from_file(header_path, frontend=frontend)['header']
+    header = Sourcefile.from_file(header_path, frontend=frontend)["header"]
     routine = Subroutine.from_source(fcode, frontend=frontend, definitions=header)
     call = FindNodes(CallStatement).visit(routine.body)[0]
 
-    assert str(call.arguments[0]) == 'x'
-    assert str(call.arguments[1]) == 'y'
-    assert str(call.arguments[2]) == 'vector'
-    assert str(call.arguments[3]) == 'matrix'
-    assert str(call.arguments[4]) == 'item%matrix'
+    assert str(call.arguments[0]) == "x"
+    assert str(call.arguments[1]) == "y"
+    assert str(call.arguments[2]) == "vector"
+    assert str(call.arguments[3]) == "matrix"
+    assert str(call.arguments[4]) == "item%matrix"
 
     assert isinstance(call.arguments[0], Scalar)
     assert isinstance(call.arguments[1], Scalar)
@@ -773,72 +886,85 @@ end subroutine routine_call_caller
     assert isinstance(call.arguments[3], Array)
     assert isinstance(call.arguments[4], Array)
 
-    assert fexprgen(call.arguments[2].shape) in ['(x,)', '(1:x,)']
-    assert fexprgen(call.arguments[3].shape) in ['(x, y)', '(1:x, 1:y)']
-#    assert fexprgen(call.arguments[4].shape) in ['(3, 3)', '(1:3, 1:3)']
+    assert fexprgen(call.arguments[2].shape) in ["(x,)", "(1:x,)"]
+    assert fexprgen(call.arguments[3].shape) in ["(x, y)", "(1:x, 1:y)"]
+    #    assert fexprgen(call.arguments[4].shape) in ['(3, 3)', '(1:3, 1:3)']
 
-    assert fgen(call) == 'CALL routine_call_callee(x, y, vector, matrix, item%matrix)'
+    assert fgen(call) == "CALL routine_call_callee(x, y, vector, matrix, item%matrix)"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_call_no_arg(frontend):
-    routine = Subroutine.from_source(frontend=frontend, source="""
+    routine = Subroutine.from_source(
+        frontend=frontend,
+        source="""
 subroutine routine_call_no_arg()
   implicit none
 
   call abort
 end subroutine routine_call_no_arg
-""")
+""",
+    )
     calls = FindNodes(CallStatement).visit(routine.body)
     assert len(calls) == 1
     assert calls[0].arguments == ()
     assert calls[0].kwarguments == ()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_call_kwargs(frontend):
-    routine = Subroutine.from_source(frontend=frontend, source="""
+    routine = Subroutine.from_source(
+        frontend=frontend,
+        source="""
 subroutine routine_call_kwargs()
   implicit none
   integer :: kprocs
 
   call mpl_init(kprocs=kprocs, cdstring='routine_call_kwargs')
 end subroutine routine_call_kwargs
-""")
+""",
+    )
     calls = FindNodes(CallStatement).visit(routine.body)
     assert len(calls) == 1
-    assert calls[0].name == 'mpl_init'
+    assert calls[0].name == "mpl_init"
 
     assert calls[0].arguments == ()
     assert len(calls[0].kwarguments) == 2
     assert all(isinstance(arg, tuple) and len(arg) == 2 for arg in calls[0].kwarguments)
 
-    assert calls[0].kwarguments[0][0] == 'kprocs'
-    assert (isinstance(calls[0].kwarguments[0][1], Scalar) and
-            calls[0].kwarguments[0][1].name == 'kprocs')
+    assert calls[0].kwarguments[0][0] == "kprocs"
+    assert (
+        isinstance(calls[0].kwarguments[0][1], Scalar)
+        and calls[0].kwarguments[0][1].name == "kprocs"
+    )
 
-    assert calls[0].kwarguments[1] == ('cdstring', StringLiteral('routine_call_kwargs'))
+    assert calls[0].kwarguments[1] == ("cdstring", StringLiteral("routine_call_kwargs"))
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_call_args_kwargs(frontend):
-    routine = Subroutine.from_source(frontend=frontend, source="""
+    routine = Subroutine.from_source(
+        frontend=frontend,
+        source="""
 subroutine routine_call_args_kwargs(pbuf, ktag, kdest)
   implicit none
   integer, intent(in) :: pbuf(:), ktag, kdest
 
   call mpl_send(pbuf, ktag, kdest, cdstring='routine_call_args_kwargs')
 end subroutine routine_call_args_kwargs
-""")
+""",
+    )
     calls = FindNodes(CallStatement).visit(routine.body)
     assert len(calls) == 1
-    assert calls[0].name == 'mpl_send'
+    assert calls[0].name == "mpl_send"
     assert len(calls[0].arguments) == 3
     assert all(a.name == b.name for a, b in zip(calls[0].arguments, routine.arguments))
-    assert calls[0].kwarguments == (('cdstring', StringLiteral('routine_call_args_kwargs')),)
+    assert calls[0].kwarguments == (
+        ("cdstring", StringLiteral("routine_call_args_kwargs")),
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_convert_endian(here, frontend):
     pre = """
 SUBROUTINE ROUTINE_CONVERT_ENDIAN()
@@ -857,21 +983,23 @@ END SUBROUTINE ROUTINE_CONVERT_ENDIAN
 """
     fcode = pre + body + post
 
-    filepath = here/(f'routine_convert_endian_{frontend}.f90')
+    filepath = here / (f"routine_convert_endian_{frontend}.f90")
     Sourcefile.to_file(fcode, filepath)
-    routine = Sourcefile.from_file(filepath, frontend=frontend, preprocess=True)['routine_convert_endian']
+    routine = Sourcefile.from_file(filepath, frontend=frontend, preprocess=True)[
+        "routine_convert_endian"
+    ]
 
     if frontend == OMNI:
         # F... OMNI
-        body = body.replace('OPEN(IUNIT', 'OPEN(UNIT=IUNIT')
+        body = body.replace("OPEN(IUNIT", "OPEN(UNIT=IUNIT")
         body = body.replace('"', "'")
-        body = body.replace('&\n  & ', '')
+        body = body.replace("&\n  & ", "")
     # TODO: This is hacky as the fgen backend is still pretty much WIP
     assert fgen(routine.body).upper().strip() == body.strip()
     filepath.unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_open_newunit(here, frontend):
     pre = """
 SUBROUTINE ROUTINE_OPEN_NEWUNIT()
@@ -891,26 +1019,31 @@ END SUBROUTINE ROUTINE_OPEN_NEWUNIT
 """
     fcode = pre + body + post
 
-    filepath = here/(f'routine_open_newunit_{frontend}.f90')
+    filepath = here / (f"routine_open_newunit_{frontend}.f90")
     Sourcefile.to_file(fcode, filepath)
-    routine = Sourcefile.from_file(filepath, frontend=frontend, preprocess=True)['routine_open_newunit']
+    routine = Sourcefile.from_file(filepath, frontend=frontend, preprocess=True)[
+        "routine_open_newunit"
+    ]
 
     if frontend == OMNI:
         # F... OMNI
         body = body.replace('"', "'")
-        body = body.replace('&\n  & ', '')
+        body = body.replace("&\n  & ", "")
     # TODO: This is hacky as the fgen backend is still pretty much WIP
     assert fgen(routine.body).upper().strip() == body.strip()
     filepath.unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_empty_spec(frontend):
-    routine = Subroutine.from_source(frontend=frontend, source="""
+    routine = Subroutine.from_source(
+        frontend=frontend,
+        source="""
 subroutine routine_empty_spec
 write(*,*) 'Hello world!'
 end subroutine routine_empty_spec
-""")
+""",
+    )
     if frontend == OMNI:
         # OMNI inserts IMPLICIT NONE into spec
         assert len(routine.spec.body) == 1
@@ -919,7 +1052,7 @@ end subroutine routine_empty_spec
     assert len(routine.body.body) == 1
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_member_procedures(here, frontend):
     """
     Test member subroutine and function
@@ -966,23 +1099,25 @@ end subroutine routine_member_procedures
     routine = Subroutine.from_source(fcode, frontend=frontend)
     assert len(routine.members) == 2
 
-    assert routine.members[0].name == 'member_procedure'
-    assert routine.members[0].symbol_attrs.lookup('localvar', recursive=False) is None
-    assert routine.members[0].symbol_attrs.lookup('localvar') is not None
-    assert routine.members[0].get_symbol_scope('localvar') is routine
-    assert routine.members[0].symbol_attrs.lookup('in1') is not None
-    assert routine.symbol_attrs.lookup('in1') is not None
-    assert routine.members[0].get_symbol_scope('in1') is routine.members[0]
+    assert routine.members[0].name == "member_procedure"
+    assert routine.members[0].symbol_attrs.lookup("localvar", recursive=False) is None
+    assert routine.members[0].symbol_attrs.lookup("localvar") is not None
+    assert routine.members[0].get_symbol_scope("localvar") is routine
+    assert routine.members[0].symbol_attrs.lookup("in1") is not None
+    assert routine.symbol_attrs.lookup("in1") is not None
+    assert routine.members[0].get_symbol_scope("in1") is routine.members[0]
 
-    assert routine.members[1].name == 'member_function'
-    assert routine.members[1].symbol_attrs.lookup('in2') is not None
-    assert routine.members[1].get_symbol_scope('in2') is routine.members[1]
-    assert routine.symbol_attrs.lookup('in2') is not None
-    assert routine.get_symbol_scope('in2') is routine
+    assert routine.members[1].name == "member_function"
+    assert routine.members[1].symbol_attrs.lookup("in2") is not None
+    assert routine.members[1].get_symbol_scope("in2") is routine.members[1]
+    assert routine.symbol_attrs.lookup("in2") is not None
+    assert routine.get_symbol_scope("in2") is routine
 
     # Generate code, compile and load
-    filepath = here/(f'routine_member_procedures_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='routine_member_procedures')
+    filepath = here / (f"routine_member_procedures_{frontend}.f90")
+    function = jit_compile(
+        routine, filepath=filepath, objname="routine_member_procedures"
+    )
 
     # Test results of the generated and compiled code
     out1, out2 = function(1, 2)
@@ -991,7 +1126,7 @@ end subroutine routine_member_procedures
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_member_routine_clone(frontend):
     """
     Test that member subroutine scopes get cloned correctly.
@@ -1036,7 +1171,10 @@ end subroutine
 
     # Check that variables are in the right scope everywhere
     assert all(v.scope is routine for v in FindVariables().visit(routine.ir))
-    assert all(v.scope in (routine, routine.members[0]) for v in FindVariables().visit(routine.members[0].ir))
+    assert all(
+        v.scope in (routine, routine.members[0])
+        for v in FindVariables().visit(routine.members[0].ir)
+    )
     assert all(v.scope is new_routine for v in FindVariables().visit(new_routine.ir))
     assert all(
         v.scope in (new_routine, new_routine.members[0])
@@ -1044,7 +1182,7 @@ end subroutine
     )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_member_routine_clone_inplace(frontend):
     """
     Test that member subroutine scopes get cloned correctly.
@@ -1085,19 +1223,23 @@ end subroutine
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
     # Make sure the initial state is as expected
-    member = routine['member_procedure']
+    member = routine["member_procedure"]
     assert member.parent is routine
     assert member.symbol_attrs.parent is routine.symbol_attrs
-    other_member = routine['other_member']
+    other_member = routine["other_member"]
     assert other_member.parent is routine
     assert other_member.symbol_attrs.parent is routine.symbol_attrs
 
     # Put the inherited symbol in the local scope, first with a clean clone...
-    member.variables += (routine.variable_map['localvar'].clone(scope=member),)
+    member.variables += (routine.variable_map["localvar"].clone(scope=member),)
     member = member.clone(parent=None)
     # ...and then with a clone that preserves the symbol table
-    other_member.variables += (routine.variable_map['localvar'].clone(scope=other_member),)
-    other_member = other_member.clone(parent=None, symbol_attrs=other_member.symbol_attrs)
+    other_member.variables += (
+        routine.variable_map["localvar"].clone(scope=other_member),
+    )
+    other_member = other_member.clone(
+        parent=None, symbol_attrs=other_member.symbol_attrs
+    )
     # Ultimately, remove the member routines
     routine = routine.clone(contains=None)
 
@@ -1116,7 +1258,7 @@ end subroutine
     assert other_member.symbol_attrs.parent is None
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_external_stmt(here, frontend):
     """
     Tests procedures passed as dummy arguments and declared as EXTERNAL.
@@ -1198,12 +1340,12 @@ end subroutine routine_call_external_stmt
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
-    routine = source['routine_external_stmt']
+    routine = source["routine_external_stmt"]
     assert len(routine.arguments) == 8
 
     for decl in FindNodes(VariableDeclaration).visit(routine.spec):
         # Skip local variables
-        if decl.symbols[0].name in ('invar', 'outvar', 'tmp'):
+        if decl.symbols[0].name in ("invar", "outvar", "tmp"):
             continue
         # Is the EXTERNAL attribute set?
         assert decl.external
@@ -1213,20 +1355,22 @@ end subroutine routine_call_external_stmt
             assert isinstance(v.type.dtype, ProcedureType)
             assert v.type.external is True
             assert v.type.dtype.procedure == BasicType.DEFERRED
-            if 'sub' in v.name:
+            if "sub" in v.name:
                 assert not v.type.dtype.is_function
                 assert v.type.dtype.return_type is None
             else:
                 assert v.type.dtype.is_function
-                assert v.type.dtype.return_type.compare(SymbolAttributes(BasicType.INTEGER))
+                assert v.type.dtype.return_type.compare(
+                    SymbolAttributes(BasicType.INTEGER)
+                )
 
     # Generate code, compile and load
-    extpath = here/(f'subroutine_routine_external_{frontend}.f90')
-    with extpath.open('w') as f:
+    extpath = here / (f"subroutine_routine_external_{frontend}.f90")
+    with extpath.open("w") as f:
         f.write(fcode_external)
-    filepath = here/(f'subroutine_routine_external_stmt_{frontend}.f90')
+    filepath = here / (f"subroutine_routine_external_stmt_{frontend}.f90")
     source.path = filepath
-    lib = jit_compile_lib([source, extpath], path=here, name='subroutine_external')
+    lib = jit_compile_lib([source, extpath], path=here, name="subroutine_external")
     function = lib.routine_call_external_stmt
 
     outvar = function(7)
@@ -1234,7 +1378,7 @@ end subroutine routine_call_external_stmt
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_subroutine_interface(here, frontend):
     """
     Test auto-generation of an interface block for a given subroutine.
@@ -1252,10 +1396,14 @@ subroutine test_subroutine_interface (in1, in2, in3, out1, out2)
   out2 = out1 + 2.
 end subroutine
 """
-    routine = Subroutine.from_source(fcode, xmods=[here/'sources/xmod'], frontend=frontend)
+    routine = Subroutine.from_source(
+        fcode, xmods=[here / "sources/xmod"], frontend=frontend
+    )
 
     if frontend == OMNI:
-        assert fgen(routine.interface).strip() == """
+        assert (
+            fgen(routine.interface).strip()
+            == """
 INTERFACE
   SUBROUTINE test_subroutine_interface (in1, in2, in3, out1, out2)
     USE header, ONLY: jprb
@@ -1268,8 +1416,11 @@ INTERFACE
   END SUBROUTINE test_subroutine_interface
 END INTERFACE
 """.strip()
+        )
     else:
-        assert fgen(routine.interface).strip() == """
+        assert (
+            fgen(routine.interface).strip()
+            == """
 INTERFACE
   SUBROUTINE test_subroutine_interface (in1, in2, in3, out1, out2)
     USE header, ONLY: jprb
@@ -1280,9 +1431,13 @@ INTERFACE
   END SUBROUTINE test_subroutine_interface
 END INTERFACE
 """.strip()
+        )
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'Parser fails without dummy module provided')]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OMNI, "Parser fails without dummy module provided")]),
+)
 def test_subroutine_rescope_symbols(frontend):
     """
     Test the rescoping of variables.
@@ -1329,28 +1484,38 @@ end subroutine test_subroutine_rescope
     # make sure all symbols are in the right scope
     nested_spec = Transformer().visit(routine.members[0].spec)
     nested_body = Transformer().visit(routine.members[0].body)
-    nested_routine = Subroutine(name=routine.members[0].name, args=routine.members[0]._dummies,
-                                spec=nested_spec, body=nested_body, parent=routine,
-                                rescope_symbols=True)
+    nested_routine = Subroutine(
+        name=routine.members[0].name,
+        args=routine.members[0]._dummies,
+        spec=nested_spec,
+        body=nested_body,
+        parent=routine,
+        rescope_symbols=True,
+    )
 
     for var in FindTypedSymbols().visit(nested_routine.ir):
-        if var.name == 'ext1':
+        if var.name == "ext1":
             assert var.scope is routine
         else:
             assert var.scope is nested_routine
 
     # Make sure the KIND parameter symbol in the variable's type is also correctly rescoped
-    assert routine.members[0].variable_map['j'].type.kind.scope is routine.members[0]
-    assert nested_routine.variable_map['j'].type.kind.scope is nested_routine
+    assert routine.members[0].variable_map["j"].type.kind.scope is routine.members[0]
+    assert nested_routine.variable_map["j"].type.kind.scope is nested_routine
 
     # Create another copy of the nested subroutine without rescoping
     nested_spec = Transformer().visit(routine.members[0].spec)
     nested_body = Transformer().visit(routine.members[0].body)
-    other_routine = Subroutine(name=routine.members[0].name, args=routine.members[0].argnames,
-                               spec=nested_spec, body=nested_body, parent=routine)
+    other_routine = Subroutine(
+        name=routine.members[0].name,
+        args=routine.members[0].argnames,
+        spec=nested_spec,
+        body=nested_body,
+        parent=routine,
+    )
 
     # Save the kind symbol for later
-    other_kind_var = other_routine.variable_map['j'].type.kind
+    other_kind_var = other_routine.variable_map["j"].type.kind
     assert other_kind_var.scope is routine.members[0]
 
     # Explicitly throw away type information from original nested routine
@@ -1361,7 +1526,10 @@ end subroutine test_subroutine_rescope
     assert all(var.scope is not None for var in other_routine.variables)
 
     # Replace member routine by copied routine
-    contains = [nested_routine if isinstance(c, Subroutine) else c for c in routine.contains.body]
+    contains = [
+        nested_routine if isinstance(c, Subroutine) else c
+        for c in routine.contains.body
+    ]
     routine.contains = routine.contains.clone(body=contains)
 
     # Now, all variables should still be well-defined and fgen should produce the same string
@@ -1373,7 +1541,7 @@ end subroutine test_subroutine_rescope
     assert all(var.scope is None or var.type is None for var in other_routine.variables)
 
     # Make sure changes apply also to the KIND attribute
-    assert routine.members[0].variable_map['j'].type.kind.scope is routine.members[0]
+    assert routine.members[0].variable_map["j"].type.kind.scope is routine.members[0]
 
     # This points (weakly) to an entry in routine.members[0].symbols which may or may not
     # have been garbage collected at this point
@@ -1389,11 +1557,14 @@ end subroutine test_subroutine_rescope
         assert str(e) in (
             "'NoneType' object has no attribute 'compare'",
             "'NoneType' object has no attribute 'dtype'",
-            "'NoneType' object has no attribute 'use_name'"
+            "'NoneType' object has no attribute 'use_name'",
         )
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'Parser fails without dummy module provided')]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OMNI, "Parser fails without dummy module provided")]),
+)
 def test_subroutine_rescope_clone(frontend):
     """
     Test the rescoping of variables in clone.
@@ -1440,14 +1611,16 @@ end subroutine test_subroutine_rescope_clone
     nested_routine = routine.members[0].clone()
 
     for var in FindTypedSymbols().visit(nested_routine.ir):
-        if var.name == 'ext1':
+        if var.name == "ext1":
             assert var.scope is routine
         else:
             assert var.scope is nested_routine
 
     # Create another copy of the nested subroutine without rescoping (this breaks
     # things on purpose and should never be done in practice, but hey, for the lolz)
-    other_routine = routine.members[0].clone(symbol_attrs=routine.symbol_attrs.clone(), rescope_symbols=False)
+    other_routine = routine.members[0].clone(
+        symbol_attrs=routine.symbol_attrs.clone(), rescope_symbols=False
+    )
 
     # Explicitly throw away type information from original nested routine
     routine.members[0]._parent = None
@@ -1457,7 +1630,10 @@ end subroutine test_subroutine_rescope_clone
     assert all(var.scope is not None for var in other_routine.variables)
 
     # Replace member routine by copied routine
-    contains = [nested_routine if isinstance(c, Subroutine) else c for c in routine.contains.body]
+    contains = [
+        nested_routine if isinstance(c, Subroutine) else c
+        for c in routine.contains.body
+    ]
     routine.contains = routine.contains.clone(body=contains)
 
     # Now, all variables should still be well-defined and fgen should produce the same string
@@ -1478,11 +1654,13 @@ end subroutine test_subroutine_rescope_clone
         assert str(e) in (
             "'NoneType' object has no attribute 'compare'",
             "'NoneType' object has no attribute 'dtype'",
-            "'NoneType' object has no attribute 'use_name'"
+            "'NoneType' object has no attribute 'use_name'",
         )
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OFP, 'No support for statement functions')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OFP, "No support for statement functions")])
+)
 def test_subroutine_stmt_func(here, frontend):
     """
     Test the correct identification of statement functions
@@ -1508,7 +1686,7 @@ subroutine subroutine_stmt_func(a, b)
 end subroutine subroutine_stmt_func
     """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    routine.name += f'_{frontend!s}'
+    routine.name += f"_{frontend!s}"
 
     # Make sure the statement function injection doesn't invalidate source
     for assignment in FindNodes(Assignment).visit(routine.body):
@@ -1517,10 +1695,12 @@ end subroutine subroutine_stmt_func
     # OMNI inlines statement functions, so we can only check correct representation
     # for fparser
     if frontend != OMNI:
-        stmt_func_decls = {d.variable: d for d in FindNodes(StatementFunction).visit(routine.spec)}
+        stmt_func_decls = {
+            d.variable: d for d in FindNodes(StatementFunction).visit(routine.spec)
+        }
         assert len(stmt_func_decls) == 3
 
-        for name in ('plus', 'minus', 'mult'):
+        for name in ("plus", "minus", "mult"):
             var = routine.variable_map[name]
             assert isinstance(var, ProcedureSymbol)
             assert isinstance(var.type.dtype, ProcedureType)
@@ -1528,13 +1708,13 @@ end subroutine subroutine_stmt_func
             assert stmt_func_decls[var].source is not None
 
     # Make sure this produces the correct result
-    filepath = here/f'{routine.name}.f90'
+    filepath = here / f"{routine.name}.f90"
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
     assert function(3) == 14
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_mixed_declaration_interface(frontend):
     """
     A simple test to catch and shame mixed declarations.
@@ -1555,7 +1735,9 @@ end subroutine valid_fortran
     assert "Declarations must have intents" in str(error.value)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OFP, 'Prefix support not implemented')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OFP, "Prefix support not implemented")])
+)
 def test_subroutine_prefix(frontend):
     """
     Test various prefixes that can occur in function/subroutine definitions
@@ -1568,13 +1750,17 @@ end function f_elem
     """.strip()
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    assert 'PURE' in routine.prefix
-    assert 'ELEMENTAL' in routine.prefix
+    assert "PURE" in routine.prefix
+    assert "ELEMENTAL" in routine.prefix
     assert routine.is_function is True
     assert routine.return_type.dtype is BasicType.REAL
 
     assert routine.name in routine.symbol_map
-    decl = [d for d in FindNodes(VariableDeclaration).visit(routine.spec) if routine.name in d.symbols]
+    decl = [
+        d
+        for d in FindNodes(VariableDeclaration).visit(routine.spec)
+        if routine.name in d.symbols
+    ]
     assert len(decl) == 1
     decl = decl[0]
 
@@ -1587,12 +1773,12 @@ end function f_elem
     assert routine.procedure_symbol.type.dtype.procedure is routine
 
     code = fgen(routine)
-    assert 'PURE' in code
-    assert 'ELEMENTAL' in code
+    assert "PURE" in code
+    assert "ELEMENTAL" in code
     assert fgen(decl) in code
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_subroutine_suffix(frontend):
     """
     Test that subroutine suffixes are supported and correctly reproduced
@@ -1637,35 +1823,35 @@ end module subroutine_suffix_mod
     """.strip()
     module = Module.from_source(fcode, frontend=frontend)
 
-    check_value = module.interface_map['check_value'].body[0]
+    check_value = module.interface_map["check_value"].body[0]
     assert check_value.is_function
     assert check_value.result_name is None
     assert check_value.return_type.dtype is BasicType.INTEGER
-    assert check_value.return_type.kind == 'c_int'
+    assert check_value.return_type.kind == "c_int"
     if frontend != OMNI:
-        assert check_value.bind == 'check_value'
+        assert check_value.bind == "check_value"
         assert "bind(c, name='check_value')" in fgen(check_value).lower()
 
-    fix_value = module.interface_map['fix_value'].body[0]
+    fix_value = module.interface_map["fix_value"].body[0]
     assert fix_value.is_function
-    assert fix_value.result_name == 'fixed'
+    assert fix_value.result_name == "fixed"
     assert fix_value.return_type.dtype is BasicType.REAL
-    assert fix_value.return_type.kind == 'c_float'
+    assert fix_value.return_type.kind == "c_float"
     if frontend == OMNI:
         assert "result(fixed)" in fgen(fix_value).lower()
     else:
-        assert fix_value.bind == 'fix_value'
+        assert fix_value.bind == "fix_value"
         assert "result(fixed) bind(c, name='fix_value')" in fgen(fix_value).lower()
 
-    routine = module['out_of_physical_bounds']
+    routine = module["out_of_physical_bounds"]
     assert routine.is_function
-    assert routine.result_name == 'is_bad'
+    assert routine.result_name == "is_bad"
     assert routine.bind is None
     assert routine.return_type.dtype is BasicType.LOGICAL
     assert "result(is_bad)" in fgen(routine).lower()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_subroutine_comparison(frontend):
     """
     Test that string-equivalence works on relevant components.
@@ -1694,7 +1880,7 @@ end subroutine my_routine
 
     # Counter example: Change the semantic meaning by adding an index
     # offset, so that symbol table and declaration spec are identical.
-    r3 = Subroutine.from_source(fcode.replace('d(i)', 'd(i+1)'), frontend=frontend)
+    r3 = Subroutine.from_source(fcode.replace("d(i)", "d(i+1)"), frontend=frontend)
     assert r1.symbol_attrs == r3.symbol_attrs
     # OMNI source file paths are affected by the string change, which
     # are attached and check to each source node object
@@ -1704,7 +1890,7 @@ end subroutine my_routine
     assert not r1 == r3
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_subroutine_comparison_case_sensitive(frontend):
     """
     Test that semantic, but no string-equivalence evaluates as not eqal
@@ -1724,11 +1910,11 @@ end subroutine my_routine
 """
     # Create two subroutine objects, but capitalize a variable in one
     r1 = Subroutine.from_source(fcode, frontend=frontend)
-    r2 = Subroutine.from_source(fcode.replace('d(i)', 'D(I)'), frontend=frontend)
+    r2 = Subroutine.from_source(fcode.replace("d(i)", "D(I)"), frontend=frontend)
 
-    assert not 'D(I)' in fgen(r1)
+    assert not "D(I)" in fgen(r1)
     if frontend != OMNI:  # OMNI always downcases!
-        assert 'D(I)' in fgen(r2)
+        assert "D(I)" in fgen(r2)
 
     # Ensure that the equivalent parts match, but body and routine do not!
     assert r1.symbol_attrs == r2.symbol_attrs
@@ -1740,7 +1926,7 @@ end subroutine my_routine
     assert not r1 == r2
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_subroutine_lazy_arguments_incomplete1(frontend):
     """
     Test that argument lists for subroutines are correctly captured when the object is made
@@ -1776,15 +1962,14 @@ end subroutine my_routine
     if frontend == OMNI:
         normalize_range_indexing(routine)
     assert not routine._incomplete
-    assert routine.arguments == ('n', 'a(n)', 'b(n)', 'd(n)')
-    assert routine.argnames == ['n', 'a', 'b', 'd']
-    assert routine._dummies == ('n', 'a', 'b', 'd')
+    assert routine.arguments == ("n", "a(n)", "b(n)", "d(n)")
+    assert routine.argnames == ["n", "a", "b", "d"]
+    assert routine._dummies == ("n", "a", "b", "d")
     assert isinstance(routine.arguments[0], Scalar)
     assert all(isinstance(arg, Array) for arg in routine.arguments[1:])
 
 
-
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_subroutine_lazy_arguments_incomplete2(frontend):
     """
     Test that argument lists for subroutines are correctly captured when the object is made
@@ -1840,18 +2025,44 @@ END SUBROUTINE CLOUDSC
     """.strip()
 
     argnames = (
-        'kidia', 'kfdia', 'klon', 'klev', 'pt', 'pq',
-        'pa', 'pclv', 'psupsat',
-        'pre_ice', 'pccn', 'pnice',
-        'pcovptot', 'prainfrac_toprfz',
-        'pfsqlf', 'pfsqif', 'pfcqnng', 'pfcqlng'
+        "kidia",
+        "kfdia",
+        "klon",
+        "klev",
+        "pt",
+        "pq",
+        "pa",
+        "pclv",
+        "psupsat",
+        "pre_ice",
+        "pccn",
+        "pnice",
+        "pcovptot",
+        "prainfrac_toprfz",
+        "pfsqlf",
+        "pfsqif",
+        "pfcqnng",
+        "pfcqlng",
     )
     argnames_with_dim = (
-        'kidia', 'kfdia', 'klon', 'klev', 'pt(klon, klev)', 'pq(klon, klev)',
-        'pa(klon, klev)', 'pclv(klon, klev, nclv)', 'psupsat(klon, klev)',
-        'pre_ice(klon, klev)', 'pccn(klon, klev)', 'pnice(klon, klev)',
-        'pcovptot(klon, klev)', 'prainfrac_toprfz(klon)',
-        'pfsqlf(klon, klev + 1)', 'pfsqif(klon, klev + 1)', 'pfcqnng(klon, klev + 1)', 'pfcqlng(klon, klev + 1)'
+        "kidia",
+        "kfdia",
+        "klon",
+        "klev",
+        "pt(klon, klev)",
+        "pq(klon, klev)",
+        "pa(klon, klev)",
+        "pclv(klon, klev, nclv)",
+        "psupsat(klon, klev)",
+        "pre_ice(klon, klev)",
+        "pccn(klon, klev)",
+        "pnice(klon, klev)",
+        "pcovptot(klon, klev)",
+        "prainfrac_toprfz(klon)",
+        "pfsqlf(klon, klev + 1)",
+        "pfsqif(klon, klev + 1)",
+        "pfcqnng(klon, klev + 1)",
+        "pfcqlng(klon, klev + 1)",
     )
 
     routine = Subroutine.from_source(fcode, frontend=REGEX)
@@ -1869,13 +2080,17 @@ END SUBROUTINE CLOUDSC
         normalize_range_indexing(routine)
     assert not routine._incomplete
     assert routine.arguments == argnames_with_dim
-    assert [arg.upper() for arg in routine.argnames] == [arg.upper() for arg in argnames]
+    assert [arg.upper() for arg in routine.argnames] == [
+        arg.upper() for arg in argnames
+    ]
     assert routine._dummies == argnames
     assert all(isinstance(arg, Scalar) for arg in routine.arguments[:4])
     assert all(isinstance(arg, Array) for arg in routine.arguments[4:])
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OFP, 'Prefix support not implemented')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OFP, "Prefix support not implemented")])
+)
 def test_subroutine_lazy_prefix(frontend):
     """
     Test that prefixes for functions are correctly captured when the object is made
@@ -1897,21 +2112,21 @@ end function f_elem
 
     routine = Subroutine.from_source(fcode, frontend=REGEX)
     assert routine._incomplete
-    assert routine.prefix == ('pure elemental real',)
+    assert routine.prefix == ("pure elemental real",)
     assert routine.arguments == ()
     assert routine.is_function is True
     assert routine.return_type is None
 
     routine.make_complete(frontend=frontend)
     assert not routine._incomplete
-    assert 'PURE' in routine.prefix
-    assert 'ELEMENTAL' in routine.prefix
-    assert routine.arguments == ('a',)
+    assert "PURE" in routine.prefix
+    assert "ELEMENTAL" in routine.prefix
+    assert routine.arguments == ("a",)
     assert routine.is_function is True
     assert routine.return_type.dtype is BasicType.REAL
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_subroutine_clone_contained(frontend):
     fcode = """
 subroutine driver(n, a)
@@ -1945,7 +2160,7 @@ end subroutine driver
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
-    driver = source['driver']
+    driver = source["driver"]
     kernels = driver.subroutines
 
     def _verify_call_enrichment(driver_, kernels_):
@@ -1953,13 +2168,15 @@ end subroutine driver
         assert len(calls) == 2
 
         for call in calls:
-            assert call.name in ('kernel1', 'kernel2')
+            assert call.name in ("kernel1", "kernel2")
             assert isinstance(call.routine, Subroutine)
             assert call.routine in kernels_
             assert call.routine in driver_.subroutines
 
         for kernel in kernels_:
-            kernel_type = [r.procedure_type for r in driver_.subroutines if r.name == kernel.name][0]
+            kernel_type = [
+                r.procedure_type for r in driver_.subroutines if r.name == kernel.name
+            ][0]
             assert kernel_type.procedure is kernel
 
     _verify_call_enrichment(driver, kernels)
@@ -1988,13 +2205,13 @@ end subroutine driver
 
     # Get a list of the names of driver arguments
     driver_args = [a.name.lower() for a in cloned_driver.arguments]
-    assert driver_args == ['n', 'a']
+    assert driver_args == ["n", "a"]
 
     _verify_call_enrichment(driver, kernels)
     _verify_call_enrichment(cloned_driver, cloned_kernels)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_enrich_calls_explicit_interface(frontend):
     """
     Test enrich_calls points to the actual routine and not the symbol declared
@@ -2056,9 +2273,12 @@ def test_enrich_calls_explicit_interface(frontend):
     assert calls[0].routine is kernel
 
 
-@pytest.mark.parametrize('frontend', available_frontends(
-    xfail=[(OMNI, 'OMNI cannot handle external type defs without source')]
-))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(
+        xfail=[(OMNI, "OMNI cannot handle external type defs without source")]
+    ),
+)
 def test_subroutine_deep_clone(frontend):
     """
     Test that deep-cloning a subroutine actually ensures clean scope separation.
@@ -2089,10 +2309,12 @@ end subroutine myroutine
     new_routine = routine.clone()
 
     # Replace all assignments with dummy calls
-    map_nodes={}
+    map_nodes = {}
     for assign in FindNodes(Assignment).visit(new_routine.body):
         map_nodes[assign] = CallStatement(
-            name=DeferredTypeSymbol(name='testcall'), arguments=(assign.lhs,), scope=new_routine
+            name=DeferredTypeSymbol(name="testcall"),
+            arguments=(assign.lhs,),
+            scope=new_routine,
         )
     new_routine.body = Transformer(map_nodes).visit(new_routine.body)
 

@@ -12,6 +12,7 @@ import pytest
 
 try:
     import yaml
+
     HAVE_YAML = True
 except ImportError:
     HAVE_YAML = False
@@ -19,45 +20,47 @@ except ImportError:
 from loki import Intrinsic, gettempdir
 from loki.lint.linter import lint_files
 from loki.lint.reporter import (
-    ProblemReport, RuleReport, FileReport,
-    DefaultHandler, ViolationFileHandler,
-    LazyTextfile
+    ProblemReport,
+    RuleReport,
+    FileReport,
+    DefaultHandler,
+    ViolationFileHandler,
+    LazyTextfile,
 )
 from loki.lint.rules import GenericRule, RuleType
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.fixture(scope='module', name='rules')
+@pytest.fixture(scope="module", name="rules")
 def fixture_rules():
-    rules = importlib.import_module('rules')
+    rules = importlib.import_module("rules")
     return rules
 
 
-@pytest.fixture(scope='module', name='dummy_file')
+@pytest.fixture(scope="module", name="dummy_file")
 def dummy_file_fixture(here):
-    file_path = here/'test_reporter_dummy_file.F90'
+    file_path = here / "test_reporter_dummy_file.F90"
     fcode = "! dummy file for reporter tests"
     file_path.write_text(fcode)
     yield file_path
     file_path.unlink()
 
 
-@pytest.fixture(scope='module', name='dummy_file_report')
+@pytest.fixture(scope="module", name="dummy_file_report")
 def fixture_dummy_file_report(dummy_file):
     file_report = FileReport(str(dummy_file))
     rule_report = RuleReport(GenericRule)
-    rule_report.add('Some message', Intrinsic('foobar'))
-    rule_report.add('Other message', Intrinsic('baz'))
+    rule_report.add("Some message", Intrinsic("foobar"))
+    rule_report.add("Other message", Intrinsic("baz"))
     file_report.add(rule_report)
     return file_report
 
 
 class DummyLogger:
-
     def __init__(self):
         self.messages = []
 
@@ -74,11 +77,11 @@ def test_reports(dummy_file):
 
     rule_report = RuleReport(SomeRule)
     assert not rule_report.problem_reports and rule_report.problem_reports is not None
-    rule_report.add('Some message', Intrinsic('foobar'))
-    rule_report.add('Other message', Intrinsic('baz'))
+    rule_report.add("Some message", Intrinsic("foobar"))
+    rule_report.add("Other message", Intrinsic("baz"))
     assert len(rule_report.problem_reports) == 2
     assert isinstance(rule_report.problem_reports[0], ProblemReport)
-    assert rule_report.problem_reports[0].msg == 'Some message'
+    assert rule_report.problem_reports[0].msg == "Some message"
 
     file_report.add(rule_report)
     assert len(file_report.reports) == 1
@@ -102,7 +105,7 @@ def test_default_handler_not_immediate(dummy_file_report):
     assert len(logger_target.messages) == 2
 
 
-@pytest.mark.skipif(not HAVE_YAML, reason='Pyyaml not installed')
+@pytest.mark.skipif(not HAVE_YAML, reason="Pyyaml not installed")
 def test_violation_file_handler(dummy_file, dummy_file_report):
     logger_target = DummyLogger()
     handler = ViolationFileHandler(target=logger_target.write)
@@ -113,14 +116,14 @@ def test_violation_file_handler(dummy_file, dummy_file_report):
     assert len(yaml_report) == 1
     assert str(dummy_file) in yaml_report
     file_report = yaml_report[str(dummy_file)]
-    assert file_report['filehash'] == dummy_file_report.hash
-    assert len(file_report['rules']) == 1
-    assert 'GenericRule' in file_report['rules']
+    assert file_report["filehash"] == dummy_file_report.hash
+    assert len(file_report["rules"]) == 1
+    assert "GenericRule" in file_report["rules"]
 
 
 def test_lazy_textfile():
     # Choose the output file and make sure it doesn't exist
-    filename = gettempdir()/'lazytextfile.log'
+    filename = gettempdir() / "lazytextfile.log"
     filename.unlink(missing_ok=True)
 
     # Instantiating the object should _not_ create the file
@@ -128,44 +131,44 @@ def test_lazy_textfile():
     assert not filename.exists()
 
     # Writing to the object should open (and therefore create) the file
-    f.write('s0me TEXT')
+    f.write("s0me TEXT")
     assert filename.exists()
 
     # Writing more to the object should append text
-    f.write(' AAAAND other Th1ngs!!!')
+    f.write(" AAAAND other Th1ngs!!!")
 
     # Deleting the object should (hopefully) trigger __del__,
     # which should flush the buffers to disk and allow us to read
     # (and check) the content
     del f
-    assert filename.read_text() == 's0me TEXT AAAAND other Th1ngs!!!'
+    assert filename.read_text() == "s0me TEXT AAAAND other Th1ngs!!!"
 
     filename.unlink(missing_ok=True)
 
 
-@pytest.mark.parametrize('max_workers', [None, 1])
-@pytest.mark.parametrize('fail_on,failures', [(None,0), ('kernel',4)])
+@pytest.mark.parametrize("max_workers", [None, 1])
+@pytest.mark.parametrize("fail_on,failures", [(None, 0), ("kernel", 4)])
 def test_linter_junitxml(here, max_workers, fail_on, failures):
     class RandomFailingRule(GenericRule):
         type = RuleType.WARN
-        docs = {'title': 'A dummy rule for the sake of testing the Linter'}
-        config = {'dummy_key': 'dummy value'}
+        docs = {"title": "A dummy rule for the sake of testing the Linter"}
+        config = {"dummy_key": "dummy value"}
 
         @classmethod
         def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
             if fail_on and fail_on in subroutine.name:
                 rule_report.add(cls.__name__, subroutine)
 
-    basedir = here.parent/'sources'
-    junitxml_file = gettempdir()/'linter_junitxml_outputfile.xml'
+    basedir = here.parent / "sources"
+    junitxml_file = gettempdir() / "linter_junitxml_outputfile.xml"
     junitxml_file.unlink(missing_ok=True)
     config = {
-        'basedir': str(basedir),
-        'include': ['projA/**/*.f90', 'projA/**/*.F90'],
-        'junitxml_file': str(junitxml_file)
+        "basedir": str(basedir),
+        "include": ["projA/**/*.f90", "projA/**/*.F90"],
+        "junitxml_file": str(junitxml_file),
     }
     if max_workers is not None:
-        config['max_workers'] = max_workers
+        config["max_workers"] = max_workers
 
     checked = lint_files([RandomFailingRule], config)
 
@@ -173,40 +176,42 @@ def test_linter_junitxml(here, max_workers, fail_on, failures):
 
     # Just a few sanity checks on the XML
     xml = ET.parse(junitxml_file).getroot()
-    assert xml.tag == 'testsuites'
-    assert xml.attrib['tests'] == '15'
-    assert xml.attrib['failures'] == str(failures)
+    assert xml.tag == "testsuites"
+    assert xml.attrib["tests"] == "15"
+    assert xml.attrib["failures"] == str(failures)
 
     junitxml_file.unlink(missing_ok=True)
 
 
-@pytest.mark.skipif(not HAVE_YAML, reason='Pyyaml not installed')
-@pytest.mark.parametrize('max_workers', [None, 1])
-@pytest.mark.parametrize('fail_on,failures', [(None,0), ('kernel',4)])
-@pytest.mark.parametrize('use_line_hashes', [None, False, True])
-def test_linter_violation_file(here, rules, max_workers, fail_on, failures, use_line_hashes):
+@pytest.mark.skipif(not HAVE_YAML, reason="Pyyaml not installed")
+@pytest.mark.parametrize("max_workers", [None, 1])
+@pytest.mark.parametrize("fail_on,failures", [(None, 0), ("kernel", 4)])
+@pytest.mark.parametrize("use_line_hashes", [None, False, True])
+def test_linter_violation_file(
+    here, rules, max_workers, fail_on, failures, use_line_hashes
+):
     class RandomFailingRule(GenericRule):
         type = RuleType.WARN
-        docs = {'title': 'A dummy rule for the sake of testing the Linter'}
-        config = {'dummy_key': 'dummy value'}
+        docs = {"title": "A dummy rule for the sake of testing the Linter"}
+        config = {"dummy_key": "dummy value"}
 
         @classmethod
         def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
             if fail_on and fail_on in subroutine.name:
                 rule_report.add(cls.__name__, subroutine)
 
-    basedir = here.parent/'sources'
-    violations_file = gettempdir()/'linter_violations_file.yml'
+    basedir = here.parent / "sources"
+    violations_file = gettempdir() / "linter_violations_file.yml"
     violations_file.unlink(missing_ok=True)
     config = {
-        'basedir': str(basedir),
-        'include': ['projA/**/*.f90', 'projA/**/*.F90'],
-        'violations_file': str(violations_file),
+        "basedir": str(basedir),
+        "include": ["projA/**/*.f90", "projA/**/*.F90"],
+        "violations_file": str(violations_file),
     }
     if use_line_hashes is not None:
-        config['use_violations_file_line_hashes'] = use_line_hashes
+        config["use_violations_file_line_hashes"] = use_line_hashes
     if max_workers is not None:
-        config['max_workers'] = max_workers
+        config["max_workers"] = max_workers
 
     checked = lint_files([RandomFailingRule, rules.DummyRule], config)
 
@@ -222,20 +227,20 @@ def test_linter_violation_file(here, rules, max_workers, fail_on, failures, use_
         for file, report in yaml_report.items():
             assert fail_on in file
             if use_line_hashes is False:
-                assert 'filehash' in report
-                assert report['rules'] == ['RandomFailingRule']
+                assert "filehash" in report
+                assert report["rules"] == ["RandomFailingRule"]
             else:
-                assert 'filehash' not in report
-                assert len(report['rules']) == 1
-                assert 'RandomFailingRule' in report['rules'][0]
-                if file.endswith('kernelE_mod.f90'):
-                    assert len(report['rules'][0]['RandomFailingRule']) == 2
+                assert "filehash" not in report
+                assert len(report["rules"]) == 1
+                assert "RandomFailingRule" in report["rules"][0]
+                if file.endswith("kernelE_mod.f90"):
+                    assert len(report["rules"][0]["RandomFailingRule"]) == 2
                 else:
-                    assert len(report['rules'][0]['RandomFailingRule']) == 1
+                    assert len(report["rules"][0]["RandomFailingRule"]) == 1
 
     # Plug the violations file into the config and see if we don't have
     # violations in another linter pass
-    config['disable'] = yaml_report
+    config["disable"] = yaml_report
     checked = lint_files([RandomFailingRule, rules.DummyRule], config)
     assert checked == 15
     assert yaml.safe_load(violations_file.read_text()) is None

@@ -12,43 +12,65 @@ import numpy as np
 
 from conftest import jit_compile, clean_test, available_frontends
 from loki import (
-    Sourcefile, OFP, OMNI, FP, REGEX, FindNodes, PreprocessorDirective,
-    Intrinsic, Assignment, Import, fgen, ProcedureType, ProcedureSymbol,
-    StatementFunction, Comment, CommentBlock, RawSource, Scalar
+    Sourcefile,
+    OFP,
+    OMNI,
+    FP,
+    REGEX,
+    FindNodes,
+    PreprocessorDirective,
+    Intrinsic,
+    Assignment,
+    Import,
+    fgen,
+    ProcedureType,
+    ProcedureSymbol,
+    StatementFunction,
+    Comment,
+    CommentBlock,
+    RawSource,
+    Scalar,
 )
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sourcefile_properties(here, frontend):
     """
     Test that all subroutines and functions are discovered
     and exposed via `subroutines` and `all_subroutines` properties.
     """
     # pylint: disable=no-member
-    filepath = here/'sources/sourcefile.f90'
+    filepath = here / "sources/sourcefile.f90"
     source = Sourcefile.from_file(filepath, frontend=frontend)
     assert len(source.subroutines) == 3
     assert len(source.all_subroutines) == 5
 
-    subroutines = ['routine_a', 'routine_b', 'function_d']
-    all_subroutines = subroutines + ['module_routine', 'module_function']
-    contained_routines = ['contained_c']
+    subroutines = ["routine_a", "routine_b", "function_d"]
+    all_subroutines = subroutines + ["module_routine", "module_function"]
+    contained_routines = ["contained_c"]
 
     assert sum(routine.name in subroutines for routine in source.subroutines) == 3
     assert sum(routine.name in all_subroutines for routine in source.subroutines) == 3
-    assert sum(routine.name in contained_routines for routine in source.subroutines) == 0
+    assert (
+        sum(routine.name in contained_routines for routine in source.subroutines) == 0
+    )
 
     assert sum(routine.name in subroutines for routine in source.all_subroutines) == 3
-    assert sum(routine.name in all_subroutines for routine in source.all_subroutines) == 5
-    assert sum(routine.name in contained_routines for routine in source.all_subroutines) == 0
+    assert (
+        sum(routine.name in all_subroutines for routine in source.all_subroutines) == 5
+    )
+    assert (
+        sum(routine.name in contained_routines for routine in source.all_subroutines)
+        == 0
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sourcefile_from_source(frontend):
     """
     Test the `from_source` constructor for `Sourcefile` objects.
@@ -96,80 +118,94 @@ end function function_d
     assert len(source.subroutines) == 3
     assert len(source.all_subroutines) == 5
 
-    subroutines = ['routine_a', 'routine_b', 'function_d']
-    all_subroutines = subroutines + ['module_routine', 'module_function']
+    subroutines = ["routine_a", "routine_b", "function_d"]
+    all_subroutines = subroutines + ["module_routine", "module_function"]
 
     assert [routine.name.lower() for routine in source.subroutines] == subroutines
-    assert [routine.name.lower() for routine in source.all_subroutines] == all_subroutines
-    assert 'contained_c' not in [routine.name.lower() for routine in source.subroutines]
-    assert 'contained_c' not in [routine.name.lower() for routine in source.all_subroutines]
+    assert [
+        routine.name.lower() for routine in source.all_subroutines
+    ] == all_subroutines
+    assert "contained_c" not in [routine.name.lower() for routine in source.subroutines]
+    assert "contained_c" not in [
+        routine.name.lower() for routine in source.all_subroutines
+    ]
 
     comments = FindNodes((Comment, CommentBlock)).visit(source.ir)
     assert len(comments) == 4
-    assert all(comment.text.strip() in ['! Some comment', '! Other comment'] for comment in comments)
+    assert all(
+        comment.text.strip() in ["! Some comment", "! Other comment"]
+        for comment in comments
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'Files are preprocessed')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "Files are preprocessed")])
+)
 def test_sourcefile_pp_macros(here, frontend):
-    filepath = here/'sources/sourcefile_pp_macros.F90'
-    routine = Sourcefile.from_file(filepath, frontend=frontend)['routine_pp_macros']
+    filepath = here / "sources/sourcefile_pp_macros.F90"
+    routine = Sourcefile.from_file(filepath, frontend=frontend)["routine_pp_macros"]
     directives = FindNodes(PreprocessorDirective).visit(routine.ir)
     assert len(directives) == 8
-    assert all(node.text.startswith('#') for node in directives)
+    assert all(node.text.startswith("#") for node in directives)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[
-    (OFP, 'Cannot handle directives'), (OMNI, 'Files are preprocessed')
-]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(
+        xfail=[(OFP, "Cannot handle directives"), (OMNI, "Files are preprocessed")]
+    ),
+)
 def test_sourcefile_pp_directives(here, frontend):
-    filepath = here/'sources/sourcefile_pp_directives.F90'
-    routine = Sourcefile.from_file(filepath, frontend=frontend)['routine_pp_directives']
+    filepath = here / "sources/sourcefile_pp_directives.F90"
+    routine = Sourcefile.from_file(filepath, frontend=frontend)["routine_pp_directives"]
 
     # Note: these checks are rather loose as we currently do not restore the original version but
     # simply replace the PP constants by strings
     directives = FindNodes(PreprocessorDirective).visit(routine.body)
     assert len(directives) == 1
-    assert directives[0].text == '#define __FILENAME__ __FILE__'
+    assert directives[0].text == "#define __FILENAME__ __FILE__"
     intrinsics = FindNodes(Intrinsic).visit(routine.body)
-    assert '__FILENAME__' in intrinsics[0].text and '__DATE__' in intrinsics[0].text
-    assert '__FILE__' in intrinsics[1].text and '__VERSION__' in intrinsics[1].text
+    assert "__FILENAME__" in intrinsics[0].text and "__DATE__" in intrinsics[0].text
+    assert "__FILE__" in intrinsics[1].text and "__VERSION__" in intrinsics[1].text
 
     statements = FindNodes(Assignment).visit(routine.body)
     assert len(statements) == 1
-    assert fgen(statements[0]) == 'y = 0*5 + 0'
+    assert fgen(statements[0]) == "y = 0*5 + 0"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sourcefile_pp_include(here, frontend):
-    filepath = here/'sources/sourcefile_pp_include.F90'
-    sourcefile = Sourcefile.from_file(filepath, frontend=frontend, includes=[here/'include'])
-    routine = sourcefile['routine_pp_include']
+    filepath = here / "sources/sourcefile_pp_include.F90"
+    sourcefile = Sourcefile.from_file(
+        filepath, frontend=frontend, includes=[here / "include"]
+    )
+    routine = sourcefile["routine_pp_include"]
 
     statements = FindNodes(Assignment).visit(routine.body)
     assert len(statements) == 1
     if frontend == OMNI:
         # OMNI resolves that statement function!
-        assert fgen(statements[0]) == 'c = real(a + b, kind=4)'
+        assert fgen(statements[0]) == "c = real(a + b, kind=4)"
     else:
-        assert fgen(statements[0]) == 'c = add(a, b)'
+        assert fgen(statements[0]) == "c = add(a, b)"
 
     if frontend is not OMNI:
         # OMNI resolves the import in the frontend
         imports = FindNodes(Import).visit([routine.spec, routine.body])
         assert len(imports) == 1
         assert imports[0].c_import
-        assert imports[0].module == 'some_header.h'
+        assert imports[0].module == "some_header.h"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sourcefile_cpp_preprocessing(here, frontend):
     """
     Test the use of the external CPP-preprocessor.
     """
-    filepath = here/'sources/sourcefile_cpp_preprocessing.F90'
+    filepath = here / "sources/sourcefile_cpp_preprocessing.F90"
 
     source = Sourcefile.from_file(filepath, preprocess=True, frontend=frontend)
-    routine = source['sourcefile_external_preprocessing']
+    routine = source["sourcefile_external_preprocessing"]
     directives = FindNodes(PreprocessorDirective).visit(routine.ir)
 
     if frontend is not OMNI:
@@ -177,37 +213,42 @@ def test_sourcefile_cpp_preprocessing(here, frontend):
         imports = FindNodes(Import).visit([routine.spec, routine.body])
         assert len(imports) == 1
         assert imports[0].c_import
-        assert imports[0].module == 'some_header.h'
+        assert imports[0].module == "some_header.h"
 
     assert len(directives) == 0
-    assert 'b = 123' in fgen(routine)
+    assert "b = 123" in fgen(routine)
 
     # Check that the ``define`` gets propagated correctly
-    source = Sourcefile.from_file(filepath, preprocess=True, defines='FLAG_SMALL',
-                                  frontend=frontend)
-    routine = source['sourcefile_external_preprocessing']
+    source = Sourcefile.from_file(
+        filepath, preprocess=True, defines="FLAG_SMALL", frontend=frontend
+    )
+    routine = source["sourcefile_external_preprocessing"]
     directives = FindNodes(PreprocessorDirective).visit(routine.ir)
 
     assert len(directives) == 0
-    assert 'b = 6' in fgen(routine)
+    assert "b = 6" in fgen(routine)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OFP, 'No support for statement functions')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OFP, "No support for statement functions")])
+)
 def test_sourcefile_cpp_stmt_func(here, frontend):
     """
     Test the correct identification of statement functions
     after inlining by preprocessor.
     """
-    sourcepath = here/'sources'
-    filepath = sourcepath/'sourcefile_cpp_stmt_func.F90'
+    sourcepath = here / "sources"
+    filepath = sourcepath / "sourcefile_cpp_stmt_func.F90"
 
-    source = Sourcefile.from_file(filepath, includes=sourcepath, preprocess=True, frontend=frontend)
-    module = source['sourcefile_cpp_stmt_func_mod']
-    module.name += f'_{frontend!s}'
+    source = Sourcefile.from_file(
+        filepath, includes=sourcepath, preprocess=True, frontend=frontend
+    )
+    module = source["sourcefile_cpp_stmt_func_mod"]
+    module.name += f"_{frontend!s}"
 
     # OMNI inlines statement functions, so we can't check the representation
     if frontend != OMNI:
-        routine = source['sourcefile_cpp_stmt_func']
+        routine = source["sourcefile_cpp_stmt_func"]
         stmt_func_decls = FindNodes(StatementFunction).visit(routine.spec)
         assert len(stmt_func_decls) == 4
 
@@ -219,20 +260,20 @@ def test_sourcefile_cpp_stmt_func(here, frontend):
             assert decl.source is not None
 
     # Generate code and compile
-    filepath = here/f'{module.name}.f90'
+    filepath = here / f"{module.name}.f90"
     mod = jit_compile(source, filepath=filepath, objname=module.name)
 
     # Verify it produces correct results
     klon, klev = 10, 5
     kidia, kfdia = 1, klon
-    zfoeew = np.zeros((klon, klev), order='F')
+    zfoeew = np.zeros((klon, klev), order="F")
     mod.sourcefile_cpp_stmt_func(kidia, kfdia, klon, klev, zfoeew)
     assert (zfoeew == 0.25).all()
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sourcefile_lazy_construction(frontend):
     """
     Test delayed ("lazy") parsing of sourcefile content
@@ -277,23 +318,23 @@ end function function_d
     assert len(source.subroutines) == 3
     assert len(source.all_subroutines) == 5
 
-    some_module = source['some_module']
-    routine_b = source['routine_b']
-    module_routine = some_module['module_routine']
-    function_d = source['function_d']
+    some_module = source["some_module"]
+    routine_b = source["routine_b"]
+    module_routine = some_module["module_routine"]
+    function_d = source["function_d"]
     assert function_d.arguments == ()
 
     # Make sure we have an incomplete parse tree until now
     assert source._incomplete
     assert len(FindNodes(RawSource).visit(source.ir)) == 5
-    assert len(FindNodes(RawSource).visit(source['routine_a'].ir)) == 1
+    assert len(FindNodes(RawSource).visit(source["routine_a"].ir)) == 1
 
     # Trigger the full parse
     try:
         source.make_complete(frontend=frontend)
     except CalledProcessError as ex:
         if frontend == OMNI and ex.returncode == -11:
-            pytest.xfail('F_Front segfault is a known issue on some platforms')
+            pytest.xfail("F_Front segfault is a known issue on some platforms")
         raise
     assert not source._incomplete
 
@@ -313,14 +354,14 @@ end function function_d
         assert len(FindNodes(Assignment).visit(routine.ir)) == 1
 
     # The previously generated ProgramUnit objects should be the same as before
-    assert routine_b is source['routine_b']
-    assert some_module is source['some_module']
-    assert module_routine is source['some_module']['module_routine']
-    assert function_d.arguments == ('d',)
+    assert routine_b is source["routine_b"]
+    assert some_module is source["some_module"]
+    assert module_routine is source["some_module"]["module_routine"]
+    assert function_d.arguments == ("d",)
     assert isinstance(function_d.arguments[0], Scalar)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_sourcefile_lazy_comments(frontend):
     """
     Make sure that lazy construction can handle comments on source file level
@@ -338,7 +379,7 @@ end subroutine myroutine
     assert isinstance(source.ir.body[0], RawSource)
     assert isinstance(source.ir.body[2], RawSource)
 
-    myroutine = source['myroutine']
+    myroutine = source["myroutine"]
     assert isinstance(myroutine.spec.body[0], RawSource)
 
     source.make_complete(frontend=frontend)
@@ -348,6 +389,6 @@ end subroutine myroutine
     assert isinstance(myroutine.body.body[0], Comment)
 
     code = source.to_fortran()
-    assert '! Comment outside' in code
-    assert '! Comment inside' in code
-    assert '! Other comment outside' in code
+    assert "! Comment outside" in code
+    assert "! Comment inside" in code
+    assert "! Other comment outside" in code

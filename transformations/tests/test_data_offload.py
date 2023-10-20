@@ -8,15 +8,21 @@
 import pytest
 
 from loki import (
-    Sourcefile, FindNodes, Pragma, PragmaRegion, Loop,
-    CallStatement, pragma_regions_attached, get_pragma_parameters
+    Sourcefile,
+    FindNodes,
+    Pragma,
+    PragmaRegion,
+    Loop,
+    CallStatement,
+    pragma_regions_attached,
+    get_pragma_parameters,
 )
 from conftest import available_frontends
 from transformations import DataOffloadTransformation
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
-@pytest.mark.parametrize('assume_deviceptr', [True, False])
+@pytest.mark.parametrize("frontend", available_frontends())
+@pytest.mark.parametrize("assume_deviceptr", [True, False])
 def test_data_offload_region_openacc(frontend, assume_deviceptr):
     """
     Test the creation of a simple device data offload region
@@ -53,28 +59,31 @@ def test_data_offload_region_openacc(frontend, assume_deviceptr):
     end do
   END SUBROUTINE kernel_routine
 """
-    driver = Sourcefile.from_source(fcode_driver, frontend=frontend)['driver_routine']
-    kernel = Sourcefile.from_source(fcode_kernel, frontend=frontend)['kernel_routine']
+    driver = Sourcefile.from_source(fcode_driver, frontend=frontend)["driver_routine"]
+    kernel = Sourcefile.from_source(fcode_kernel, frontend=frontend)["kernel_routine"]
     driver.enrich_calls(kernel)
 
-    driver.apply(DataOffloadTransformation(assume_deviceptr=assume_deviceptr), role='driver',
-                 targets=['kernel_routine'])
+    driver.apply(
+        DataOffloadTransformation(assume_deviceptr=assume_deviceptr),
+        role="driver",
+        targets=["kernel_routine"],
+    )
 
     pragmas = FindNodes(Pragma).visit(driver.body)
     assert len(pragmas) == 2
-    assert all(p.keyword == 'acc' for p in pragmas)
+    assert all(p.keyword == "acc" for p in pragmas)
     if assume_deviceptr:
-        assert 'deviceptr' in pragmas[0].content
+        assert "deviceptr" in pragmas[0].content
         params = get_pragma_parameters(pragmas[0], only_loki_pragmas=False)
-        assert all(var in params['deviceptr'] for var in ('a', 'b', 'c'))
+        assert all(var in params["deviceptr"] for var in ("a", "b", "c"))
     else:
         transformed = driver.to_fortran()
-        assert 'copyin( a )' in transformed
-        assert 'copy( b )' in transformed
-        assert 'copyout( c )' in transformed
+        assert "copyin( a )" in transformed
+        assert "copy( b )" in transformed
+        assert "copyout( c )" in transformed
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_data_offload_region_complex_remove_openmp(frontend):
     """
     Test the creation of a data offload region (OpenACC) with
@@ -127,15 +136,15 @@ def test_data_offload_region_complex_remove_openmp(frontend):
     end do
   END SUBROUTINE kernel_routine
 """
-    driver = Sourcefile.from_source(fcode_driver, frontend=frontend)['driver_routine']
-    kernel = Sourcefile.from_source(fcode_kernel, frontend=frontend)['kernel_routine']
+    driver = Sourcefile.from_source(fcode_driver, frontend=frontend)["driver_routine"]
+    kernel = Sourcefile.from_source(fcode_kernel, frontend=frontend)["kernel_routine"]
     driver.enrich_calls(kernel)
 
     offload_transform = DataOffloadTransformation(remove_openmp=True)
-    driver.apply(offload_transform, role='driver', targets=['kernel_routine'])
+    driver.apply(offload_transform, role="driver", targets=["kernel_routine"])
 
     assert len(FindNodes(Pragma).visit(driver.body)) == 2
-    assert all(p.keyword == 'acc' for p in FindNodes(Pragma).visit(driver.body))
+    assert all(p.keyword == "acc" for p in FindNodes(Pragma).visit(driver.body))
 
     with pragma_regions_attached(driver):
         # Ensure that loops in the region are preserved
@@ -146,20 +155,20 @@ def test_data_offload_region_complex_remove_openmp(frontend):
         # Ensure all activa and inactive calls are there
         calls = FindNodes(CallStatement).visit(regions[0])
         assert len(calls) == 3
-        assert calls[0].name == 'my_custom_timer'
-        assert calls[1].name == 'kernel_routine'
-        assert calls[2].name == 'my_custom_timer'
+        assert calls[0].name == "my_custom_timer"
+        assert calls[1].name == "kernel_routine"
+        assert calls[2].name == "my_custom_timer"
 
         # Ensure OpenMP loop pragma is taken out
         assert len(FindNodes(Pragma).visit(regions[0])) == 0
 
     transformed = driver.to_fortran()
-    assert 'copyin( a )' in transformed
-    assert 'copy( b, c )' in transformed
-    assert '!$omp' not in transformed
+    assert "copyin( a )" in transformed
+    assert "copy( b, c )" in transformed
+    assert "!$omp" not in transformed
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_data_offload_region_multiple(frontend):
     """
     Test the creation of a device data offload region (`!$acc update`)
@@ -198,18 +207,18 @@ def test_data_offload_region_multiple(frontend):
     end do
   END SUBROUTINE kernel_routine
 """
-    driver = Sourcefile.from_source(fcode_driver, frontend=frontend)['driver_routine']
-    kernel = Sourcefile.from_source(fcode_kernel, frontend=frontend)['kernel_routine']
+    driver = Sourcefile.from_source(fcode_driver, frontend=frontend)["driver_routine"]
+    kernel = Sourcefile.from_source(fcode_kernel, frontend=frontend)["kernel_routine"]
     driver.enrich_calls(kernel)
 
-    driver.apply(DataOffloadTransformation(), role='driver', targets=['kernel_routine'])
+    driver.apply(DataOffloadTransformation(), role="driver", targets=["kernel_routine"])
 
     assert len(FindNodes(Pragma).visit(driver.body)) == 2
-    assert all(p.keyword == 'acc' for p in FindNodes(Pragma).visit(driver.body))
+    assert all(p.keyword == "acc" for p in FindNodes(Pragma).visit(driver.body))
 
     # Ensure that the copy direction is the union of the two calls, ie.
     # "a" is "copyin" in first call and "copyout" in second, so it should be "copy"
     transformed = driver.to_fortran()
-    assert 'copyin( d )' in transformed
-    assert 'copy( b, a )' in transformed
-    assert 'copyout( c )' in transformed
+    assert "copyin( d )" in transformed
+    assert "copy( b, a )" in transformed
+    assert "copyout( c )" in transformed

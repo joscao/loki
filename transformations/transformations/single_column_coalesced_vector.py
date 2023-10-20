@@ -9,13 +9,29 @@ from more_itertools import split_at
 
 from loki.expression import symbols as sym
 from loki import (
-     Transformation, FindNodes, ir, FindScopes, as_tuple, flatten, Transformer,
-     NestedTransformer, FindVariables, demote_variables, is_dimension_constant,
-     is_loki_pragma, dataflow_analysis_attached, BasicType, pragmas_attached
+    Transformation,
+    FindNodes,
+    ir,
+    FindScopes,
+    as_tuple,
+    flatten,
+    Transformer,
+    NestedTransformer,
+    FindVariables,
+    demote_variables,
+    is_dimension_constant,
+    is_loki_pragma,
+    dataflow_analysis_attached,
+    BasicType,
+    pragmas_attached,
 )
 from transformations.single_column_coalesced import SCCBaseTransformation
 
-__all__ = ['SCCDevectorTransformation', 'SCCRevectorTransformation', 'SCCDemoteTransformation']
+__all__ = [
+    "SCCDevectorTransformation",
+    "SCCRevectorTransformation",
+    "SCCDemoteTransformation",
+]
 
 
 class SCCDevectorTransformation(Transformation):
@@ -74,8 +90,12 @@ class SCCDevectorTransformation(Transformation):
 
         # Identify outer "scopes" (loops/conditionals) constrained by recursive routine calls
         calls = FindNodes(ir.CallStatement).visit(section)
-        pragmas = [pragma for pragma in FindNodes(ir.Pragma).visit(section) if pragma.keyword.lower() == "loki" and
-                   pragma.content.lower() == "separator"]
+        pragmas = [
+            pragma
+            for pragma in FindNodes(ir.Pragma).visit(section)
+            if pragma.keyword.lower() == "loki"
+            and pragma.content.lower() == "separator"
+        ]
         separator_nodes = pragmas
 
         for call in calls:
@@ -83,7 +103,9 @@ class SCCDevectorTransformation(Transformation):
             # check if calls have been enriched
             if not call.routine is BasicType.DEFERRED:
                 # check if called routine is marked as sequential
-                if SCCBaseTransformation.check_routine_pragmas(routine=call.routine, directive=None):
+                if SCCBaseTransformation.check_routine_pragmas(
+                    routine=call.routine, directive=None
+                ):
                     continue
 
             if call in section:
@@ -93,22 +115,32 @@ class SCCDevectorTransformation(Transformation):
             else:
                 # If the call is deeper in the IR tree, it's highest ancestor is used
                 ancestors = flatten(FindScopes(call).visit(section))
-                ancestor_scopes = [a for a in ancestors if isinstance(a, _scope_node_types)]
-                if len(ancestor_scopes) > 0 and ancestor_scopes[0] not in separator_nodes:
+                ancestor_scopes = [
+                    a for a in ancestors if isinstance(a, _scope_node_types)
+                ]
+                if (
+                    len(ancestor_scopes) > 0
+                    and ancestor_scopes[0] not in separator_nodes
+                ):
                     separator_nodes.append(ancestor_scopes[0])
 
         for pragma in FindNodes(ir.Pragma).visit(section):
             # Reductions over thread-parallel regions should be marked as a separator node
-            if (is_loki_pragma(pragma, starts_with='vector-reduction') or
-                is_loki_pragma(pragma, starts_with='end vector-reduction')):
+            if is_loki_pragma(pragma, starts_with="vector-reduction") or is_loki_pragma(
+                pragma, starts_with="end vector-reduction"
+            ):
                 separator_nodes.append(pragma)
 
         # Extract contiguous node sections between separator nodes
         assert all(n in section for n in separator_nodes)
-        subsections = [as_tuple(s) for s in split_at(section, lambda n: n in separator_nodes)]
+        subsections = [
+            as_tuple(s) for s in split_at(section, lambda n: n in separator_nodes)
+        ]
 
         # Filter sub-sections that do not use the horizontal loop index variable
-        subsections = [s for s in subsections if horizontal.index in list(FindVariables().visit(s))]
+        subsections = [
+            s for s in subsections if horizontal.index in list(FindVariables().visit(s))
+        ]
 
         # Recurse on all separator nodes that might contain further vector sections
         for separator in separator_nodes:
@@ -122,7 +154,9 @@ class SCCDevectorTransformation(Transformation):
                 subsec_body = cls.extract_vector_sections(separator.body, horizontal)
                 if subsec_body:
                     subsections += subsec_body
-                subsec_else = cls.extract_vector_sections(separator.else_body, horizontal)
+                subsec_else = cls.extract_vector_sections(
+                    separator.else_body, horizontal
+                )
                 if subsec_else:
                     subsections += subsec_else
 
@@ -131,7 +165,9 @@ class SCCDevectorTransformation(Transformation):
                     subsec_body = cls.extract_vector_sections(body, horizontal)
                     if subsec_body:
                         subsections += subsec_body
-                subsec_else = cls.extract_vector_sections(separator.else_body, horizontal)
+                subsec_else = cls.extract_vector_sections(
+                    separator.else_body, horizontal
+                )
                 if subsec_else:
                     subsections += subsec_else
 
@@ -147,11 +183,15 @@ class SCCDevectorTransformation(Transformation):
         trimmed_sections = ()
         with dataflow_analysis_attached(routine):
             for sec in sections:
-                vec_nodes = [node for node in sec if horizontal.index.lower() in node.uses_symbols]
+                vec_nodes = [
+                    node
+                    for node in sec
+                    if horizontal.index.lower() in node.uses_symbols
+                ]
                 start = sec.index(vec_nodes[0])
                 end = sec.index(vec_nodes[-1])
 
-                trimmed_sections += (sec[start:end+1],)
+                trimmed_sections += (sec[start : end + 1],)
 
         return trimmed_sections
 
@@ -166,10 +206,10 @@ class SCCDevectorTransformation(Transformation):
         role : string
             Role of the subroutine in the call tree; should be ``"kernel"``
         """
-        role = kwargs['role']
-        targets = kwargs.get('targets', ())
+        role = kwargs["role"]
+        targets = kwargs.get("targets", ())
 
-        if role == 'kernel':
+        if role == "kernel":
             self.process_kernel(routine)
         if role == "driver":
             self.process_driver(routine, targets=targets)
@@ -196,7 +236,9 @@ class SCCDevectorTransformation(Transformation):
             sections = self.get_trimmed_sections(routine, self.horizontal, sections)
 
         # Replace sections with marked Section node
-        section_mapper = {s: ir.Section(body=s, label='vector_section') for s in sections}
+        section_mapper = {
+            s: ir.Section(body=s, label="vector_section") for s in sections
+        }
         routine.body = NestedTransformer(section_mapper).visit(routine.body)
 
     def process_driver(self, routine, targets=()):
@@ -215,7 +257,9 @@ class SCCDevectorTransformation(Transformation):
         """
 
         with pragmas_attached(routine, ir.Loop, attach_pragma_post=True):
-            driver_loops = SCCBaseTransformation.find_driver_loops(routine=routine, targets=targets)
+            driver_loops = SCCBaseTransformation.find_driver_loops(
+                routine=routine, targets=targets
+            )
 
         # remove vector loops
         driver_loop_map = {}
@@ -226,10 +270,16 @@ class SCCDevectorTransformation(Transformation):
                     loop_map[l] = l.body
             new_driver_loop = Transformer(loop_map).visit(loop.body)
             new_driver_loop = loop.clone(body=new_driver_loop)
-            sections = self.extract_vector_sections(new_driver_loop.body, self.horizontal)
+            sections = self.extract_vector_sections(
+                new_driver_loop.body, self.horizontal
+            )
             if self.trim_vector_sections:
-                sections = self.get_trimmed_sections(new_driver_loop, self.horizontal, sections)
-            section_mapper = {s: ir.Section(body=s, label='vector_section') for s in sections}
+                sections = self.get_trimmed_sections(
+                    new_driver_loop, self.horizontal, sections
+                )
+            section_mapper = {
+                s: ir.Section(body=s, label="vector_section") for s in sections
+            }
             new_driver_loop = NestedTransformer(section_mapper).visit(new_driver_loop)
             driver_loop_map[loop] = new_driver_loop
         routine.body = Transformer(driver_loop_map).visit(routine.body)
@@ -272,11 +322,13 @@ class SCCRevectorTransformation(Transformation):
         bounds = sym.LoopRange((v_start, v_end))
 
         # Ensure we clone all body nodes, to avoid recursion issues
-        vector_loop = ir.Loop(variable=index, bounds=bounds, body=Transformer().visit(section))
+        vector_loop = ir.Loop(
+            variable=index, bounds=bounds, body=Transformer().visit(section)
+        )
 
         # Add a comment before and after the pragma-annotated loop to ensure
         # we do not overlap with neighbouring pragmas
-        return (ir.Comment(''), vector_loop, ir.Comment(''))
+        return (ir.Comment(""), vector_loop, ir.Comment(""))
 
     def transform_subroutine(self, routine, **kwargs):
         """
@@ -289,9 +341,11 @@ class SCCRevectorTransformation(Transformation):
         routine : :any:`Subroutine`
             Subroutine to apply this transformation to.
         """
-        mapper = {s.body: self.wrap_vector_section(s.body, routine, self.horizontal)
-                  for s in FindNodes(ir.Section).visit(routine.body)
-                  if s.label == 'vector_section'}
+        mapper = {
+            s.body: self.wrap_vector_section(s.body, routine, self.horizontal)
+            for s in FindNodes(ir.Section).visit(routine.body)
+            if s.label == "vector_section"
+        }
         routine.body = NestedTransformer(mapper).visit(routine.body)
 
 
@@ -329,19 +383,25 @@ class SCCDemoteTransformation(Transformation):
             arrays = [v for v in arrays if v.shape and v.shape[0] == horizontal.size]
 
             # Also demote arrays whose remaning dimensions are known constants
-            arrays = [v for v in arrays if all(is_dimension_constant(d) for d in v.shape[1:])]
+            arrays = [
+                v for v in arrays if all(is_dimension_constant(d) for d in v.shape[1:])
+            ]
             return arrays
 
         # Create a list of all local horizontal temporary arrays
         candidates = _get_local_arrays(routine.body)
 
         # Create an index into all variable uses per vector-level section
-        vars_per_section = {s: set(v.name.lower() for v in _get_local_arrays(s)) for s in sections}
+        vars_per_section = {
+            s: set(v.name.lower() for v in _get_local_arrays(s)) for s in sections
+        }
 
         # Count in how many sections each temporary is used
         counts = {}
         for arr in candidates:
-            counts[arr] = sum(1 if arr.name.lower() in v else 0 for v in vars_per_section.values())
+            counts[arr] = sum(
+                1 if arr.name.lower() in v else 0 for v in vars_per_section.values()
+            )
 
         # Mark temporaries that are only used in one section for demotion
         to_demote = [k for k, v in counts.items() if v == 1]
@@ -365,13 +425,15 @@ class SCCDemoteTransformation(Transformation):
         role : string
             Role of the subroutine in the call tree; should be ``"kernel"``
         """
-        role = kwargs['role']
-        item = kwargs.get('item', None)
+        role = kwargs["role"]
+        item = kwargs.get("item", None)
 
-        if role == 'kernel':
+        if role == "kernel":
             demote_locals = self.demote_local_arrays
             if item:
-                demote_locals = item.config.get('demote_locals', self.demote_local_arrays)
+                demote_locals = item.config.get(
+                    "demote_locals", self.demote_local_arrays
+                )
             self.process_kernel(routine, demote_locals=demote_locals)
 
     def process_kernel(self, routine, demote_locals=True):
@@ -385,7 +447,11 @@ class SCCDemoteTransformation(Transformation):
         """
 
         # Find vector sections marked in the SCCDevectorTransformation
-        sections = [s for s in FindNodes(ir.Section).visit(routine.body) if s.label == 'vector_section']
+        sections = [
+            s
+            for s in FindNodes(ir.Section).visit(routine.body)
+            if s.label == "vector_section"
+        ]
 
         # Extract the local variables to demote after we wrap the sections in vector loops.
         # We do this, because need the section blocks to determine which local arrays
@@ -396,4 +462,6 @@ class SCCDemoteTransformation(Transformation):
         if demote_locals:
             variables = tuple(v.name for v in to_demote)
             if variables:
-                demote_variables(routine, variable_names=variables, dimensions=self.horizontal.size)
+                demote_variables(
+                    routine, variable_names=variables, dimensions=self.horizontal.size
+                )

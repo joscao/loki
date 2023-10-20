@@ -15,26 +15,59 @@ import numpy as np
 import pymbolic.primitives as pmbl
 
 from conftest import (
-    available_frontends, jit_compile, clean_test, stdchannel_redirected, stdchannel_is_captured
+    available_frontends,
+    jit_compile,
+    clean_test,
+    stdchannel_redirected,
+    stdchannel_is_captured,
 )
 from loki import (
-    OFP, OMNI, FP, Sourcefile, fgen, Cast, RangeIndex, Assignment, Intrinsic, Variable,
-    Nullify, IntLiteral, FloatLiteral, IntrinsicLiteral, InlineCall, Subroutine,
-    FindVariables, FindNodes, SubstituteExpressions, Scope, BasicType, SymbolAttributes,
-    parse_fparser_expression, Sum, DerivedType, ProcedureType, ProcedureSymbol,
-    DeferredTypeSymbol, Module, HAVE_FP, FindExpressions, LiteralList, FindInlineCalls,
-    AttachScopesMapper, FindTypedSymbols
+    OFP,
+    OMNI,
+    FP,
+    Sourcefile,
+    fgen,
+    Cast,
+    RangeIndex,
+    Assignment,
+    Intrinsic,
+    Variable,
+    Nullify,
+    IntLiteral,
+    FloatLiteral,
+    IntrinsicLiteral,
+    InlineCall,
+    Subroutine,
+    FindVariables,
+    FindNodes,
+    SubstituteExpressions,
+    Scope,
+    BasicType,
+    SymbolAttributes,
+    parse_fparser_expression,
+    Sum,
+    DerivedType,
+    ProcedureType,
+    ProcedureSymbol,
+    DeferredTypeSymbol,
+    Module,
+    HAVE_FP,
+    FindExpressions,
+    LiteralList,
+    FindInlineCalls,
+    AttachScopesMapper,
+    FindTypedSymbols,
 )
 from loki.expression import symbols
 from loki.tools import gettempdir, filehash
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_arithmetic(here, frontend):
     """
     Test simple floating point arithmetic expressions (+,-,*,/,**).
@@ -49,16 +82,16 @@ subroutine arithmetic_expr(v1, v2, v3, v4, v5, v6)
   v6 = (v1 ** v2) - (v3 / v4)
 end subroutine arithmetic_expr
 """
-    filepath = here/(f'expression_arithmetic_{frontend}.f90')
+    filepath = here / (f"expression_arithmetic_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='arithmetic_expr')
+    function = jit_compile(routine, filepath=filepath, objname="arithmetic_expr")
 
-    v5, v6 = function(2., 3., 10., 5.)
-    assert v5 == 25. and v6 == 6.
+    v5, v6 = function(2.0, 3.0, 10.0, 5.0)
+    assert v5 == 25.0 and v6 == 6.0
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_math_intrinsics(here, frontend):
     """
     Test supported math intrinsic functions (min, max, exp, abs, sqrt, log)
@@ -77,17 +110,17 @@ subroutine math_intrinsics(v1, v2, vmin, vmax, vabs, vexp, vsqrt, vlog)
   vlog = log(v1 + v2)
 end subroutine math_intrinsics
 """
-    filepath = here/(f'expression_math_intrinsics_{frontend}.f90')
+    filepath = here / (f"expression_math_intrinsics_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='math_intrinsics')
+    function = jit_compile(routine, filepath=filepath, objname="math_intrinsics")
 
-    vmin, vmax, vabs, vexp, vsqrt, vlog = function(2., 4.)
-    assert vmin == 2. and vmax == 4. and vabs == 2.
-    assert vexp == np.exp(6.) and vsqrt == np.sqrt(6.) and vlog == np.log(6.)
+    vmin, vmax, vabs, vexp, vsqrt, vlog = function(2.0, 4.0)
+    assert vmin == 2.0 and vmax == 4.0 and vabs == 2.0
+    assert vexp == np.exp(6.0) and vsqrt == np.sqrt(6.0) and vlog == np.log(6.0)
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_logicals(here, frontend):
     """
     Test logical expressions (and, or, not, tru, false, equal, not nequal).
@@ -109,17 +142,19 @@ subroutine logicals(t, f, vand_t, vand_f, vor_t, vor_f, vnot_t, vnot_f, vtrue, v
   vneq = 3 /= 4
 end subroutine logicals
 """
-    filepath = here/(f'expression_logicals_{frontend}.f90')
+    filepath = here / (f"expression_logicals_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='logicals')
+    function = jit_compile(routine, filepath=filepath, objname="logicals")
 
-    vand_t, vand_f, vor_t, vor_f, vnot_t, vnot_f, vtrue, vfalse, veq, vneq = function(True, False)
+    vand_t, vand_f, vor_t, vor_f, vnot_t, vnot_f, vtrue, vfalse, veq, vneq = function(
+        True, False
+    )
     assert vand_t and vor_t and vnot_t and vtrue and vneq
-    assert not(vand_f and vor_f and vnot_f and vfalse and veq)
+    assert not (vand_f and vor_f and vnot_f and vfalse and veq)
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_literals(here, frontend):
     """
     Test simple literal values.
@@ -139,13 +174,13 @@ subroutine literals(v1, v2, v3, v4, v5, v6)
   v6 = int(3.5)
 end subroutine literals
 """
-    filepath = here/(f'expression_literals_{frontend}.f90')
+    filepath = here / (f"expression_literals_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='literals')
+    function = jit_compile(routine, filepath=filepath, objname="literals")
 
     v1, v2, v3, v4, v5, v6 = function()
-    assert v1 == 66. and v2 == 66. and v4 == 2.4 and v5 == 7.0 and v6 == 3.0
-    assert math.isclose(v3, 2.3, abs_tol=1.e-6)
+    assert v1 == 66.0 and v2 == 66.0 and v4 == 2.4 and v5 == 7.0 and v6 == 3.0
+    assert math.isclose(v3, 2.3, abs_tol=1.0e-6)
     clean_test(filepath)
 
     # In addition to value testing, let's make sure
@@ -155,17 +190,17 @@ end subroutine literals
     assert isinstance(stmts[1].rhs, FloatLiteral)
     assert isinstance(stmts[2].rhs, FloatLiteral)
     assert isinstance(stmts[3].rhs, FloatLiteral)
-    assert stmts[3].rhs.kind in ['jprb']
+    assert stmts[3].rhs.kind in ["jprb"]
     assert isinstance(stmts[4].rhs, Sum)
     for expr in stmts[4].rhs.children:
         assert isinstance(expr, Cast)
-        assert str(expr.kind).lower() in ['selected_real_kind(13, 300)', 'jprb']
+        assert str(expr.kind).lower() in ["selected_real_kind(13, 300)", "jprb"]
     assert isinstance(stmts[5].rhs, Cast)
-    assert str(stmts[5].rhs.kind).lower() in ['selected_real_kind(13, 300)', 'jprb']
+    assert str(stmts[5].rhs.kind).lower() in ["selected_real_kind(13, 300)", "jprb"]
     assert isinstance(stmts[6].rhs, Cast)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_boz_literals(here, frontend):
     """
     Test boz literal values.
@@ -182,13 +217,15 @@ subroutine boz_literals(n1, n2, n3, n4, n5, n6)
   n6 = int(z"babe")
 end subroutine boz_literals
 """
-    filepath = here/(f'expression_boz_literals_{frontend}.f90')
+    filepath = here / (f"expression_boz_literals_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='boz_literals')
+    function = jit_compile(routine, filepath=filepath, objname="boz_literals")
 
     n1, n2, n3, n4, n5, n6 = function()
     clean_test(filepath)
-    assert n1 == 0 and n2 == 42 and n3 == 479 and n4 == 7 and n5 == 51966 and n6 == 47806
+    assert (
+        n1 == 0 and n2 == 42 and n3 == 479 and n4 == 7 and n5 == 51966 and n6 == 47806
+    )
 
     # In addition to value testing, let's make sure that we created the correct expression types
     if frontend is not OMNI:
@@ -207,8 +244,11 @@ end subroutine boz_literals
         assert stmts[5].rhs.parameters[0].value == 'z"babe"'
 
 
-@pytest.mark.parametrize('frontend', available_frontends(
-    skip={OFP: "Not implemented because too stupid in OFP parse tree"})
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(
+        skip={OFP: "Not implemented because too stupid in OFP parse tree"}
+    ),
 )
 def test_complex_literals(here, frontend):
     """
@@ -223,29 +263,37 @@ subroutine complex_literals(c1, c2, c3)
   c3 = (21_2, 4._8)
 end subroutine complex_literals
 """
-    filepath = here/(f'expression_complex_literals_{frontend}.f90')
+    filepath = here / (f"expression_complex_literals_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='complex_literals')
+    function = jit_compile(routine, filepath=filepath, objname="complex_literals")
 
     c1, c2, c3 = function()
     clean_test(filepath)
-    assert c1 == (1-1j) and c2 == (3+2e8j) and c3 == (21+4j)
+    assert c1 == (1 - 1j) and c2 == (3 + 2e8j) and c3 == (21 + 4j)
 
     # In addition to value testing, let's make sure that we created the correct expression types
     stmts = FindNodes(Assignment).visit(routine.body)
-    assert isinstance(stmts[0].rhs, IntrinsicLiteral) and stmts[0].rhs.value == '(1.0, -1.0)'
+    assert (
+        isinstance(stmts[0].rhs, IntrinsicLiteral)
+        and stmts[0].rhs.value == "(1.0, -1.0)"
+    )
     # Note: Here, for inconsistency, FP converts the exponential letter 'e' to lower case...
-    assert isinstance(stmts[1].rhs, IntrinsicLiteral) and stmts[1].rhs.value.lower() == '(3, 2e8)'
+    assert (
+        isinstance(stmts[1].rhs, IntrinsicLiteral)
+        and stmts[1].rhs.value.lower() == "(3, 2e8)"
+    )
     assert isinstance(stmts[2].rhs, IntrinsicLiteral)
     try:
-        assert stmts[2].rhs.value == '(21_2, 4._8)'
+        assert stmts[2].rhs.value == "(21_2, 4._8)"
     except AssertionError as excinfo:
         if frontend == OMNI:
-            pytest.xfail('OMNI wrongfully assigns the same kind to real and imaginary part')
+            pytest.xfail(
+                "OMNI wrongfully assigns the same kind to real and imaginary part"
+            )
         raise excinfo
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_casts(here, frontend):
     """
     Test data type casting expressions.
@@ -261,16 +309,16 @@ subroutine casts(v1, v2, v3, v4, v5)
   v5 = real(v1, kind=jprb) * max(v2, v3)  ! Cast as part of expression
 end subroutine casts
 """
-    filepath = here/(f'expression_casts_{frontend}.f90')
+    filepath = here / (f"expression_casts_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='casts')
+    function = jit_compile(routine, filepath=filepath, objname="casts")
 
-    v4, v5 = function(2, 1., 4.)
-    assert v4 == 2. and v5 == 8.
+    v4, v5 = function(2, 1.0, 4.0)
+    assert v4 == 2.0 and v5 == 8.0
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_logical_array(here, frontend):
     """
     Test logical arrays for masking.
@@ -299,19 +347,19 @@ subroutine logical_array(dim, arr, out)
   end do
 end subroutine logical_array
 """
-    filepath = here/(f'expression_logical_array_{frontend}.f90')
+    filepath = here / (f"expression_logical_array_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='logical_array')
+    function = jit_compile(routine, filepath=filepath, objname="logical_array")
 
     out = np.zeros(6)
-    function(6, [0., 2., -1., 3., 0., 2.], out)
-    assert (out == [1., 1., 1., 3., 1., 3.]).all()
+    function(6, [0.0, 2.0, -1.0, 3.0, 0.0, 2.0], out)
+    assert (out == [1.0, 1.0, 1.0, 3.0, 1.0, 3.0]).all()
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(
-    xfail=[(OFP, 'Not implemented')]
-))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OFP, "Not implemented")])
+)
 def test_array_constructor(here, frontend):
     """
     Test various array constructor formats
@@ -339,45 +387,49 @@ subroutine array_constructor(dim, zarr1, zarr2, narr1, narr2, narr3, narr4, narr
 end subroutine array_constructor
     """.strip()
 
-    filepath = here/f'array_constructor_{frontend}.f90'
+    filepath = here / f"array_constructor_{frontend}.f90"
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='array_constructor')
+    function = jit_compile(routine, filepath=filepath, objname="array_constructor")
 
-    literal_lists = [e for e in FindExpressions().visit(routine.body) if isinstance(e, LiteralList)]
+    literal_lists = [
+        e for e in FindExpressions().visit(routine.body) if isinstance(e, LiteralList)
+    ]
     assert len(literal_lists) == 8
     assert {str(l).lower() for l in literal_lists} == {
-        '[ 3.6, ( 3.6 / i, i = 1:dim ) ]',
-        '[ ( i, i = 1:dim ) ]',
-        '[ 1, 0, ( i, i = -1:-6:-1 ), -7, -8 ]',
-        '[ <symbolattributes basictype.integer> :: 1, 2., 3d0 ]',
-        '[ <symbolattributes basictype.real, kind=8> :: 1, 2, 3._8 ]',
-        '[ 1, 2, 3, 4 ]',
-        '[ 2, 2 ]',
-        '[ ( i, i = 30:48:2 ) ]'
+        "[ 3.6, ( 3.6 / i, i = 1:dim ) ]",
+        "[ ( i, i = 1:dim ) ]",
+        "[ 1, 0, ( i, i = -1:-6:-1 ), -7, -8 ]",
+        "[ <symbolattributes basictype.integer> :: 1, 2., 3d0 ]",
+        "[ <symbolattributes basictype.real, kind=8> :: 1, 2, 3._8 ]",
+        "[ 1, 2, 3, 4 ]",
+        "[ 2, 2 ]",
+        "[ ( i, i = 30:48:2 ) ]",
     }
 
     dim = 13
-    zarr1 = np.zeros(dim+1, dtype=np.float64)
+    zarr1 = np.zeros(dim + 1, dtype=np.float64)
     zarr2 = np.zeros(3, dtype=np.float64)
     narr1 = np.zeros(dim, dtype=np.int32)
     narr2 = np.zeros(10, dtype=np.int32)
     narr3 = np.zeros(3, dtype=np.int32)
-    narr4 = np.zeros((2, 2), dtype=np.int32, order='F')
+    narr4 = np.zeros((2, 2), dtype=np.int32, order="F")
     narr5 = np.zeros(10, dtype=np.int32)
     function(dim, zarr1, zarr2, narr1, narr2, narr3, narr4, narr5)
 
-    assert np.isclose(zarr1, ([3.6] + [3.6/(i+1) for i in range(dim)])).all()
-    assert np.isclose(zarr2, [1., 2., 3.]).all()
-    assert (narr1 == range(1, dim+1)).all()
+    assert np.isclose(zarr1, ([3.6] + [3.6 / (i + 1) for i in range(dim)])).all()
+    assert np.isclose(zarr2, [1.0, 2.0, 3.0]).all()
+    assert (narr1 == range(1, dim + 1)).all()
     assert (narr2 == range(1, -9, -1)).all()
     assert (narr3 == [1, 2, 3]).all()
-    assert (narr4 == np.array([[1, 3], [2, 4]], order='F')).all()
+    assert (narr4 == np.array([[1, 3], [2, 4]], order="F")).all()
     assert (narr5 == range(30, 49, 2)).all()
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'Precedence not honoured')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "Precedence not honoured")])
+)
 def test_parenthesis(frontend):
     """
     Test explicit parenthesis in provided source code.
@@ -412,21 +464,29 @@ end subroutine parenthesis
 
     # Check that the reduntant bracket around the minus
     # and the first exponential are still there.
-    assert fgen(stmts[0]) == 'v3 = (v1(i - 1)**1.23_jprb)*1.3_jprb + (1_jprb - v2**1.26_jprb)'
+    assert (
+        fgen(stmts[0])
+        == "v3 = (v1(i - 1)**1.23_jprb)*1.3_jprb + (1_jprb - v2**1.26_jprb)"
+    )
 
     # Now perform a simple substitutions on the expression
     # and make sure we are still parenthesising as we should!
-    v2 = [v for v in FindVariables().visit(stmts[0]) if v.name == 'v2'][0]
-    v4 = v2.clone(name='v4')
+    v2 = [v for v in FindVariables().visit(stmts[0]) if v.name == "v2"][0]
+    v4 = v2.clone(name="v4")
     stmt2 = SubstituteExpressions({v2: v4}).visit(stmts[0])
-    assert fgen(stmt2) == 'v3 = (v1(i - 1)**1.23_jprb)*1.3_jprb + (1_jprb - v4**1.26_jprb)'
+    assert (
+        fgen(stmt2) == "v3 = (v1(i - 1)**1.23_jprb)*1.3_jprb + (1_jprb - v4**1.26_jprb)"
+    )
 
     # Make sure there are no additional brackets in the exponentials or numerators/denominators
-    assert '\n'.join(l.lstrip() for l in fcode.splitlines()[-5:-3]) == fgen(stmts[1]).lower()
+    assert (
+        "\n".join(l.lstrip() for l in fcode.splitlines()[-5:-3])
+        == fgen(stmts[1]).lower()
+    )
     assert fgen(stmts[2]) == fcode.splitlines()[-2].lstrip()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_commutativity(frontend):
     """
     Verifies the strict adherence to ordering of commutative terms,
@@ -444,11 +504,13 @@ end subroutine commutativity
     routine = Subroutine.from_source(fcode, frontend=frontend)
     stmt = FindNodes(Assignment).visit(routine.body)[0]
 
-    assert fgen(stmt) in ('v3(:) = 1.0_jprb + v2*v1(:) - v2 - v3(:)',
-                          'v3(:) = 1._jprb + v2*v1(:) - v2 - v3(:)')
+    assert fgen(stmt) in (
+        "v3(:) = 1.0_jprb + v2*v1(:) - v2 - v3(:)",
+        "v3(:) = 1._jprb + v2*v1(:) - v2 - v3(:)",
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_index_ranges(frontend):
     """
     Test index range expressions for array accesses.
@@ -466,22 +528,22 @@ end subroutine index_ranges
     routine = Subroutine.from_source(fcode, frontend=frontend)
     vmap = routine.variable_map
 
-    assert str(vmap['v1']) == 'v1(:)'
-    assert str(vmap['v2']) == 'v2(0:)'
-    assert str(vmap['v3']) == 'v3(0:4)'
+    assert str(vmap["v1"]) == "v1(:)"
+    assert str(vmap["v2"]) == "v2(0:)"
+    assert str(vmap["v3"]) == "v3(0:4)"
     # OMNI will insert implicit lower=1 into shape declarations,
     # we simply have to live with it... :(
-    assert str(vmap['v4']) == 'v4(dim)' or str(vmap['v4']) == 'v4(1:dim)'
-    assert str(vmap['v5']) == 'v5(1:dim)'
+    assert str(vmap["v4"]) == "v4(dim)" or str(vmap["v4"]) == "v4(1:dim)"
+    assert str(vmap["v5"]) == "v5(1:dim)"
 
     vmap_body = {v.name: v for v in FindVariables().visit(routine.body)}
-    assert str(vmap_body['v1']) == 'v1(::2)'
-    assert str(vmap_body['v2']) == 'v2(1:dim)'
-    assert str(vmap_body['v3']) == 'v3(0:4:2)'
-    assert str(vmap_body['v5']) == 'v5(:)'
+    assert str(vmap_body["v1"]) == "v1(::2)"
+    assert str(vmap_body["v2"]) == "v2(1:dim)"
+    assert str(vmap_body["v3"]) == "v3(0:4:2)"
+    assert str(vmap_body["v5"]) == "v5(:)"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_strings(here, frontend, capsys):
     """
     Test recognition of literal strings.
@@ -497,24 +559,24 @@ subroutine strings()
   print *, "42!"
 end subroutine strings
 """
-    filepath = here/(f'expression_strings_{frontend}.f90')
+    filepath = here / (f"expression_strings_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
-    function = jit_compile(routine, filepath=filepath, objname='strings')
-    output_file = gettempdir()/filehash(str(filepath), prefix='', suffix='.log')
+    function = jit_compile(routine, filepath=filepath, objname="strings")
+    output_file = gettempdir() / filehash(str(filepath), prefix="", suffix=".log")
     with capsys.disabled():
         with stdchannel_redirected(sys.stdout, output_file):
             function()
 
     clean_test(filepath)
 
-    with open(output_file, 'r') as f:
+    with open(output_file, "r") as f:
         output_str = f.read()
 
-    assert output_str == ' Hello world!\n 42!\n'
+    assert output_str == " Hello world!\n 42!\n"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_very_long_statement(here, frontend):
     """
     Test a long statement with line breaks.
@@ -529,9 +591,9 @@ subroutine very_long_statement(scalar, res)
         - 9) + 10 - 8 + 7 - 6 + 5 - 4 + 3 - 2 + 1
 end subroutine very_long_statement
 """
-    filepath = here/(f'expression_very_long_statement_{frontend}.f90')
+    filepath = here / (f"expression_very_long_statement_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='very_long_statement')
+    function = jit_compile(routine, filepath=filepath, objname="very_long_statement")
 
     scalar = 1
     result = function(scalar)
@@ -539,7 +601,7 @@ end subroutine very_long_statement
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_output_intrinsics(frontend):
     """
     Some collected intrinsics or other edge cases that failed in cloudsc.
@@ -560,23 +622,25 @@ end subroutine output_intrinsics
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
-    ref = ['format(1x, 2i10, 1x, i4, \' : \', i10)',
-           'write(0, 1002) numomp, ngptot, - 1, int(tdiff * 1000.0_jprb)']
+    ref = [
+        "format(1x, 2i10, 1x, i4, ' : ', i10)",
+        "write(0, 1002) numomp, ngptot, - 1, int(tdiff * 1000.0_jprb)",
+    ]
 
     if frontend == OMNI:
         ref[0] = ref[0].replace("'", '"')
-        ref[1] = ref[1].replace('0, 1002', 'unit=0, fmt=1002')
-        ref[1] = ref[1].replace(' * ', '*')
-        ref[1] = ref[1].replace('- 1', '-1')
+        ref[1] = ref[1].replace("0, 1002", "unit=0, fmt=1002")
+        ref[1] = ref[1].replace(" * ", "*")
+        ref[1] = ref[1].replace("- 1", "-1")
 
     intrinsics = FindNodes(Intrinsic).visit(routine.body)
     assert len(intrinsics) == 2
     assert intrinsics[0].text.lower() == ref[0]
     assert intrinsics[1].text.lower() == ref[1]
-    assert fgen(intrinsics).lower() == '{} {}\n{}'.format('1002', *ref)
+    assert fgen(intrinsics).lower() == "{} {}\n{}".format("1002", *ref)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_nested_call_inline_call(here, frontend):
     """
     The purpose of this test is to highlight the differences between calls in expression
@@ -615,17 +679,19 @@ subroutine nested_call_inline_call(v1, v2, v3)
   call very_long_statement(int(v2), v3)
 end subroutine nested_call_inline_call
 """
-    filepath = here/(f'expression_nested_call_inline_call_{frontend}.f90')
+    filepath = here / (f"expression_nested_call_inline_call_{frontend}.f90")
     routine = Sourcefile.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='nested_call_inline_call')
+    function = jit_compile(
+        routine, filepath=filepath, objname="nested_call_inline_call"
+    )
 
     v2, v3 = function(1)
-    assert v2 == 8.
+    assert v2 == 8.0
     assert v3 == 40
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_no_arg_inline_call(frontend):
     """
     Make sure that no-argument function calls are recognized as such,
@@ -653,20 +719,26 @@ end subroutine my_routine
 
     if frontend != OMNI:
         routine = Subroutine.from_source(fcode_routine, frontend=frontend)
-        assert routine.symbol_attrs['my_func'].dtype is BasicType.DEFERRED
+        assert routine.symbol_attrs["my_func"].dtype is BasicType.DEFERRED
         assignment = FindNodes(Assignment).visit(routine.body)[0]
-        assert assignment.lhs == 'var'
-        assert isinstance(assignment.rhs, InlineCall) and isinstance(assignment.rhs.function, DeferredTypeSymbol)
+        assert assignment.lhs == "var"
+        assert isinstance(assignment.rhs, InlineCall) and isinstance(
+            assignment.rhs.function, DeferredTypeSymbol
+        )
 
     module = Module.from_source(fcode_mod, frontend=frontend)
-    routine = Subroutine.from_source(fcode_routine, frontend=frontend, definitions=module)
-    assert isinstance(routine.symbol_attrs['my_func'].dtype, ProcedureType)
+    routine = Subroutine.from_source(
+        fcode_routine, frontend=frontend, definitions=module
+    )
+    assert isinstance(routine.symbol_attrs["my_func"].dtype, ProcedureType)
     assignment = FindNodes(Assignment).visit(routine.body)[0]
-    assert assignment.lhs == 'var'
-    assert isinstance(assignment.rhs, InlineCall) and isinstance(assignment.rhs.function, ProcedureSymbol)
+    assert assignment.lhs == "var"
+    assert isinstance(assignment.rhs, InlineCall) and isinstance(
+        assignment.rhs.function, ProcedureSymbol
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_inline_call_derived_type_arguments(frontend):
     """
     Check that derived type arguments are correctly represented in
@@ -712,15 +784,18 @@ contains
 end module inline_call_mod
     """.strip()
     module = Module.from_source(fcode, frontend=frontend)
-    some_func = module['some_func']
+    some_func = module["some_func"]
     inline_calls = FindInlineCalls().visit(some_func.body)
     assert len(inline_calls) == 4
     assert {fgen(c) for c in inline_calls} == {
-        'check(this%val, thr=10)', 'check(this%arr(1))', 'check(val=this%arr(2))', 'check(this%arr(3))'
+        "check(this%val, thr=10)",
+        "check(this%arr(1))",
+        "check(val=this%arr(2))",
+        "check(this%arr(3))",
     }
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_character_concat(here, frontend):
     """
     Concatenation operator ``//``
@@ -736,16 +811,16 @@ subroutine character_concat(string)
   string = trim(string) // "!"
 end subroutine character_concat
 """
-    filepath = here/(f'expression_character_concat_{frontend}.f90')
+    filepath = here / (f"expression_character_concat_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='character_concat')
+    function = jit_compile(routine, filepath=filepath, objname="character_concat")
 
     result = function()
-    assert result == b'Hello world!'
+    assert result == b"Hello world!"
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_masked_statements(here, frontend):
     """
     Masked statements (WHERE(...) ... [ELSEWHERE ...] ENDWHERE)
@@ -773,15 +848,17 @@ subroutine expression_masked_statements(length, vec1, vec2, vec3)
 end subroutine expression_masked_statements
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
 
     # Reference solution
     length = 11
-    ref1 = np.append(np.arange(0, 6, dtype=np.float64),
-                     5 * np.ones(length - 6, dtype=np.float64))
-    ref2 = np.append(np.append(-1 *np.ones(5, dtype=np.float64), 0.0),
-                     np.ones(5, dtype=np.float64))
+    ref1 = np.append(
+        np.arange(0, 6, dtype=np.float64), 5 * np.ones(length - 6, dtype=np.float64)
+    )
+    ref2 = np.append(
+        np.append(-1 * np.ones(5, dtype=np.float64), 0.0), np.ones(5, dtype=np.float64)
+    )
     ref3 = np.append(np.arange(-2, 1, dtype=np.float64), np.ones(2, dtype=np.float64))
     ref3 = np.append(ref3, np.arange(3, length - 2, dtype=np.float64))
 
@@ -795,9 +872,12 @@ end subroutine expression_masked_statements
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[
-    (OFP, 'Current implementation does not handle nested where constructs')
-]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(
+        xfail=[(OFP, "Current implementation does not handle nested where constructs")]
+    ),
+)
 def test_masked_statements_nested(here, frontend):
     """
     Nested masked statements (WHERE(...) ... [ELSEWHERE ...] ENDWHERE)
@@ -824,7 +904,7 @@ subroutine expression_nested_masked_statements(length, vec1)
 end subroutine expression_nested_masked_statements
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
 
     # Reference solution
@@ -840,9 +920,10 @@ end subroutine expression_nested_masked_statements
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[
-    (OMNI, 'Not implemented'), (FP, 'Not implemented')
-]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OMNI, "Not implemented"), (FP, "Not implemented")]),
+)
 def test_data_declaration(here, frontend):
     """
     Variable initialization with DATA statements
@@ -865,19 +946,19 @@ subroutine data_declaration(data_out)
   data_out(1:3,1) = data3
 end subroutine data_declaration
 """
-    filepath = here/(f'expression_data_declaration_{frontend}.f90')
+    filepath = here / (f"expression_data_declaration_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='data_declaration')
+    function = jit_compile(routine, filepath=filepath, objname="data_declaration")
 
-    expected = np.ones(shape=(5, 4), dtype=np.int32, order='F') * 8
+    expected = np.ones(shape=(5, 4), dtype=np.int32, order="F") * 8
     expected[[0, 1, 2], 0] = [1, 3, 2]
-    result = np.zeros(shape=(5, 4), dtype=np.int32, order='F')
+    result = np.zeros(shape=(5, 4), dtype=np.int32, order="F")
     function(result)
     assert np.all(result == expected)
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pointer_nullify(here, frontend):
     """
     POINTERS and their nullification via '=> NULL()'
@@ -896,24 +977,28 @@ subroutine pointer_nullify()
   charp => NULL()
 end subroutine pointer_nullify
 """
-    filepath = here/(f'expression_pointer_nullify_{frontend}.f90')
+    filepath = here / (f"expression_pointer_nullify_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
 
     assert np.all(v.type.pointer for v in routine.variables)
-    assert np.all(isinstance(v.initial, InlineCall) and v.type.initial.name.lower() == 'null'
-                  for v in routine.variables)
+    assert np.all(
+        isinstance(v.initial, InlineCall) and v.type.initial.name.lower() == "null"
+        for v in routine.variables
+    )
     nullify_stmts = FindNodes(Nullify).visit(routine.body)
     assert len(nullify_stmts) == 1
-    assert nullify_stmts[0].variables[0].name == 'pp'
-    assert [stmt.ptr for stmt in FindNodes(Assignment).visit(routine.body)].count(True) == 2
+    assert nullify_stmts[0].variables[0].name == "pp"
+    assert [stmt.ptr for stmt in FindNodes(Assignment).visit(routine.body)].count(
+        True
+    ) == 2
 
     # Execute the generated identity (to verify it is valid Fortran)
-    function = jit_compile(routine, filepath=filepath, objname='pointer_nullify')
+    function = jit_compile(routine, filepath=filepath, objname="pointer_nullify")
     function()
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_parameter_stmt(here, frontend):
     """
     PARAMETER(...) statement
@@ -929,9 +1014,9 @@ subroutine parameter_stmt(out1)
   out1 = param
 end subroutine parameter_stmt
 """
-    filepath = here/(f'expression_parameter_stmt_{frontend}.f90')
+    filepath = here / (f"expression_parameter_stmt_{frontend}.f90")
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    function = jit_compile(routine, filepath=filepath, objname='parameter_stmt')
+    function = jit_compile(routine, filepath=filepath, objname="parameter_stmt")
 
     out1 = function()
     assert out1 == 2.0
@@ -950,58 +1035,82 @@ def test_string_compare():
     type_int = SymbolAttributes(dtype=BasicType.INTEGER)
     type_real = SymbolAttributes(dtype=BasicType.REAL)
 
-    i = Variable(name='i', scope=scope, type=type_int)
-    j = Variable(name='j', scope=scope, type=type_int)
+    i = Variable(name="i", scope=scope, type=type_int)
+    j = Variable(name="j", scope=scope, type=type_int)
 
     # Test a scalar variable
-    u = Variable(name='u', scope=scope, type=SymbolAttributes(dtype=BasicType.REAL))
-    assert all(u == exp for exp in ['u', 'U', 'u ', 'U '])
-    assert not all(u == exp for exp in ['u()', '_u', 'U()', '_U'])
+    u = Variable(name="u", scope=scope, type=SymbolAttributes(dtype=BasicType.REAL))
+    assert all(u == exp for exp in ["u", "U", "u ", "U "])
+    assert not all(u == exp for exp in ["u()", "_u", "U()", "_U"])
 
     # Test an array variable
-    v = Variable(name='v', dimensions=(i, j), scope=scope, type=type_real)
-    assert all(v == exp for exp in ['v(i,j)', 'v(i, j)', 'v (i , j)', 'V(i,j)', 'V(I, J)'])
-    assert not all(v == exp for exp in ['v(i,j())', 'v(i,_j)', '_V(i,j)'])
+    v = Variable(name="v", dimensions=(i, j), scope=scope, type=type_real)
+    assert all(
+        v == exp for exp in ["v(i,j)", "v(i, j)", "v (i , j)", "V(i,j)", "V(I, J)"]
+    )
+    assert not all(v == exp for exp in ["v(i,j())", "v(i,_j)", "_V(i,j)"])
 
     # Test a standard array dimension range
     r = RangeIndex(children=(i, j))
-    w = Variable(name='w', dimensions=(r,), scope=scope, type=type_real)
-    assert all(w == exp for exp in ['w(i:j)', 'w (i : j)', 'W(i:J)', ' w( I:j)'])
+    w = Variable(name="w", dimensions=(r,), scope=scope, type=type_real)
+    assert all(w == exp for exp in ["w(i:j)", "w (i : j)", "W(i:J)", " w( I:j)"])
 
     # Test simple arithmetic expressions
-    assert all(symbols.Sum((i, u)) == exp for exp in ['i+u', 'i + u', 'i +  U', ' I + u'])
-    assert all(symbols.Product((i, u)) == exp for exp in ['i*u', 'i * u', 'i *  U', ' I * u'])
-    assert all(symbols.Quotient(i, u) == exp for exp in ['i/u', 'i / u', 'i /  U', ' I / u'])
-    assert all(symbols.Power(i, u) == exp for exp in ['i**u', 'i ** u', 'i **  U', ' I ** u'])
-    assert all(symbols.Comparison(i, '==', u) == exp for exp in ['i==u', 'i == u', 'i ==  U', ' I == u'])
-    assert all(symbols.LogicalAnd((i, u)) == exp for exp in ['i AND u', 'i and u', 'i and  U', ' I and u'])
-    assert all(symbols.LogicalOr((i, u)) == exp for exp in ['i OR u', 'i or u', 'i or  U', ' I oR u'])
-    assert all(symbols.LogicalNot(u) == exp for exp in ['not u', ' nOt u', 'not  U', ' noT u'])
+    assert all(
+        symbols.Sum((i, u)) == exp for exp in ["i+u", "i + u", "i +  U", " I + u"]
+    )
+    assert all(
+        symbols.Product((i, u)) == exp for exp in ["i*u", "i * u", "i *  U", " I * u"]
+    )
+    assert all(
+        symbols.Quotient(i, u) == exp for exp in ["i/u", "i / u", "i /  U", " I / u"]
+    )
+    assert all(
+        symbols.Power(i, u) == exp for exp in ["i**u", "i ** u", "i **  U", " I ** u"]
+    )
+    assert all(
+        symbols.Comparison(i, "==", u) == exp
+        for exp in ["i==u", "i == u", "i ==  U", " I == u"]
+    )
+    assert all(
+        symbols.LogicalAnd((i, u)) == exp
+        for exp in ["i AND u", "i and u", "i and  U", " I and u"]
+    )
+    assert all(
+        symbols.LogicalOr((i, u)) == exp
+        for exp in ["i OR u", "i or u", "i or  U", " I oR u"]
+    )
+    assert all(
+        symbols.LogicalNot(u) == exp for exp in ["not u", " nOt u", "not  U", " noT u"]
+    )
 
     # Test literal behaviour
     assert symbols.Literal(41) == 41
-    assert symbols.Literal(41) == '41'
-    assert symbols.Literal(41) != symbols.Literal(41, kind='jpim')
+    assert symbols.Literal(41) == "41"
+    assert symbols.Literal(41) != symbols.Literal(41, kind="jpim")
     assert symbols.Literal(66.6) == 66.6
-    assert symbols.Literal(66.6) == '66.6'
-    assert symbols.Literal(66.6) != symbols.Literal(66.6, kind='jprb')
-    assert symbols.Literal('u') == 'u'
-    assert symbols.Literal('u') != 'U'
-    assert symbols.Literal('u') != u  # The `Variable(name='u', ...) from above
-    assert symbols.Literal('.TrUe.') == 'true'
+    assert symbols.Literal(66.6) == "66.6"
+    assert symbols.Literal(66.6) != symbols.Literal(66.6, kind="jprb")
+    assert symbols.Literal("u") == "u"
+    assert symbols.Literal("u") != "U"
+    assert symbols.Literal("u") != u  # The `Variable(name='u', ...) from above
+    assert symbols.Literal(".TrUe.") == "true"
     # Specific test for constructor checks
-    assert symbols.LogicLiteral(value=True) == 'true'
+    assert symbols.LogicLiteral(value=True) == "true"
 
 
-@pytest.mark.skipif(not HAVE_FP, reason='Fparser not available')
-@pytest.mark.parametrize('expr, string, ref', [
-    ('a + 1', 'a', True),
-    ('u(a)', 'a', True),
-    ('u(a + 1)', 'a', True),
-    ('u(a + 1) + 2', 'u(a + 1)', True),
-    ('ansatz(a + 1)', 'a', True),
-    ('ansatz(b + 1)', 'a', False),  # Ensure no false positives
-])
+@pytest.mark.skipif(not HAVE_FP, reason="Fparser not available")
+@pytest.mark.parametrize(
+    "expr, string, ref",
+    [
+        ("a + 1", "a", True),
+        ("u(a)", "a", True),
+        ("u(a + 1)", "a", True),
+        ("u(a + 1) + 2", "u(a + 1)", True),
+        ("ansatz(a + 1)", "a", True),
+        ("ansatz(b + 1)", "a", False),  # Ensure no false positives
+    ],
+)
 def test_subexpression_match(expr, string, ref):
     """
     Test that we can identify individual symbols or sub-expressions in
@@ -1012,16 +1121,19 @@ def test_subexpression_match(expr, string, ref):
     assert (string in expr) == ref
 
 
-@pytest.mark.skipif(not HAVE_FP, reason='Fparser not available')
-@pytest.mark.parametrize('source, ref', [
-    ('1 + 1', '1 + 1'),
-    ('1+2+3+4', '1 + 2 + 3 + 4'),
-    ('5*4 - 3*2 - 1', '5*4 - 3*2 - 1'),
-    ('1*(2 + 3)', '1*(2 + 3)'),
-    ('5*a +3*7**5 - 4/b', '5*a + 3*7**5 - 4 / b'),
-    ('5 + (4 + 3) - (2*1)', '5 + (4 + 3) - (2*1)'),
-    ('a*(b*(c+(d+e)))', 'a*(b*(c + (d + e)))'),
-])
+@pytest.mark.skipif(not HAVE_FP, reason="Fparser not available")
+@pytest.mark.parametrize(
+    "source, ref",
+    [
+        ("1 + 1", "1 + 1"),
+        ("1+2+3+4", "1 + 2 + 3 + 4"),
+        ("5*4 - 3*2 - 1", "5*4 - 3*2 - 1"),
+        ("1*(2 + 3)", "1*(2 + 3)"),
+        ("5*a +3*7**5 - 4/b", "5*a + 3*7**5 - 4 / b"),
+        ("5 + (4 + 3) - (2*1)", "5 + (4 + 3) - (2*1)"),
+        ("a*(b*(c+(d+e)))", "a*(b*(c + (d + e)))"),
+    ],
+)
 def test_parse_fparser_expression(source, ref):
     """
     Test the utility function that parses simple expressions.
@@ -1032,25 +1144,50 @@ def test_parse_fparser_expression(source, ref):
     assert str(ir) == ref
 
 
-@pytest.mark.parametrize('kwargs,reftype', [
-    ({}, symbols.DeferredTypeSymbol),
-    ({'type': SymbolAttributes(BasicType.DEFERRED)}, symbols.DeferredTypeSymbol),
-    ({'type': SymbolAttributes(BasicType.INTEGER)}, symbols.Scalar),
-    ({'type': SymbolAttributes(BasicType.REAL)}, symbols.Scalar),
-    ({'type': SymbolAttributes(DerivedType('t'))}, symbols.Scalar),
-    ({'type': SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(3),))}, symbols.Array),
-    ({'type': SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(3),)),
-      'dimensions': (symbols.Literal(1),)}, symbols.Array),
-    ({'type': SymbolAttributes(BasicType.INTEGER), 'dimensions': (symbols.Literal(1),)}, symbols.Array),
-    ({'type': SymbolAttributes(BasicType.DEFERRED), 'dimensions': (symbols.Literal(1),)}, symbols.Array),
-    ({'type': SymbolAttributes(ProcedureType('routine'))}, symbols.ProcedureSymbol),
-])
+@pytest.mark.parametrize(
+    "kwargs,reftype",
+    [
+        ({}, symbols.DeferredTypeSymbol),
+        ({"type": SymbolAttributes(BasicType.DEFERRED)}, symbols.DeferredTypeSymbol),
+        ({"type": SymbolAttributes(BasicType.INTEGER)}, symbols.Scalar),
+        ({"type": SymbolAttributes(BasicType.REAL)}, symbols.Scalar),
+        ({"type": SymbolAttributes(DerivedType("t"))}, symbols.Scalar),
+        (
+            {"type": SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(3),))},
+            symbols.Array,
+        ),
+        (
+            {
+                "type": SymbolAttributes(
+                    BasicType.INTEGER, shape=(symbols.Literal(3),)
+                ),
+                "dimensions": (symbols.Literal(1),),
+            },
+            symbols.Array,
+        ),
+        (
+            {
+                "type": SymbolAttributes(BasicType.INTEGER),
+                "dimensions": (symbols.Literal(1),),
+            },
+            symbols.Array,
+        ),
+        (
+            {
+                "type": SymbolAttributes(BasicType.DEFERRED),
+                "dimensions": (symbols.Literal(1),),
+            },
+            symbols.Array,
+        ),
+        ({"type": SymbolAttributes(ProcedureType("routine"))}, symbols.ProcedureSymbol),
+    ],
+)
 def test_variable_factory(kwargs, reftype):
     """
     Test the factory class :any:`Variable` and the dispatch to correct classes.
     """
     scope = Scope()
-    assert isinstance(symbols.Variable(name='var', scope=scope, **kwargs), reftype)
+    assert isinstance(symbols.Variable(name="var", scope=scope, **kwargs), reftype)
 
 
 def test_variable_factory_invalid():
@@ -1061,134 +1198,303 @@ def test_variable_factory_invalid():
         _ = symbols.Variable()
 
 
-@pytest.mark.parametrize('initype,inireftype,newtype,newreftype', [
-    # From deferred type to other type
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(BasicType.INTEGER), symbols.Scalar),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(BasicType.REAL), symbols.Scalar),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(DerivedType('t')), symbols.Scalar),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)), symbols.Array),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(ProcedureType('routine')), symbols.ProcedureSymbol),
-    (None, symbols.DeferredTypeSymbol, SymbolAttributes(BasicType.INTEGER), symbols.Scalar),
-    # From Scalar to other type
-    (SymbolAttributes(BasicType.INTEGER), symbols.Scalar,
-     SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol),
-    (SymbolAttributes(BasicType.INTEGER), symbols.Scalar,
-     SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(3),)), symbols.Array),
-    (SymbolAttributes(BasicType.INTEGER), symbols.Scalar,
-     SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol),
-    # From Array to other type
-    (SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)), symbols.Array,
-     SymbolAttributes(BasicType.INTEGER), symbols.Scalar),
-    (SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)), symbols.Array,
-     SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol),
-    (SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)), symbols.Array,
-     SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol),
-    # From ProcedureSymbol to other type
-    (SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol,
-     SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol),
-    (SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol,
-     SymbolAttributes(BasicType.INTEGER), symbols.Scalar),
-    (SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol,
-     SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(5),)), symbols.Array),
-])
+@pytest.mark.parametrize(
+    "initype,inireftype,newtype,newreftype",
+    [
+        # From deferred type to other type
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.REAL),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(DerivedType("t")),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)),
+            symbols.Array,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(ProcedureType("routine")),
+            symbols.ProcedureSymbol,
+        ),
+        (
+            None,
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+        ),
+        # From Scalar to other type
+        (
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+        ),
+        (
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(3),)),
+            symbols.Array,
+        ),
+        (
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+        ),
+        # From Array to other type
+        (
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)),
+            symbols.Array,
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)),
+            symbols.Array,
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+        ),
+        (
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)),
+            symbols.Array,
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+        ),
+        # From ProcedureSymbol to other type
+        (
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+        ),
+        (
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(5),)),
+            symbols.Array,
+        ),
+    ],
+)
 def test_variable_rebuild(initype, inireftype, newtype, newreftype):
     """
     Test that rebuilding a variable object changes class according to symmbol type
     """
     scope = Scope()
-    var = symbols.Variable(name='var', scope=scope, type=initype)
+    var = symbols.Variable(name="var", scope=scope, type=initype)
     assert isinstance(var, inireftype)
-    assert 'var' in scope.symbol_attrs
-    scope.symbol_attrs['var'] = newtype
+    assert "var" in scope.symbol_attrs
+    scope.symbol_attrs["var"] = newtype
     assert isinstance(var, inireftype)
     var = var.clone()  # pylint: disable=no-member
     assert isinstance(var, newreftype)
 
 
-@pytest.mark.parametrize('initype,inireftype,newtype,newreftype', [
-    # From deferred type to other type
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(BasicType.INTEGER), symbols.Scalar),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(BasicType.REAL), symbols.Scalar),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(DerivedType('t')), symbols.Scalar),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)), symbols.Array),
-    (SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol,
-     SymbolAttributes(ProcedureType('routine')), symbols.ProcedureSymbol),
-    (None, symbols.DeferredTypeSymbol, SymbolAttributes(BasicType.INTEGER), symbols.Scalar),
-    # From Scalar to other type
-    (SymbolAttributes(BasicType.INTEGER), symbols.Scalar,
-     SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol),
-    (SymbolAttributes(BasicType.INTEGER), symbols.Scalar,
-     SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(3),)), symbols.Array),
-    (SymbolAttributes(BasicType.INTEGER), symbols.Scalar,
-     SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol),
-    # From Array to other type
-    (SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)), symbols.Array,
-     SymbolAttributes(BasicType.INTEGER), symbols.Scalar),
-    (SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)), symbols.Array,
-     SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol),
-    (SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)), symbols.Array,
-     SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol),
-    # From ProcedureSymbol to other type
-    (SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol,
-     SymbolAttributes(BasicType.DEFERRED), symbols.DeferredTypeSymbol),
-    (SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol,
-     SymbolAttributes(BasicType.INTEGER), symbols.Scalar),
-    (SymbolAttributes(ProcedureType('foo')), symbols.ProcedureSymbol,
-     SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(5),)), symbols.Array),
-])
+@pytest.mark.parametrize(
+    "initype,inireftype,newtype,newreftype",
+    [
+        # From deferred type to other type
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.REAL),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(DerivedType("t")),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)),
+            symbols.Array,
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(ProcedureType("routine")),
+            symbols.ProcedureSymbol,
+        ),
+        (
+            None,
+            symbols.DeferredTypeSymbol,
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+        ),
+        # From Scalar to other type
+        (
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+        ),
+        (
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(3),)),
+            symbols.Array,
+        ),
+        (
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+        ),
+        # From Array to other type
+        (
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)),
+            symbols.Array,
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)),
+            symbols.Array,
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+        ),
+        (
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(4),)),
+            symbols.Array,
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+        ),
+        # From ProcedureSymbol to other type
+        (
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+            SymbolAttributes(BasicType.DEFERRED),
+            symbols.DeferredTypeSymbol,
+        ),
+        (
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+            SymbolAttributes(BasicType.INTEGER),
+            symbols.Scalar,
+        ),
+        (
+            SymbolAttributes(ProcedureType("foo")),
+            symbols.ProcedureSymbol,
+            SymbolAttributes(BasicType.INTEGER, shape=(symbols.Literal(5),)),
+            symbols.Array,
+        ),
+    ],
+)
 def test_variable_clone_class(initype, inireftype, newtype, newreftype):
     """
     Test that cloning a variable object changes class according to symbol type
     """
     scope = Scope()
-    var = symbols.Variable(name='var', scope=scope, type=initype)
+    var = symbols.Variable(name="var", scope=scope, type=initype)
     assert isinstance(var, inireftype)
-    assert 'var' in scope.symbol_attrs
+    assert "var" in scope.symbol_attrs
     var = var.clone(type=newtype)  # pylint: disable=no-member
     assert isinstance(var, newreftype)
 
-@pytest.mark.parametrize('initype,newtype,reftype', [
-    # Preserve existing type info if type=None is given
-    (SymbolAttributes(BasicType.REAL), None, SymbolAttributes(BasicType.REAL)),
-    (SymbolAttributes(BasicType.INTEGER), None, SymbolAttributes(BasicType.INTEGER)),
-    (SymbolAttributes(BasicType.DEFERRED), None, SymbolAttributes(BasicType.DEFERRED)),
-    (SymbolAttributes(BasicType.DEFERRED, intent='in'), None,
-     SymbolAttributes(BasicType.DEFERRED, intent='in')),
-    # Update from deferred to known type
-    (SymbolAttributes(BasicType.DEFERRED), SymbolAttributes(BasicType.INTEGER),
-     SymbolAttributes(BasicType.INTEGER)),
-    (SymbolAttributes(BasicType.DEFERRED), SymbolAttributes(BasicType.REAL),
-     SymbolAttributes(BasicType.REAL)),
-    (SymbolAttributes(BasicType.DEFERRED), SymbolAttributes(BasicType.DEFERRED, intent='in'),
-     SymbolAttributes(BasicType.DEFERRED, intent='in')),  # Special case: Add attribute only
-    # Invalidate type by setting to DEFERRED
-    (SymbolAttributes(BasicType.INTEGER), SymbolAttributes(BasicType.DEFERRED),
-     SymbolAttributes(BasicType.DEFERRED)),
-    (SymbolAttributes(BasicType.REAL), SymbolAttributes(BasicType.DEFERRED),
-     SymbolAttributes(BasicType.DEFERRED)),
-    (SymbolAttributes(BasicType.DEFERRED, intent='in'), SymbolAttributes(BasicType.DEFERRED),
-     SymbolAttributes(BasicType.DEFERRED)),
-])
+
+@pytest.mark.parametrize(
+    "initype,newtype,reftype",
+    [
+        # Preserve existing type info if type=None is given
+        (SymbolAttributes(BasicType.REAL), None, SymbolAttributes(BasicType.REAL)),
+        (
+            SymbolAttributes(BasicType.INTEGER),
+            None,
+            SymbolAttributes(BasicType.INTEGER),
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            None,
+            SymbolAttributes(BasicType.DEFERRED),
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED, intent="in"),
+            None,
+            SymbolAttributes(BasicType.DEFERRED, intent="in"),
+        ),
+        # Update from deferred to known type
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            SymbolAttributes(BasicType.INTEGER),
+            SymbolAttributes(BasicType.INTEGER),
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            SymbolAttributes(BasicType.REAL),
+            SymbolAttributes(BasicType.REAL),
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED),
+            SymbolAttributes(BasicType.DEFERRED, intent="in"),
+            SymbolAttributes(BasicType.DEFERRED, intent="in"),
+        ),  # Special case: Add attribute only
+        # Invalidate type by setting to DEFERRED
+        (
+            SymbolAttributes(BasicType.INTEGER),
+            SymbolAttributes(BasicType.DEFERRED),
+            SymbolAttributes(BasicType.DEFERRED),
+        ),
+        (
+            SymbolAttributes(BasicType.REAL),
+            SymbolAttributes(BasicType.DEFERRED),
+            SymbolAttributes(BasicType.DEFERRED),
+        ),
+        (
+            SymbolAttributes(BasicType.DEFERRED, intent="in"),
+            SymbolAttributes(BasicType.DEFERRED),
+            SymbolAttributes(BasicType.DEFERRED),
+        ),
+    ],
+)
 def test_variable_clone_type(initype, newtype, reftype):
     """
     Test type updates are handled as expected and types are never ``None``.
     """
     scope = Scope()
-    var = symbols.Variable(name='var', scope=scope, type=initype)
-    assert 'var' in scope.symbol_attrs
+    var = symbols.Variable(name="var", scope=scope, type=initype)
+    assert "var" in scope.symbol_attrs
     new = var.clone(type=newtype)  # pylint: disable=no-member
     assert new.type == reftype
 
@@ -1200,12 +1506,12 @@ def test_variable_without_scope():
     """
     # pylint: disable=no-member
     # Create a plain variable without type or scope
-    var = symbols.Variable(name='var')
+    var = symbols.Variable(name="var")
     assert isinstance(var, symbols.DeferredTypeSymbol)
     assert var.type and var.type.dtype is BasicType.DEFERRED
     # Attach a scope with a data type for this variable
     scope = Scope()
-    scope.symbol_attrs['var'] = SymbolAttributes(BasicType.INTEGER)
+    scope.symbol_attrs["var"] = SymbolAttributes(BasicType.INTEGER)
     assert isinstance(var, symbols.DeferredTypeSymbol)
     assert var.type and var.type.dtype is BasicType.DEFERRED
     var = var.clone(scope=scope)
@@ -1216,55 +1522,58 @@ def test_variable_without_scope():
     var = var.clone(type=SymbolAttributes(BasicType.REAL))
     assert isinstance(var, symbols.Scalar)
     assert var.type.dtype is BasicType.REAL
-    assert scope.symbol_attrs['var'].dtype is BasicType.REAL
+    assert scope.symbol_attrs["var"].dtype is BasicType.REAL
     # Detach the scope (type remains)
     var = var.clone(scope=None)
     assert var.scope is None
     assert isinstance(var, symbols.Scalar)
     assert var.type.dtype is BasicType.REAL
-    assert scope.symbol_attrs['var'].dtype is BasicType.REAL
+    assert scope.symbol_attrs["var"].dtype is BasicType.REAL
     # Assign a data type locally
     var = var.clone(type=SymbolAttributes(BasicType.LOGICAL))
     assert var.scope is None
     assert isinstance(var, symbols.Scalar)
     assert var.type.dtype is BasicType.LOGICAL
-    assert scope.symbol_attrs['var'].dtype is BasicType.REAL
+    assert scope.symbol_attrs["var"].dtype is BasicType.REAL
     # Re-attach the scope without specifying type
     var = var.clone(scope=scope, type=None)
     assert var.scope is scope
     assert isinstance(var, symbols.Scalar)
     assert var.type.dtype is BasicType.REAL
-    assert scope.symbol_attrs['var'].dtype is BasicType.REAL
+    assert scope.symbol_attrs["var"].dtype is BasicType.REAL
     # Detach the scope and specify new type
     var = var.clone(scope=None, type=SymbolAttributes(BasicType.LOGICAL))
     assert var.scope is None
     assert isinstance(var, symbols.Scalar)
     assert var.type.dtype is BasicType.LOGICAL
-    assert scope.symbol_attrs['var'].dtype is BasicType.REAL
+    assert scope.symbol_attrs["var"].dtype is BasicType.REAL
     # Rescope (doesn't overwrite scope-stored type with local type)
     rescoped_var = var.rescope(scope)
     assert rescoped_var.scope is scope
     assert isinstance(rescoped_var, symbols.Scalar)
     assert rescoped_var.type.dtype is BasicType.REAL
-    assert scope.symbol_attrs['var'].dtype is BasicType.REAL
+    assert scope.symbol_attrs["var"].dtype is BasicType.REAL
     # Re-attach the scope (uses scope-stored type over local type)
     var = var.clone(scope=scope)
     assert var.scope is scope
     assert isinstance(var, symbols.Scalar)
     assert var.type.dtype is BasicType.REAL
-    assert scope.symbol_attrs['var'].dtype is BasicType.REAL
+    assert scope.symbol_attrs["var"].dtype is BasicType.REAL
 
 
-@pytest.mark.skipif(not HAVE_FP, reason='Fparser not available')
-@pytest.mark.parametrize('expr', [
-    ('1.8 - 3.E-03*ztp1'),
-    ('1.8 - 0.003*ztp1'),
-    ('(a / b) + 3.0_jprb'),
-    ('a / b*3.0_jprb'),
-    ('-5*3 + (-(5*3))'),
-    ('5 + (-1)'),
-    ('5 - 1')
-])
+@pytest.mark.skipif(not HAVE_FP, reason="Fparser not available")
+@pytest.mark.parametrize(
+    "expr",
+    [
+        ("1.8 - 3.E-03*ztp1"),
+        ("1.8 - 0.003*ztp1"),
+        ("(a / b) + 3.0_jprb"),
+        ("a / b*3.0_jprb"),
+        ("-5*3 + (-(5*3))"),
+        ("5 + (-1)"),
+        ("5 - 1"),
+    ],
+)
 def test_standalone_expr_parenthesis(expr):
     scope = Scope()
     ir = parse_fparser_expression(expr, scope)
@@ -1272,7 +1581,7 @@ def test_standalone_expr_parenthesis(expr):
     assert fgen(ir) == expr
 
 
-@pytest.mark.skipif(not HAVE_FP, reason='Fparser not available')
+@pytest.mark.skipif(not HAVE_FP, reason="Fparser not available")
 def test_array_to_inline_call_rescope():
     """
     Test a mechanism that can convert arrays to procedure calls, to mop up
@@ -1280,24 +1589,28 @@ def test_array_to_inline_call_rescope():
     """
     # Parse the expression, which fparser will interpret as an array
     scope = Scope()
-    expr = parse_fparser_expression('FLUX%OUT_OF_PHYSICAL_BOUNDS(KIDIA, KFDIA)', scope=scope)
+    expr = parse_fparser_expression(
+        "FLUX%OUT_OF_PHYSICAL_BOUNDS(KIDIA, KFDIA)", scope=scope
+    )
     assert isinstance(expr, symbols.Array)
 
     # Detach the expression from the scope and update the type information in the scope
     expr = expr.clone(scope=None)
     return_type = SymbolAttributes(BasicType.INTEGER)
-    proc_type = ProcedureType('out_of_physical_bounds', is_function=True, return_type=return_type)
-    scope.symbol_attrs['flux%out_of_physical_bounds'] = SymbolAttributes(proc_type)
+    proc_type = ProcedureType(
+        "out_of_physical_bounds", is_function=True, return_type=return_type
+    )
+    scope.symbol_attrs["flux%out_of_physical_bounds"] = SymbolAttributes(proc_type)
 
     # Re-attach the scope to trigger the rescoping (and symbol rebuild)
     expr = AttachScopesMapper()(expr, scope=scope)
     assert isinstance(expr, symbols.InlineCall)
     assert expr.function.type.dtype is proc_type
-    assert expr.function == 'flux%out_of_physical_bounds'
-    assert expr.parameters == ('kidia', 'kfdia')
+    assert expr.function == "flux%out_of_physical_bounds"
+    assert expr.parameters == ("kidia", "kfdia")
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_recursive_substitution(frontend):
     """
     Test expression substitution where the substitution key is included
@@ -1316,18 +1629,18 @@ end subroutine my_routine
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
     assignment = FindNodes(Assignment).visit(routine.body)[0]
-    assert assignment.lhs == 'var(j)'
+    assert assignment.lhs == "var(j)"
 
     # Replace Array subscript by j+1
-    j = routine.variable_map['j']
+    j = routine.variable_map["j"]
     expr_map = {j: symbols.Sum((j, symbols.Literal(1)))}
     assert j in FindVariables().visit(list(expr_map.values()))
     routine.body = SubstituteExpressions(expr_map).visit(routine.body)
     assignment = FindNodes(Assignment).visit(routine.body)[0]
-    assert assignment.lhs == 'var(j + 1)'
+    assert assignment.lhs == "var(j + 1)"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_variable_in_declaration_initializer(frontend):
     """
     Check correct handling of cases where the variable appears
@@ -1345,14 +1658,14 @@ end subroutine some_routine
 
     def _check(routine_):
         # A few sanity checks
-        assert 'zexplimit' in routine_.variable_map
-        zexplimit = routine_.variable_map['zexplimit']
+        assert "zexplimit" in routine_.variable_map
+        zexplimit = routine_.variable_map["zexplimit"]
         assert zexplimit.scope is routine_
         # Now let's take a closer look at the initializer expression
-        assert 'zexplimit' in str(zexplimit.type.initial).lower()
+        assert "zexplimit" in str(zexplimit.type.initial).lower()
         variables = FindVariables().visit(zexplimit.type.initial)
-        assert 'zexplimit' in variables
-        assert variables[variables.index('zexplimit')].scope is routine_
+        assert "zexplimit" in variables
+        assert variables[variables.index("zexplimit")].scope is routine_
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
     _check(routine)
@@ -1361,7 +1674,7 @@ end subroutine some_routine
     _check(routine)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_variable_in_dimensions(frontend):
     """
     Check correct handling of cases where the variable appears in the
@@ -1389,13 +1702,13 @@ end module some_mod
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    routine = module['some_routine']
-    assert 'levels%data' in routine.symbol_attrs
-    shape = routine.symbol_attrs['levels%data'].shape
+    routine = module["some_routine"]
+    assert "levels%data" in routine.symbol_attrs
+    shape = routine.symbol_attrs["levels%data"].shape
     assert len(shape) == 2
     for i, dim in enumerate(shape):
         assert isinstance(dim, symbols.InlineCall)
-        assert str(dim).lower() == f'size(levels(jscale - 1)%data, {i+1})'
+        assert str(dim).lower() == f"size(levels(jscale - 1)%data, {i+1})"
 
 
 def test_expression_container_matching():
@@ -1407,9 +1720,9 @@ def test_expression_container_matching():
     t_real = SymbolAttributes(BasicType.REAL)
     t_int = SymbolAttributes(BasicType.INTEGER)
 
-    i = symbols.Variable(name='i', scope=scope, type=t_int)
-    a = symbols.Variable(name='a', scope=scope, type=t_real)
-    b = symbols.Variable(name='b', scope=scope, type=t_real, dimensions=(i,))
+    i = symbols.Variable(name="i", scope=scope, type=t_int)
+    a = symbols.Variable(name="a", scope=scope, type=t_real)
+    b = symbols.Variable(name="b", scope=scope, type=t_real, dimensions=(i,))
 
     # Test for simple containment of scalars
     assert a in (a, b)
@@ -1419,30 +1732,30 @@ def test_expression_container_matching():
     assert a in defaultdict(list, ((a, [b]),))
 
     # Test for simple containment of scalars against strings
-    assert a == 'a'
-    assert a in ('a', 'b(i)')
-    assert a in ['a', 'b(i)']
-    assert a in {'a', 'b(i)'}
-    assert a in {'a': 'b(i)'}
-    assert a in defaultdict(list, (('a', ['b(i)']),))
+    assert a == "a"
+    assert a in ("a", "b(i)")
+    assert a in ["a", "b(i)"]
+    assert a in {"a", "b(i)"}
+    assert a in {"a": "b(i)"}
+    assert a in defaultdict(list, (("a", ["b(i)"]),))
 
     # Test for simple containment of arrays against strings
-    assert b == 'b(i)'
-    assert b in ('b(i)', 'a')
-    assert b in ['b(i)', 'a']
-    assert b in {'b(i)', 'a'}
-    assert b in {'b(i)': 'a'}
-    assert b in defaultdict(list, (('b(i)', ['a']),))
+    assert b == "b(i)"
+    assert b in ("b(i)", "a")
+    assert b in ["b(i)", "a"]
+    assert b in {"b(i)", "a"}
+    assert b in {"b(i)": "a"}
+    assert b in defaultdict(list, (("b(i)", ["a"]),))
 
     # Test for simple containment of strings indices against arrays
-    assert 'b(i)' in (b, a)
-    assert 'b(i)' in [b, a]
-    assert 'b(i)' in {b, a}
-    assert 'b(i)' in {b: a}
-    assert 'b(i)' in defaultdict(list, ((b, [a]),))
+    assert "b(i)" in (b, a)
+    assert "b(i)" in [b, a]
+    assert "b(i)" in {b, a}
+    assert "b(i)" in {b: a}
+    assert "b(i)" in defaultdict(list, ((b, [a]),))
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_expression_finder_retrieval_function(frontend):
     """
     Verify that expression finder visitors work as intended and remain
@@ -1466,19 +1779,19 @@ end module some_mod
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
 
-    expected_ts = {'var', 'some_func'}
-    expected_vars = ('var',)
+    expected_ts = {"var", "some_func"}
+    expected_vars = ("var",)
 
     # Instantiate the first expression finder and make sure it works as expected
     find_ts = FindTypedSymbols()
-    assert find_ts.visit(source['other_routine'].body) == expected_ts
+    assert find_ts.visit(source["other_routine"].body) == expected_ts
 
     # Verify that it works also on a repeated invocation
-    assert find_ts.visit(source['other_routine'].body) == expected_ts
+    assert find_ts.visit(source["other_routine"].body) == expected_ts
 
     # Instantiate the second expression finder and make sure it works as expected
     find_vars = FindVariables(unique=False)
-    assert find_vars.visit(source['other_routine'].body) == expected_vars
+    assert find_vars.visit(source["other_routine"].body) == expected_vars
 
     # Make sure the first expression finder still works
-    assert find_ts.visit(source['other_routine'].body) == expected_ts
+    assert find_ts.visit(source["other_routine"].body) == expected_ts

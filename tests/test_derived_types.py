@@ -15,24 +15,40 @@ import numpy as np
 
 from conftest import jit_compile, jit_compile_lib, clean_test, available_frontends
 from loki import (
-    OMNI, OFP, Module, Subroutine, BasicType, DerivedType, TypeDef,
-    fgen, FindNodes, Intrinsic, ProcedureDeclaration, ProcedureType,
-    VariableDeclaration, Assignment, InlineCall, Builder, StringSubscript,
-    Conditional, CallStatement, ProcedureSymbol
+    OMNI,
+    OFP,
+    Module,
+    Subroutine,
+    BasicType,
+    DerivedType,
+    TypeDef,
+    fgen,
+    FindNodes,
+    Intrinsic,
+    ProcedureDeclaration,
+    ProcedureType,
+    VariableDeclaration,
+    Assignment,
+    InlineCall,
+    Builder,
+    StringSubscript,
+    Conditional,
+    CallStatement,
+    ProcedureSymbol,
 )
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.fixture(scope='module', name='builder')
+@pytest.fixture(scope="module", name="builder")
 def fixture_builder(here):
-    return Builder(source_dirs=here, build_dir=here/'build')
+    return Builder(source_dirs=here, build_dir=here / "build")
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_simple_loops(here, frontend):
     """
     Test simple vector/matrix arithmetic with a derived type
@@ -66,20 +82,20 @@ contains
 end module
 """
     module = Module.from_source(fcode, frontend=frontend)
-    filepath = here/(f'derived_types_simple_loops_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='derived_types_mod')
+    filepath = here / (f"derived_types_simple_loops_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="derived_types_mod")
 
     item = mod.explicit()
-    item.scalar = 2.
-    item.vector[:] = 5.
-    item.matrix[:, :] = 4.
+    item.scalar = 2.0
+    item.vector[:] = 5.0
+    item.matrix[:, :] = 4.0
     mod.simple_loops(item)
-    assert (item.vector == 7.).all() and (item.matrix == 6.).all()
+    assert (item.vector == 7.0).all() and (item.matrix == 6.0).all()
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_array_indexing_explicit(here, frontend):
     """
     Test simple vector/matrix arithmetic with a derived type
@@ -108,18 +124,20 @@ contains
 end module
 """
     module = Module.from_source(fcode, frontend=frontend)
-    filepath = here/(f'derived_types_array_indexing_explicit_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='derived_types_mod')
+    filepath = here / (f"derived_types_array_indexing_explicit_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="derived_types_mod")
 
     item = mod.explicit()
     mod.array_indexing_explicit(item)
-    assert (item.vector == 666.).all()
-    assert (item.matrix == np.array([[1., 2., 3.], [1., 2., 3.], [1., 2., 3.]])).all()
+    assert (item.vector == 666.0).all()
+    assert (
+        item.matrix == np.array([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]])
+    ).all()
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_array_indexing_deferred(here, frontend):
     """
     Test simple vector/matrix arithmetic with a derived type
@@ -162,20 +180,22 @@ contains
 end module
 """
     module = Module.from_source(fcode, frontend=frontend)
-    filepath = here/(f'derived_types_array_indexing_deferred_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='derived_types_mod')
+    filepath = here / (f"derived_types_array_indexing_deferred_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="derived_types_mod")
 
     item = mod.deferred()
     mod.alloc_deferred(item)
     mod.array_indexing_deferred(item)
-    assert (item.vector == 666.).all()
-    assert (item.matrix == np.array([[1., 2., 3.], [1., 2., 3.], [1., 2., 3.]])).all()
+    assert (item.vector == 666.0).all()
+    assert (
+        item.matrix == np.array([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]])
+    ).all()
     mod.free_deferred(item)
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_array_indexing_nested(here, frontend):
     """
     Test simple vector/matrix arithmetic with a nested derived type
@@ -211,21 +231,22 @@ contains
 end module
 """
     module = Module.from_source(fcode, frontend=frontend)
-    filepath = here/(f'derived_types_array_indexing_nested_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='derived_types_mod')
+    filepath = here / (f"derived_types_array_indexing_nested_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="derived_types_mod")
 
     item = mod.nested()
     mod.array_indexing_nested(item)
-    assert (item.a_vector == 666.).all()
-    assert (item.another_item.vector == 999.).all()
-    assert (item.another_item.matrix == np.array([[1., 2., 3.],
-                                                  [1., 2., 3.],
-                                                  [1., 2., 3.]])).all()
+    assert (item.a_vector == 666.0).all()
+    assert (item.another_item.vector == 999.0).all()
+    assert (
+        item.another_item.matrix
+        == np.array([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]])
+    ).all()
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_deferred_array(here, frontend):
     """
     Test simple vector/matrix with an array of derived types
@@ -289,20 +310,22 @@ contains
 end module
 """
     module = Module.from_source(fcode, frontend=frontend)
-    filepath = here/(f'derived_types_deferred_array_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='derived_types_mod')
+    filepath = here / (f"derived_types_deferred_array_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="derived_types_mod")
 
     item = mod.deferred()
     mod.alloc_deferred(item)
     mod.deferred_array(item)
-    assert (item.vector == 4 * 666.).all()
-    assert (item.matrix == 4 * np.array([[1., 2., 3.], [1., 2., 3.], [1., 2., 3.]])).all()
+    assert (item.vector == 4 * 666.0).all()
+    assert (
+        item.matrix == 4 * np.array([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [1.0, 2.0, 3.0]])
+    ).all()
     mod.free_deferred(item)
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_caller(here, frontend):
     """
     Test a simple call to another routine specifying a derived type as argument
@@ -345,22 +368,26 @@ contains
 end module
 """
     module = Module.from_source(fcode, frontend=frontend)
-    filepath = here/(f'derived_types_derived_type_caller_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='derived_types_mod')
+    filepath = here / (f"derived_types_derived_type_caller_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="derived_types_mod")
 
     # Test the generated identity
     item = mod.explicit()
-    item.scalar = 2.
-    item.vector[:] = 5.
-    item.matrix[:, :] = 4.
-    item.red_herring = -1.
+    item.scalar = 2.0
+    item.vector[:] = 5.0
+    item.matrix[:, :] = 4.0
+    item.red_herring = -1.0
     mod.derived_type_caller(item)
-    assert (item.vector == 7.).all() and (item.matrix == 6.).all() and item.red_herring == 42.
+    assert (
+        (item.vector == 7.0).all()
+        and (item.matrix == 6.0).all()
+        and item.red_herring == 42.0
+    )
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_case_sensitivity(here, frontend):
     """
     Some abuse of the case agnostic behaviour of Fortran
@@ -388,15 +415,15 @@ contains
 end module
 """
     module = Module.from_source(fcode, frontend=frontend)
-    filepath = here/(f'derived_types_case_sensitivity_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='derived_types_mod')
+    filepath = here / (f"derived_types_case_sensitivity_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="derived_types_mod")
 
     item = mod.case_sensitive()
-    item.u = 0.
-    item.v = 0.
-    item.t = 0.
-    item.q = 0.
-    item.a = 0.
+    item.u = 0.0
+    item.v = 0.0
+    item.t = 0.0
+    item.q = 0.0
+    item.a = 0.0
     mod.check_case(item)
     assert item.u == 1.0 and item.v == 2.0 and item.t == 3.0
     assert item.q == -1.0 and item.a == -5.0
@@ -404,7 +431,7 @@ end module
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_bind_c(frontend):
     # Example code from F2008, Note 15.13
     fcode = """
@@ -423,12 +450,12 @@ end module derived_type_bind_c
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    myftype = module.typedef_map['myftype']
+    myftype = module.typedef_map["myftype"]
     assert myftype.bind_c is True
-    assert ', BIND(C)' in fgen(myftype)
+    assert ", BIND(C)" in fgen(myftype)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_inheritance(frontend):
     fcode = """
 module derived_type_private_mod
@@ -460,25 +487,25 @@ end module derived_type_private_mod
 
     module = Module.from_source(fcode, frontend=frontend)
 
-    base_type = module.typedef_map['base_type']
-    some_type = module.typedef_map['some_type']
+    base_type = module.typedef_map["base_type"]
+    some_type = module.typedef_map["some_type"]
 
     # Verify correct properties on the `TypeDef` object
     assert base_type.abstract is True
     assert some_type.abstract is False
 
     assert base_type.extends is None
-    assert some_type.extends.lower() == 'base_type'
+    assert some_type.extends.lower() == "base_type"
 
     assert base_type.bind_c is False
     assert some_type.bind_c is False
 
     # Verify fgen
-    assert 'type, abstract' in fgen(base_type).lower()
-    assert 'extends(base_type)' in fgen(some_type).lower()
+    assert "type, abstract" in fgen(base_type).lower()
+    assert "extends(base_type)" in fgen(some_type).lower()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_private(frontend):
     fcode = """
 module derived_type_private_mod
@@ -492,13 +519,13 @@ end module derived_type_private_mod
 
     module = Module.from_source(fcode, frontend=frontend)
 
-    priv_type = module.typedef_map['priv_type']
+    priv_type = module.typedef_map["priv_type"]
     assert priv_type.private is True
     assert priv_type.public is False
-    assert ', PRIVATE' in fgen(priv_type)
+    assert ", PRIVATE" in fgen(priv_type)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_public(frontend):
     fcode = """
 module derived_type_public_mod
@@ -512,13 +539,13 @@ end module derived_type_public_mod
 
     module = Module.from_source(fcode, frontend=frontend)
 
-    pub_type = module.typedef_map['pub_type']
+    pub_type = module.typedef_map["pub_type"]
     assert pub_type.public is True
     assert pub_type.private is False
-    assert ', PUBLIC' in fgen(pub_type)
+    assert ", PUBLIC" in fgen(pub_type)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_private_comp(frontend):
     fcode = """
 module derived_type_private_comp_mod
@@ -555,31 +582,39 @@ end module derived_type_private_comp_mod
 
     module = Module.from_source(fcode, frontend=frontend)
 
-    some_private_comp_type = module.typedef_map['some_private_comp_type']
-    type_bound_proc_type = module.typedef_map['type_bound_proc_type']
+    some_private_comp_type = module.typedef_map["some_private_comp_type"]
+    type_bound_proc_type = module.typedef_map["type_bound_proc_type"]
 
     intrinsic_nodes = FindNodes(Intrinsic).visit(type_bound_proc_type.body)
     assert len(intrinsic_nodes) == 2
-    assert intrinsic_nodes[0].text.lower() == 'contains'
-    assert intrinsic_nodes[1].text.lower() == 'private'
+    assert intrinsic_nodes[0].text.lower() == "contains"
+    assert intrinsic_nodes[1].text.lower() == "private"
 
-    assert re.search(
-      r'^\s+contains$\s+private', fgen(type_bound_proc_type), re.I | re.MULTILINE
-    ) is not None
+    assert (
+        re.search(
+            r"^\s+contains$\s+private", fgen(type_bound_proc_type), re.I | re.MULTILINE
+        )
+        is not None
+    )
 
     # OMNI gets the below wrong as it doesn't retain the private statement for components
     if frontend != OMNI:
         intrinsic_nodes = FindNodes(Intrinsic).visit(some_private_comp_type.body)
         assert len(intrinsic_nodes) == 2
-        assert intrinsic_nodes[0].text.lower() == 'private'
-        assert intrinsic_nodes[1].text.lower() == 'contains'
+        assert intrinsic_nodes[0].text.lower() == "private"
+        assert intrinsic_nodes[1].text.lower() == "contains"
 
-        assert re.search(
-            r'^\s+private*$(\s.*?){2}\s+contains', fgen(some_private_comp_type), re.I | re.MULTILINE
-        ) is not None
+        assert (
+            re.search(
+                r"^\s+private*$(\s.*?){2}\s+contains",
+                fgen(some_private_comp_type),
+                re.I | re.MULTILINE,
+            )
+            is not None
+        )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_procedure_designator(frontend):
     mcode = """
 module derived_type_procedure_designator_mod
@@ -628,68 +663,68 @@ end subroutine derived_type_procedure_designator
     """.strip()
 
     module = Module.from_source(mcode, frontend=frontend)
-    assert 'some_type' in module.typedef_map
-    assert 'other_type' in module.typedef_map
-    assert 'some_type' in module.symbol_attrs
-    assert 'other_type' in module.symbol_attrs
+    assert "some_type" in module.typedef_map
+    assert "other_type" in module.typedef_map
+    assert "some_type" in module.symbol_attrs
+    assert "other_type" in module.symbol_attrs
 
     # First, with external definitions (generates xmod for OMNI)
     routine = Subroutine.from_source(fcode, frontend=frontend, definitions=[module])
 
-    for name in ('some_type', 'other_type'):
+    for name in ("some_type", "other_type"):
         assert name in routine.symbol_attrs
         assert routine.symbol_attrs[name].imported is True
         assert isinstance(routine.symbol_attrs[name].dtype, DerivedType)
         assert isinstance(routine.symbol_attrs[name].dtype.typedef, TypeDef)
 
     # Make sure type-bound procedure declarations exist
-    some_type = module.typedef_map['some_type']
+    some_type = module.typedef_map["some_type"]
     proc_decls = FindNodes(ProcedureDeclaration).visit(some_type.body)
     assert len(proc_decls) == 3
     assert all(decl.interface is None for decl in proc_decls)
 
     proc_symbols = {s.name.lower(): s for d in proc_decls for s in d.symbols}
-    assert set(proc_symbols.keys()) == {'some_proc', 'some_func', 'other_proc'}
+    assert set(proc_symbols.keys()) == {"some_proc", "some_func", "other_proc"}
     assert all(s.scope is some_type for s in proc_symbols.values())
     assert all(isinstance(s.type.dtype, ProcedureType) for s in proc_symbols.values())
 
-    assert proc_symbols['some_proc'].type.bind_names == ('some_type_some_proc',)
-    assert proc_symbols['some_proc'].type.bind_names[0].scope is module
-    assert proc_symbols['some_func'].type.bind_names == ('some_type_some_func',)
-    assert proc_symbols['some_proc'].type.bind_names[0].scope is module
-    assert proc_symbols['other_proc'].type.bind_names is None
+    assert proc_symbols["some_proc"].type.bind_names == ("some_type_some_proc",)
+    assert proc_symbols["some_proc"].type.bind_names[0].scope is module
+    assert proc_symbols["some_func"].type.bind_names == ("some_type_some_func",)
+    assert proc_symbols["some_proc"].type.bind_names[0].scope is module
+    assert proc_symbols["other_proc"].type.bind_names is None
     assert all(proc.type.initial is None for proc in proc_symbols.values())
 
     # Verify type representation in bound routines
-    some_type_some_proc = module['some_type_some_proc']
-    self = some_type_some_proc.symbol_map['self']
+    some_type_some_proc = module["some_type_some_proc"]
+    self = some_type_some_proc.symbol_map["self"]
     assert isinstance(self.type.dtype, DerivedType)
     assert self.type.dtype.typedef is some_type
     assert self.type.polymorphic is True
     decls = FindNodes(VariableDeclaration).visit(some_type_some_proc.spec)
-    assert 'CLASS(SOME_TYPE)' in fgen(decls[0]).upper()
+    assert "CLASS(SOME_TYPE)" in fgen(decls[0]).upper()
 
     # Verify type representation in using routine
-    assert isinstance(routine.symbol_attrs['tp'].dtype, DerivedType)
-    assert isinstance(routine.symbol_attrs['tp'].dtype.typedef, TypeDef)
-    assert routine.symbol_attrs['tp'].polymorphic is None
-    assert routine.symbol_attrs['tp'].dtype.typedef is some_type
+    assert isinstance(routine.symbol_attrs["tp"].dtype, DerivedType)
+    assert isinstance(routine.symbol_attrs["tp"].dtype.typedef, TypeDef)
+    assert routine.symbol_attrs["tp"].polymorphic is None
+    assert routine.symbol_attrs["tp"].dtype.typedef is some_type
     decls = FindNodes(VariableDeclaration).visit(routine.spec)
-    assert 'TYPE(SOME_TYPE)' in fgen(decls[1]).upper()
+    assert "TYPE(SOME_TYPE)" in fgen(decls[1]).upper()
 
     # TODO: verify correct type association of calls to type-bound procedures
 
     # Next, without external definitions
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    assert 'some_type' not in routine.symbol_attrs
-    assert 'other_type' not in routine.symbol_attrs
-    assert isinstance(routine.symbol_attrs['tp'].dtype, DerivedType)
-    assert routine.symbol_attrs['tp'].dtype.typedef == BasicType.DEFERRED
+    assert "some_type" not in routine.symbol_attrs
+    assert "other_type" not in routine.symbol_attrs
+    assert isinstance(routine.symbol_attrs["tp"].dtype, DerivedType)
+    assert routine.symbol_attrs["tp"].dtype.typedef == BasicType.DEFERRED
 
     # TODO: verify correct type association of calls to type-bound procedures
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_bind_attrs(frontend):
     """
     Test attribute representation in type-bound procedures
@@ -726,41 +761,41 @@ end module derived_types_bind_attrs_mod
 
     module = Module.from_source(fcode, frontend=frontend)
 
-    some_type = module.typedef_map['some_type']
+    some_type = module.typedef_map["some_type"]
 
     proc_decls = FindNodes(ProcedureDeclaration).visit(some_type.body)
     assert len(proc_decls) == 3
     assert all(decl.interface is None for decl in proc_decls)
 
     proc_symbols = {s.name.lower(): s for d in proc_decls for s in d.symbols}
-    assert set(proc_symbols.keys()) == {'pass_proc', 'no_pass_proc', 'pass_arg_proc'}
+    assert set(proc_symbols.keys()) == {"pass_proc", "no_pass_proc", "pass_arg_proc"}
 
-    assert proc_symbols['pass_proc'].type.pass_attr is True
-    assert proc_symbols['pass_proc'].type.non_overridable is True
-    assert proc_symbols['pass_proc'].type.private is None
-    assert proc_symbols['pass_proc'].type.public is None
+    assert proc_symbols["pass_proc"].type.pass_attr is True
+    assert proc_symbols["pass_proc"].type.non_overridable is True
+    assert proc_symbols["pass_proc"].type.private is None
+    assert proc_symbols["pass_proc"].type.public is None
 
-    assert proc_symbols['no_pass_proc'].type.pass_attr is False
-    assert proc_symbols['no_pass_proc'].type.non_overridable is None
-    assert proc_symbols['no_pass_proc'].type.private is None
-    assert proc_symbols['no_pass_proc'].type.public is True
+    assert proc_symbols["no_pass_proc"].type.pass_attr is False
+    assert proc_symbols["no_pass_proc"].type.non_overridable is None
+    assert proc_symbols["no_pass_proc"].type.private is None
+    assert proc_symbols["no_pass_proc"].type.public is True
 
-    assert proc_symbols['pass_arg_proc'].type.pass_attr == 'this'
-    assert proc_symbols['pass_arg_proc'].type.private is True
-    assert proc_symbols['pass_arg_proc'].type.public is None
+    assert proc_symbols["pass_arg_proc"].type.pass_attr == "this"
+    assert proc_symbols["pass_arg_proc"].type.private is True
+    assert proc_symbols["pass_arg_proc"].type.public is None
 
     proc_decls = {decl.symbols[0].name: decl for decl in proc_decls}
-    assert ', PASS' in fgen(proc_decls['pass_proc'])
-    assert ', NON_OVERRIDABLE' in fgen(proc_decls['pass_proc'])
+    assert ", PASS" in fgen(proc_decls["pass_proc"])
+    assert ", NON_OVERRIDABLE" in fgen(proc_decls["pass_proc"])
 
-    assert ', NOPASS' in fgen(proc_decls['no_pass_proc'])
-    assert ', PUBLIC' in fgen(proc_decls['no_pass_proc'])
+    assert ", NOPASS" in fgen(proc_decls["no_pass_proc"])
+    assert ", PUBLIC" in fgen(proc_decls["no_pass_proc"])
 
-    assert ', PASS(this)' in fgen(proc_decls['pass_arg_proc'])
-    assert ', PRIVATE' in fgen(proc_decls['pass_arg_proc'])
+    assert ", PASS(this)" in fgen(proc_decls["pass_arg_proc"])
+    assert ", PRIVATE" in fgen(proc_decls["pass_arg_proc"])
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_bind_deferred(frontend):
     # Example from https://www.ibm.com/docs/en/xffbg/121.141?topic=types-abstract-deferred-bindings-fortran-2003
     fcode = """
@@ -782,21 +817,21 @@ end module derived_type_bind_deferred_mod
 
     module = Module.from_source(fcode, frontend=frontend)
 
-    file_handle = module.typedef_map['file_handle']
+    file_handle = module.typedef_map["file_handle"]
     assert len(file_handle.body) == 2
 
     proc_decl = file_handle.body[1]
-    assert proc_decl.interface == 'open_file'
+    assert proc_decl.interface == "open_file"
 
     proc_sym = proc_decl.symbols[0]
     assert proc_sym.type.deferred is True
-    assert proc_sym.type.pass_attr.lower() == 'handle'
+    assert proc_sym.type.pass_attr.lower() == "handle"
 
-    assert ', DEFERRED' in fgen(proc_decl)
-    assert ', PASS(HANDLE)' in fgen(proc_decl).upper()
+    assert ", DEFERRED" in fgen(proc_decl)
+    assert ", PASS(HANDLE)" in fgen(proc_decl).upper()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_final_generic(frontend):
     """
     Test derived types with generic and final bindings
@@ -854,7 +889,7 @@ end module derived_type_final_generic_mod
     """.strip()
 
     mod = Module.from_source(fcode, frontend=frontend)
-    hdf5_file = mod.typedef_map['hdf5_file']
+    hdf5_file = mod.typedef_map["hdf5_file"]
     proc_decls = FindNodes(ProcedureDeclaration).visit(hdf5_file.body)
     assert len(proc_decls) == 5
 
@@ -864,23 +899,32 @@ end module derived_type_final_generic_mod
     proc_map = {proc.name.lower(): proc for decl in proc_decls for proc in decl.symbols}
 
     assert proc_decls[-2].generic is True
-    assert 'generic, public ::' in fgen(proc_decls[-2]).lower()
-    assert 'load => ' in fgen(proc_decls[-2]).lower()
-    assert proc_decls[-2].symbols == ('load',)
-    assert proc_decls[-2].symbols[0].type.bind_names == ('hdf5_file_load_int', 'hdf5_file_load_real')
-    assert proc_decls[-2].symbols[0].type.dtype.name == 'load'
+    assert "generic, public ::" in fgen(proc_decls[-2]).lower()
+    assert "load => " in fgen(proc_decls[-2]).lower()
+    assert proc_decls[-2].symbols == ("load",)
+    assert proc_decls[-2].symbols[0].type.bind_names == (
+        "hdf5_file_load_int",
+        "hdf5_file_load_real",
+    )
+    assert proc_decls[-2].symbols[0].type.dtype.name == "load"
     assert proc_decls[-2].symbols[0].type.dtype.is_generic is True
-    assert all(proc.type.dtype.name == proc.name for proc in proc_decls[-2].symbols[0].type.bind_names)
-    assert all(proc == proc_map[proc.name] for proc in proc_decls[-2].symbols[0].type.bind_names)
+    assert all(
+        proc.type.dtype.name == proc.name
+        for proc in proc_decls[-2].symbols[0].type.bind_names
+    )
+    assert all(
+        proc == proc_map[proc.name]
+        for proc in proc_decls[-2].symbols[0].type.bind_names
+    )
 
     assert proc_decls[-1].final is True
     assert proc_decls[-1].generic is False
-    assert 'final ::' in fgen(proc_decls[-1]).lower()
-    assert proc_decls[-1].symbols == ('hdf5_file_close',)
-    assert proc_decls[-1].symbols[0].type.dtype.name == 'hdf5_file_close'
+    assert "final ::" in fgen(proc_decls[-1]).lower()
+    assert proc_decls[-1].symbols == ("hdf5_file_close",)
+    assert proc_decls[-1].symbols[0].type.dtype.name == "hdf5_file_close"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_clone(frontend):
     """
     Test cloning of derived types
@@ -897,19 +941,19 @@ end module
 """
     module = Module.from_source(fcode, frontend=frontend)
 
-    explicit = module.typedef_map['explicit']
-    other = explicit.clone(name='other')
+    explicit = module.typedef_map["explicit"]
+    other = explicit.clone(name="other")
 
-    assert explicit.name == 'explicit'
-    assert other.name == 'other'
+    assert explicit.name == "explicit"
+    assert other.name == "other"
     assert all(v.scope is other for v in other.variables)
     assert all(v.scope is explicit for v in explicit.variables)
 
     fcode = fgen(other)
-    assert fgen(explicit) == fcode.replace('other', 'explicit')
+    assert fgen(explicit) == fcode.replace("other", "explicit")
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_linked_list(frontend):
     """
     Test correct initialization of derived type members that create a circular
@@ -949,44 +993,48 @@ end module derived_type_linked_list
     module = Module.from_source(fcode, frontend=frontend)
 
     # Test correct instantiation and association of module-level variables
-    for name in ('beg', 'cur'):
+    for name in ("beg", "cur"):
         assert name in module.variables
         assert isinstance(module.variable_map[name].type.dtype, DerivedType)
-        assert module.variable_map[name].type.dtype.typedef is module.typedef_map['list_t']
+        assert (
+            module.variable_map[name].type.dtype.typedef is module.typedef_map["list_t"]
+        )
 
         variables = module.variable_map[name].type.dtype.typedef.variables
-        assert all(v.scope is module.variable_map[name].type.dtype.typedef for v in variables)
-        assert 'payload' in variables
-        assert 'next' in variables
+        assert all(
+            v.scope is module.variable_map[name].type.dtype.typedef for v in variables
+        )
+        assert "payload" in variables
+        assert "next" in variables
 
         variables = module.variable_map[name].variables
         assert all(v.scope is module for v in variables)
-        assert f'{name}%payload' in variables
-        assert f'{name}%next' in variables
+        assert f"{name}%payload" in variables
+        assert f"{name}%next" in variables
 
     # Test correct instantiation and association of subroutine-level variables
-    routine = module['find']
-    for name in ('this', 'x'):
+    routine = module["find"]
+    for name in ("this", "x"):
         var = routine.variable_map[name]
-        assert var.type.dtype.typedef is module.typedef_map['list_t']
+        assert var.type.dtype.typedef is module.typedef_map["list_t"]
 
-        assert 'payload' in var.variable_map
-        assert 'next' in var.variable_map
+        assert "payload" in var.variable_map
+        assert "next" in var.variable_map
         assert all(v.scope is var.scope for v in var.variables)
 
     # Test on-the-fly creation of variable lists
     # Chase the next-chain to the limit with a buffer
-    var = routine.variable_map['x']
-    name = 'x'
-    for _ in range(min(1000, getrecursionlimit()-len(stack())-50)):
-        var = var.variable_map['next']
+    var = routine.variable_map["x"]
+    name = "x"
+    for _ in range(min(1000, getrecursionlimit() - len(stack()) - 50)):
+        var = var.variable_map["next"]
         assert var
-        assert var.type.dtype.typedef is module.typedef_map['list_t']
-        name = f'{name}%next'
+        assert var.type.dtype.typedef is module.typedef_map["list_t"]
+        name = f"{name}%next"
         assert var.name == name
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_nested_procedure_call(frontend):
     """
     Test correct representation of inline calls and call statements for
@@ -1031,24 +1079,28 @@ end module derived_type_nested_proc_call_mod
 
     mod = Module.from_source(fcode, frontend=frontend)
 
-    assignment = FindNodes(Assignment).visit(mod['exists'].body)
+    assignment = FindNodes(Assignment).visit(mod["exists"].body)
     assert len(assignment) == 1
     assignment = assignment[0]
     assert isinstance(assignment.rhs, InlineCall)
-    assert fgen(assignment.rhs).lower() == 'this%file%exists(var_name)'
+    assert fgen(assignment.rhs).lower() == "this%file%exists(var_name)"
 
     assert isinstance(assignment.rhs.function, ProcedureSymbol)
     assert isinstance(assignment.rhs.function.type.dtype, ProcedureType)
-    assert assignment.rhs.function.parent and isinstance(assignment.rhs.function.parent.type.dtype, DerivedType)
-    assert assignment.rhs.function.parent.type.dtype.name == 'netcdf_file_raw'
-    assert assignment.rhs.function.parent.type.dtype.typedef is mod['netcdf_file_raw']
+    assert assignment.rhs.function.parent and isinstance(
+        assignment.rhs.function.parent.type.dtype, DerivedType
+    )
+    assert assignment.rhs.function.parent.type.dtype.name == "netcdf_file_raw"
+    assert assignment.rhs.function.parent.type.dtype.typedef is mod["netcdf_file_raw"]
     assert assignment.rhs.function.parent.parent
     assert isinstance(assignment.rhs.function.parent.parent.type.dtype, DerivedType)
-    assert assignment.rhs.function.parent.parent.type.dtype.name == 'netcdf_file'
-    assert assignment.rhs.function.parent.parent.type.dtype.typedef is mod['netcdf_file']
+    assert assignment.rhs.function.parent.parent.type.dtype.name == "netcdf_file"
+    assert (
+        assignment.rhs.function.parent.parent.type.dtype.typedef is mod["netcdf_file"]
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_type_sequence(frontend):
     """
     Verify derived types with ``SEQUENCE`` stmt work as expected
@@ -1067,11 +1119,11 @@ end module derived_type_sequence
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    numeric_seq = module.typedef_map['numeric_seq']
-    assert 'SEQUENCE' in fgen(numeric_seq)
+    numeric_seq = module.typedef_map["numeric_seq"]
+    assert "SEQUENCE" in fgen(numeric_seq)
 
 
-@pytest.fixture(scope='module', name='shadowed_typedef_symbols_fcode')
+@pytest.fixture(scope="module", name="shadowed_typedef_symbols_fcode")
 def fixture_shadowed_typedef_symbols_fcode(here, builder):
     # Excerpt from ecrad's radiation_random_numbers.F90
     fcode = """
@@ -1124,10 +1176,12 @@ end module radiation_random_numbers
     """.strip()
 
     # Verify that this code behaves as expected
-    ref_path = here/'radiation_random_numbers.F90'
+    ref_path = here / "radiation_random_numbers.F90"
     ref_path.write_text(fcode)
 
-    ref_lib = jit_compile_lib([ref_path], path=here, name='radiation_random_numbers', builder=builder)
+    ref_lib = jit_compile_lib(
+        [ref_path], path=here, name="radiation_random_numbers", builder=builder
+    )
     ref_mod = ref_lib.radiation_random_numbers
     ref_default_shape, ref_default_maxstreams = ref_mod.rng_default()
     ref_init_shape, ref_init_maxstreams = ref_mod.rng_init()
@@ -1142,46 +1196,49 @@ end module radiation_random_numbers
     clean_test(ref_path)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
-def test_derived_type_rescope_symbols_shadowed(here, shadowed_typedef_symbols_fcode, frontend):
+@pytest.mark.parametrize("frontend", available_frontends())
+def test_derived_type_rescope_symbols_shadowed(
+    here, shadowed_typedef_symbols_fcode, frontend
+):
     """
     Test the rescoping of symbols with shadowed symbols in a typedef.
     """
     # Parse into Loki IR
     module = Module.from_source(shadowed_typedef_symbols_fcode, frontend=frontend)
-    mod_var = module.variable_map['nmaxstreams']
+    mod_var = module.variable_map["nmaxstreams"]
     assert mod_var.scope is module
 
     # Verify scope of variables in type def
-    rng_type = module.typedef_map['rng_type']
-    istate = rng_type.variable_map['istate']
-    tdef_var = rng_type.variable_map['nmaxstreams']
+    rng_type = module.typedef_map["rng_type"]
+    istate = rng_type.variable_map["istate"]
+    tdef_var = rng_type.variable_map["nmaxstreams"]
 
-    assert istate in ('istate(nmaxstreams)', 'istate(1:nmaxstreams)')
+    assert istate in ("istate(nmaxstreams)", "istate(1:nmaxstreams)")
     assert istate.scope is rng_type
 
     if frontend == OMNI:
-        assert istate.dimensions[0] == '1:nmaxstreams'
+        assert istate.dimensions[0] == "1:nmaxstreams"
         assert istate.dimensions[0].stop.scope
     else:
-        assert istate.dimensions[0] == 'nmaxstreams'
+        assert istate.dimensions[0] == "nmaxstreams"
         assert istate.dimensions[0].scope
 
     # FIXME: Use of NMaxStreams from parent scope is in the wrong scope (LOKI-52)
-    #assert istate.dimensions[0].scope is module
+    # assert istate.dimensions[0].scope is module
 
     assert tdef_var.scope is rng_type
 
     if frontend != OMNI:
         # FIXME: OMNI doesn't retain the initializer expressions in the typedef
         from loki.expression import Scalar  # pylint: disable=import-outside-toplevel
-        assert tdef_var.type.initial == 'NMaxStreams'
+
+        assert tdef_var.type.initial == "NMaxStreams"
         assert tdef_var.type.initial.scope is module
         assert tdef_var.type.initial == mod_var
         assert isinstance(tdef_var.type.initial, Scalar)
 
         # Test the outcome works as expected
-        filepath = here/f'{module.name}_{frontend}.F90'
+        filepath = here / f"{module.name}_{frontend}.F90"
         mod = jit_compile(module, filepath=filepath, objname=module.name)
 
         default_shape, default_maxstreams = mod.rng_default()
@@ -1195,9 +1252,9 @@ def test_derived_type_rescope_symbols_shadowed(here, shadowed_typedef_symbols_fc
         clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[
-    (OFP, 'OFP cannot parse the Fortran')
-]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OFP, "OFP cannot parse the Fortran")])
+)
 def test_derived_types_character_array_subscript(frontend):
     fcode = """
 module derived_type_char_arr_mod
@@ -1226,14 +1283,15 @@ end module derived_type_char_arr_mod
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    conditionals = FindNodes(Conditional).visit(module['some_routine'].body)
+    conditionals = FindNodes(Conditional).visit(module["some_routine"].body)
     assert all(isinstance(c.condition.left, StringSubscript) for c in conditionals)
     assert [fgen(c.condition.left) for c in conditionals] == [
-      'config%some_name(i)(1:1)', 'config%some_name(i)(strlen - 2:strlen)'
+        "config%some_name(i)(1:1)",
+        "config%some_name(i)(strlen - 2:strlen)",
     ]
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_types_nested_subscript(frontend):
     fcode = """
 module derived_types_nested_subscript
@@ -1272,13 +1330,13 @@ end module derived_types_nested_subscript
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    calls = FindNodes(CallStatement).visit(module['driver'].body)
+    calls = FindNodes(CallStatement).visit(module["driver"].body)
     assert len(calls) == 1
-    assert str(calls[0].name) == 'outers(i)%inner(j)%some_routine'
-    assert fgen(calls[0].name) == 'outers(i)%inner(j)%some_routine'
+    assert str(calls[0].name) == "outers(i)%inner(j)%some_routine"
+    assert fgen(calls[0].name) == "outers(i)%inner(j)%some_routine"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_types_nested_type(frontend):
     fcode_module = """
 module some_mod
@@ -1323,18 +1381,22 @@ end subroutine driver
     """.strip()
 
     module = Module.from_source(fcode_module, frontend=frontend)
-    driver = Subroutine.from_source(fcode_driver, frontend=frontend, definitions=[module])
+    driver = Subroutine.from_source(
+        fcode_driver, frontend=frontend, definitions=[module]
+    )
 
-    other_routine = module['other_routine']
+    other_routine = module["other_routine"]
     call = other_routine.body.body[0]
     assert isinstance(call, CallStatement)
     assert isinstance(call.name.type.dtype, ProcedureType)
     assert call.name.parent and isinstance(call.name.parent.type.dtype, DerivedType)
-    assert call.name.parent.type.dtype.name == 'some_type'
-    assert call.name.parent.type.dtype.typedef is module['some_type']
-    assert call.name.parent.parent and isinstance(call.name.parent.parent.type.dtype, DerivedType)
-    assert call.name.parent.parent.type.dtype.name == 'other_type'
-    assert call.name.parent.parent.type.dtype.typedef is module['other_type']
+    assert call.name.parent.type.dtype.name == "some_type"
+    assert call.name.parent.type.dtype.typedef is module["some_type"]
+    assert call.name.parent.parent and isinstance(
+        call.name.parent.parent.type.dtype, DerivedType
+    )
+    assert call.name.parent.parent.type.dtype.name == "other_type"
+    assert call.name.parent.parent.type.dtype.typedef is module["other_type"]
 
     calls = FindNodes(CallStatement).visit(driver.body)
     assert len(calls) == 2
@@ -1342,26 +1404,28 @@ end subroutine driver
         assert isinstance(call.name.type.dtype, ProcedureType)
         assert call.name.parent and isinstance(call.name.parent.type.dtype, DerivedType)
 
-    assert calls[0].name.parent.type.dtype.name == 'other_type'
-    assert calls[0].name.parent.type.dtype.typedef is module['other_type']
+    assert calls[0].name.parent.type.dtype.name == "other_type"
+    assert calls[0].name.parent.type.dtype.typedef is module["other_type"]
 
-    assert calls[1].name.parent.type.dtype.name == 'some_type'
-    assert calls[1].name.parent.type.dtype.typedef is module['some_type']
+    assert calls[1].name.parent.type.dtype.name == "some_type"
+    assert calls[1].name.parent.type.dtype.typedef is module["some_type"]
     assert calls[1].name.parent.parent
-    assert calls[1].name.parent.parent.type.dtype.name == 'other_type'
-    assert calls[1].name.parent.parent.type.dtype.typedef is module['other_type']
+    assert calls[1].name.parent.parent.type.dtype.name == "other_type"
+    assert calls[1].name.parent.parent.type.dtype.typedef is module["other_type"]
 
     assignment = driver.body.body[-1]
     assert isinstance(assignment, Assignment)
     assert assignment.rhs.type.dtype is BasicType.INTEGER
-    assert assignment.rhs.parent and isinstance(assignment.rhs.parent.type.dtype, DerivedType)
-    assert assignment.rhs.parent.type.dtype.name == 'some_type'
-    assert assignment.rhs.parent.type.dtype.typedef is module['some_type']
-    assert assignment.rhs.parent.parent.type.dtype.name == 'other_type'
-    assert assignment.rhs.parent.parent.type.dtype.typedef is module['other_type']
+    assert assignment.rhs.parent and isinstance(
+        assignment.rhs.parent.type.dtype, DerivedType
+    )
+    assert assignment.rhs.parent.type.dtype.name == "some_type"
+    assert assignment.rhs.parent.type.dtype.typedef is module["some_type"]
+    assert assignment.rhs.parent.parent.type.dtype.name == "other_type"
+    assert assignment.rhs.parent.parent.type.dtype.typedef is module["other_type"]
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_derived_types_abstract_deferred_procedure(frontend):
     fcode = """
 module some_mod
@@ -1388,9 +1452,9 @@ module some_mod
 end module some_mod
     """.strip()
     module = Module.from_source(fcode, frontend=frontend)
-    typedef = module['abstract_type']
+    typedef = module["abstract_type"]
     assert typedef.abstract is True
-    assert typedef.variables == ('some_proc', 'other_proc')
+    assert typedef.variables == ("some_proc", "other_proc")
     for symbol in typedef.variables:
         assert isinstance(symbol, ProcedureSymbol)
         assert isinstance(symbol.type.dtype, ProcedureType)

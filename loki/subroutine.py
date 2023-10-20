@@ -8,8 +8,11 @@
 from loki import ir
 from loki.expression import FindVariables, SubstituteExpressions, symbols as sym
 from loki.frontend import (
-    parse_omni_ast, parse_ofp_ast, parse_fparser_ast, get_fparser_node,
-    parse_regex_source
+    parse_omni_ast,
+    parse_ofp_ast,
+    parse_fparser_ast,
+    get_fparser_node,
+    parse_regex_source,
 )
 from loki.pragma_utils import is_loki_pragma, pragmas_attached
 from loki.program_unit import ProgramUnit
@@ -18,7 +21,7 @@ from loki.tools import as_tuple, CaseInsensitiveDict
 from loki.types import BasicType, ProcedureType, DerivedType, SymbolAttributes
 
 
-__all__ = ['Subroutine']
+__all__ = ["Subroutine"]
 
 
 class Subroutine(ProgramUnit):
@@ -72,10 +75,23 @@ class Subroutine(ProgramUnit):
     """
 
     def __init__(
-            self, name, args=None, docstring=None, spec=None, body=None,
-            contains=None, prefix=None, bind=None, result_name=None,
-            is_function=False, ast=None, source=None, parent=None,
-            symbol_attrs=None, rescope_symbols=False, incomplete=False
+        self,
+        name,
+        args=None,
+        docstring=None,
+        spec=None,
+        body=None,
+        contains=None,
+        prefix=None,
+        bind=None,
+        result_name=None,
+        is_function=False,
+        ast=None,
+        source=None,
+        parent=None,
+        symbol_attrs=None,
+        rescope_symbols=False,
+        incomplete=False,
     ):
         super().__init__(parent=parent)
 
@@ -83,19 +99,43 @@ class Subroutine(ProgramUnit):
             self.symbol_attrs.update(symbol_attrs)
 
         self.__initialize__(
-            name=name, args=args, docstring=docstring, spec=spec, body=body,
-            contains=contains,  prefix=prefix, bind=bind, result_name=result_name,
-            is_function=is_function, ast=ast, source=source,
-            rescope_symbols=rescope_symbols, incomplete=incomplete
+            name=name,
+            args=args,
+            docstring=docstring,
+            spec=spec,
+            body=body,
+            contains=contains,
+            prefix=prefix,
+            bind=bind,
+            result_name=result_name,
+            is_function=is_function,
+            ast=ast,
+            source=source,
+            rescope_symbols=rescope_symbols,
+            incomplete=incomplete,
         )
 
     def __initialize__(
-            self, name, docstring=None, spec=None, contains=None,
-            ast=None, source=None, rescope_symbols=False, incomplete=False,
-            body=None, args=None, prefix=None, bind=None, result_name=None, is_function=False,
+        self,
+        name,
+        docstring=None,
+        spec=None,
+        contains=None,
+        ast=None,
+        source=None,
+        rescope_symbols=False,
+        incomplete=False,
+        body=None,
+        args=None,
+        prefix=None,
+        bind=None,
+        result_name=None,
+        is_function=False,
     ):
         # First, store additional Subroutine-specific properties
-        self._dummies = as_tuple(a.lower() for a in as_tuple(args))  # Order of dummy arguments
+        self._dummies = as_tuple(
+            a.lower() for a in as_tuple(args)
+        )  # Order of dummy arguments
         self.prefix = as_tuple(prefix)
         self.bind = bind
         self.result_name = result_name
@@ -107,12 +147,18 @@ class Subroutine(ProgramUnit):
         self.body = body
 
         super().__initialize__(
-            name=name, docstring=docstring, spec=spec, contains=contains,
-            ast=ast, source=source, rescope_symbols=rescope_symbols, incomplete=incomplete
+            name=name,
+            docstring=docstring,
+            spec=spec,
+            contains=contains,
+            ast=ast,
+            source=source,
+            rescope_symbols=rescope_symbols,
+            incomplete=incomplete,
         )
 
     def __getstate__(self):
-        _ignore = ('_ast', '_parent')
+        _ignore = ("_ast", "_parent")
         return dict((k, v) for k, v in self.__dict__.items() if k not in _ignore)
 
     def __setstate__(self, s):
@@ -122,7 +168,9 @@ class Subroutine(ProgramUnit):
 
         # Re-register all encapulated member procedures
         for member in self.members:
-            self.symbol_attrs[member.name] = SymbolAttributes(ProcedureType(procedure=member))
+            self.symbol_attrs[member.name] = SymbolAttributes(
+                ProcedureType(procedure=member)
+            )
 
         # Ensure that we are attaching all symbols to the newly create ``self``.
         self.rescope_symbols()
@@ -150,8 +198,10 @@ class Subroutine(ProgramUnit):
             if v.name.lower() in alloc_map:
                 vtype = v.type.clone(shape=alloc_map[v.name.lower()])
                 smap[v] = v.clone(type=vtype)
-        return (SubstituteExpressions(smap, invalidate_source=False).visit(spec),
-                SubstituteExpressions(vmap, invalidate_source=False).visit(body))
+        return (
+            SubstituteExpressions(smap, invalidate_source=False).visit(spec),
+            SubstituteExpressions(vmap, invalidate_source=False).visit(body),
+        )
 
     @classmethod
     def from_omni(cls, ast, raw_source, definitions=None, parent=None, type_map=None):
@@ -173,11 +223,14 @@ class Subroutine(ProgramUnit):
             OMNI's ``typeTable`` parse tree node
         """
         type_map = type_map or {}
-        if ast.tag != 'FfunctionDefinition':
-            ast = ast.find('globalDeclarations/FfunctionDefinition')
+        if ast.tag != "FfunctionDefinition":
+            ast = ast.find("globalDeclarations/FfunctionDefinition")
         return parse_omni_ast(
-            ast=ast, definitions=definitions, raw_source=raw_source,
-            type_map=type_map, scope=parent
+            ast=ast,
+            definitions=definitions,
+            raw_source=raw_source,
+            type_map=type_map,
+            scope=parent,
         )
 
     @classmethod
@@ -198,11 +251,18 @@ class Subroutine(ProgramUnit):
         parent : :any:`Scope`, optional
             The enclosing parent scope of the subroutine, typically a :any:`Module`.
         """
-        if ast.tag not in ('subroutine', 'function'):
-            ast = [r for r in as_tuple(ast.find('file')) if r.tag in ('subroutine', 'function')].pop()
+        if ast.tag not in ("subroutine", "function"):
+            ast = [
+                r
+                for r in as_tuple(ast.find("file"))
+                if r.tag in ("subroutine", "function")
+            ].pop()
         return parse_ofp_ast(
-            ast=ast, pp_info=pp_info, raw_source=raw_source,
-            definitions=definitions, scope=parent
+            ast=ast,
+            pp_info=pp_info,
+            raw_source=raw_source,
+            definitions=definitions,
+            scope=parent,
         )
 
     @classmethod
@@ -223,14 +283,22 @@ class Subroutine(ProgramUnit):
         parent : :any:`Scope`, optional
             The enclosing parent scope of the subroutine, typically a :any:`Module`.
         """
-        if ast.__class__.__name__ not in ('Subroutine_Subprogram', 'Function_Subprogram'):
-            ast = get_fparser_node(ast, ('Subroutine_Subprogram', 'Function_Subprogram'))
+        if ast.__class__.__name__ not in (
+            "Subroutine_Subprogram",
+            "Function_Subprogram",
+        ):
+            ast = get_fparser_node(
+                ast, ("Subroutine_Subprogram", "Function_Subprogram")
+            )
         # Note that our Fparser interface returns a tuple with the
         # Subroutine object always last but potentially containing
         # comments before the Subroutine object
         return parse_fparser_ast(
-            ast, pp_info=pp_info, definitions=definitions,
-            raw_source=raw_source, scope=parent
+            ast,
+            pp_info=pp_info,
+            definitions=definitions,
+            raw_source=raw_source,
+            scope=parent,
         )[-1]
 
     @classmethod
@@ -245,7 +313,9 @@ class Subroutine(ProgramUnit):
         parent : :any:`Scope`, optional
             The enclosing parent scope of the subroutine, typically a :any:`Module`.
         """
-        ir_ = parse_regex_source(raw_source, parser_classes=parser_classes, scope=parent)
+        ir_ = parse_regex_source(
+            raw_source, parser_classes=parser_classes, scope=parent
+        )
         return [node for node in ir_.body if isinstance(node, cls)][0]
 
     def register_in_parent_scope(self):
@@ -273,22 +343,22 @@ class Subroutine(ProgramUnit):
             The cloned subroutine object.
         """
         # Collect all properties bespoke to Subroutine
-        if self.argnames and 'args' not in kwargs:
-            kwargs['args'] = self.argnames
-        if self.body and 'body' not in kwargs:
-            kwargs['body'] = self.body
-        if self.prefix and 'prefix' not in kwargs:
-            kwargs['prefix'] = self.prefix
-        if self.bind and 'bind' not in kwargs:
-            kwargs['bind'] = self.bind
-        if self.result_name and 'result_name' not in kwargs:
-            kwargs['result_name'] = self.result_name
-        if self.is_function and 'is_function' not in kwargs:
-            kwargs['is_function'] = self.is_function
+        if self.argnames and "args" not in kwargs:
+            kwargs["args"] = self.argnames
+        if self.body and "body" not in kwargs:
+            kwargs["body"] = self.body
+        if self.prefix and "prefix" not in kwargs:
+            kwargs["prefix"] = self.prefix
+        if self.bind and "bind" not in kwargs:
+            kwargs["bind"] = self.bind
+        if self.result_name and "result_name" not in kwargs:
+            kwargs["result_name"] = self.result_name
+        if self.is_function and "is_function" not in kwargs:
+            kwargs["is_function"] = self.is_function
 
         # Rebuild body (other IR components are taken care of in super class)
-        if 'body' in kwargs:
-            kwargs['body'] = Transformer({}, rebuild_scopes=True).visit(kwargs['body'])
+        if "body" in kwargs:
+            kwargs["body"] = Transformer({}, rebuild_scopes=True).visit(kwargs["body"])
 
         # Escalate to parent class
         return super().clone(**kwargs)
@@ -299,9 +369,16 @@ class Subroutine(ProgramUnit):
         Base definition for comparing :any:`Subroutine` objects.
         """
         return (
-            self.name, self.is_function, self._dummies, self.prefix,
-            self.bind, self.docstring, self.spec, self.body,
-            self.contains, self.symbol_attrs
+            self.name,
+            self.is_function,
+            self._dummies,
+            self.prefix,
+            self.bind,
+            self.docstring,
+            self.spec,
+            self.body,
+            self.contains,
+            self.symbol_attrs,
         )
 
     def __eq__(self, other):
@@ -317,7 +394,11 @@ class Subroutine(ProgramUnit):
         """
         Return the procedure symbol for this subroutine
         """
-        return sym.Variable(name=self.name, type=SymbolAttributes(self.procedure_type), scope=self.parent)
+        return sym.Variable(
+            name=self.name,
+            type=SymbolAttributes(self.procedure_type),
+            scope=self.parent,
+        )
 
     @property
     def procedure_type(self):
@@ -352,7 +433,9 @@ class Subroutine(ProgramUnit):
 
         # Filter the dummy list in case we removed an argument
         varnames = [str(v.name).lower() for v in variables]
-        self._dummies = as_tuple(arg for arg in self._dummies if str(arg).lower() in varnames)
+        self._dummies = as_tuple(
+            arg for arg in self._dummies if str(arg).lower() in varnames
+        )
 
     @property
     def arguments(self):
@@ -360,11 +443,13 @@ class Subroutine(ProgramUnit):
         Return arguments in order of the defined signature (dummy list).
         """
 
-        #Load symbol_map
-        #Note that if the map is not loaded, Python will recreate it for every arguement,
-        #resulting in a large overhead.
+        # Load symbol_map
+        # Note that if the map is not loaded, Python will recreate it for every arguement,
+        # resulting in a large overhead.
         symbol_map = self.symbol_map
-        return as_tuple(symbol_map.get(arg, sym.Variable(name=arg)) for arg in self._dummies)
+        return as_tuple(
+            symbol_map.get(arg, sym.Variable(name=arg)) for arg in self._dummies
+        )
 
     @arguments.setter
     def arguments(self, arguments):
@@ -376,7 +461,9 @@ class Subroutine(ProgramUnit):
         # FIXME: This will fail if one of the argument is declared via an interface!
 
         # First map variables to existing declarations
-        declarations = FindNodes((ir.VariableDeclaration, ir.ProcedureDeclaration)).visit(self.spec)
+        declarations = FindNodes(
+            (ir.VariableDeclaration, ir.ProcedureDeclaration)
+        ).visit(self.spec)
         decl_map = dict((v, decl) for decl in declarations for v in decl.symbols)
 
         arguments = as_tuple(arguments)
@@ -385,9 +472,9 @@ class Subroutine(ProgramUnit):
                 # By default, append new variables to the end of the spec
                 assert arg.type.intent is not None
                 if isinstance(arg.type, ProcedureType):
-                    new_decl = ir.ProcedureDeclaration(symbols=(arg, ))
+                    new_decl = ir.ProcedureDeclaration(symbols=(arg,))
                 else:
-                    new_decl = ir.VariableDeclaration(symbols=(arg, ))
+                    new_decl = ir.VariableDeclaration(symbols=(arg,))
                 self.spec.append(new_decl)
 
         # Set new dummy list according to input
@@ -420,10 +507,14 @@ class Subroutine(ProgramUnit):
         arg_names = [arg.name for arg in self.arguments]
         routine = Subroutine(name=self.name, args=arg_names, spec=None, body=None)
         decl_map = {}
-        for decl in FindNodes((ir.VariableDeclaration, ir.ProcedureDeclaration)).visit(self.spec):
+        for decl in FindNodes((ir.VariableDeclaration, ir.ProcedureDeclaration)).visit(
+            self.spec
+        ):
             if any(v.name in arg_names for v in decl.symbols):
-                assert all(v.name in arg_names and v.type.intent is not None for v in decl.symbols), \
-                    "Declarations must have intents and dummy and local arguments cannot be mixed."
+                assert all(
+                    v.name in arg_names and v.type.intent is not None
+                    for v in decl.symbols
+                ), "Declarations must have intents and dummy and local arguments cannot be mixed."
                 # Replicate declaration with re-scoped variables
                 variables = as_tuple(v.clone(scope=routine) for v in decl.symbols)
                 decl_map[decl] = decl.clone(symbols=variables)
@@ -449,7 +540,7 @@ class Subroutine(ProgramUnit):
             for call in FindNodes(ir.CallStatement).visit(self.body):
                 name = str(call.name)
                 # Calls marked as 'reference' are inactive and thus skipped
-                not_active = is_loki_pragma(call.pragma, starts_with='reference')
+                not_active = is_loki_pragma(call.pragma, starts_with="reference")
 
                 # Update symbol table if necessary and present in routine_map
                 routine = routine_map.get(name)
@@ -462,20 +553,26 @@ class Subroutine(ProgramUnit):
                 if routine is not None:
                     name_type = call.name.type
                     update_symbol = (
-                        call.name.scope is None or                # No scope attached
-                        name_type.dtype is BasicType.DEFERRED or  # No ProcedureType attached
-                        name_type.dtype.procedure is not routine  # ProcedureType not linked to routine
+                        call.name.scope is None
+                        or name_type.dtype is BasicType.DEFERRED  # No scope attached
+                        or name_type.dtype.procedure  # No ProcedureType attached
+                        is not routine  # ProcedureType not linked to routine
                     )
                     if update_symbol:
                         # Remove existing symbol from symbol table if defined in interface block
-                        for node in [node for intf in self.interfaces for node in intf.body]:
-                            if getattr(node, 'name', None) == call.name:
+                        for node in [
+                            node for intf in self.interfaces for node in intf.body
+                        ]:
+                            if getattr(node, "name", None) == call.name:
                                 if node.parent == self:
                                     node.parent = None
 
                         # Need to update the call's symbol to establish link to routine
                         name_type = name_type.clone(dtype=routine.procedure_type)
-                        call._update(name=call.name.clone(scope=self, type=name_type), not_active=not_active)
+                        call._update(
+                            name=call.name.clone(scope=self, type=name_type),
+                            not_active=not_active,
+                        )
 
                 # In any case, update the not_active attribute
                 if call.not_active is not not_active:
@@ -490,9 +587,14 @@ class Subroutine(ProgramUnit):
         type_map = CaseInsensitiveDict((t.name, t) for t in as_tuple(typedefs))
         for variable in self.variables:
             type_ = variable.type
-            if isinstance(type_.dtype, DerivedType) and type_.dtype.typedef is BasicType.DEFERRED:
+            if (
+                isinstance(type_.dtype, DerivedType)
+                and type_.dtype.typedef is BasicType.DEFERRED
+            ):
                 if type_.dtype.name in type_map:
-                    variable.type = type_.clone(dtype=DerivedType(typedef=type_map[type_.dtype.name]))
+                    variable.type = type_.clone(
+                        dtype=DerivedType(typedef=type_map[type_.dtype.name])
+                    )
 
     def __repr__(self):
         """

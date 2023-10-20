@@ -10,11 +10,17 @@ import pytest
 from conftest import available_frontends
 
 from loki import (
-    Module, Subroutine, fgen, OMNI, OFP, Intrinsic, DataDeclaration,
+    Module,
+    Subroutine,
+    fgen,
+    OMNI,
+    OFP,
+    Intrinsic,
+    DataDeclaration,
 )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_fgen_literal_list_linebreak(frontend):
     """
     Test correct handling of linebreaks for LiteralList expression nodes
@@ -63,33 +69,33 @@ end module some_mod
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    routine = module['literal_list_linebreak']
+    routine = module["literal_list_linebreak"]
 
     # Make sure all lines are continued correctly
     code = module.to_fortran()
     code_lines = code.splitlines()
-    assert len(code_lines) in (35, 36) # OMNI produces an extra line
-    assert all(line.strip(' &\n') for line in code_lines)
+    assert len(code_lines) in (35, 36)  # OMNI produces an extra line
+    assert all(line.strip(" &\n") for line in code_lines)
     assert all(len(line) < 132 for line in code_lines)
 
     # Make sure it works also with less indentation
     spec_code = fgen(routine.spec)
-    assert spec_code.count('&') == 32
+    assert spec_code.count("&") == 32
     spec_lines = spec_code.splitlines()
     assert len(spec_lines) == 18
     assert all(len(line) < 132 for line in spec_code.splitlines())
 
     body_code = fgen(routine.body)
-    assert body_code.count(',') == 27
-    assert body_code.count('(/') == 2
-    assert body_code.count('/)') == 2
-    assert body_code.count('&') == 6
+    assert body_code.count(",") == 27
+    assert body_code.count("(/") == 2
+    assert body_code.count("/)") == 2
+    assert body_code.count("&") == 6
     body_lines = body_code.splitlines()
     assert len(body_lines) == 4
     assert all(len(line) < 132 for line in body_lines)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_fgen_data_stmt(frontend):
     """
     Test correct formatting of data declaration statements
@@ -111,15 +117,17 @@ end subroutine data_stmt
     else:
         assert isinstance(routine.spec.body[-1], DataDeclaration)
     spec_code = fgen(routine.spec)
-    assert spec_code.lower().count('data ') == 2
-    assert spec_code.count('/') == 4
+    assert spec_code.lower().count("data ") == 2
+    assert spec_code.count("/") == 4
     if frontend != OMNI:
         # OMNI seems to evaluate constant expressions, replacing 31*0 by 0,
         # although it's not a product here but a repeat specifier (great job, Fortran!)
-        assert '31*0' in spec_code
+        assert "31*0" in spec_code
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'Loki likes only valid code')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OMNI, "Loki likes only valid code")])
+)
 def test_multiline_inline_conditional(frontend):
     """
     Test correct formatting of an inline :any:`Conditional` that
@@ -145,10 +153,10 @@ end subroutine test_fgen
 
     out = fgen(routine, linewidth=132)
     for line in out.splitlines():
-        assert line.count('&') <= 2
+        assert line.count("&") <= 2
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_fgen_save_attribute(frontend):
     """
     Make sure the SAVE attribute on declarations is preserved (#164)
@@ -159,7 +167,7 @@ MODULE test
 END MODULE test
     """.strip()
     module = Module.from_source(fcode, frontend=frontend)
-    assert module['variable'].type.save is True
+    assert module["variable"].type.save is True
     assert len(module.declarations) == 1
-    assert 'SAVE' in fgen(module.declarations[0])
-    assert 'SAVE' in module.to_fortran()
+    assert "SAVE" in fgen(module.declarations[0])
+    assert "SAVE" in module.to_fortran()

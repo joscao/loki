@@ -15,17 +15,18 @@ from loki import Sourcefile, FindInlineCalls, FindNodes, VariableDeclaration
 from loki.lint import DefaultHandler
 
 
-pytestmark = pytest.mark.skipif(not available_frontends(),
-                                reason='Supported frontend not available')
+pytestmark = pytest.mark.skipif(
+    not available_frontends(), reason="Supported frontend not available"
+)
 
 
-@pytest.fixture(scope='module', name='rules')
+@pytest.fixture(scope="module", name="rules")
 def fixture_rules():
-    rules = importlib.import_module('lint_rules.debug_rules')
+    rules = importlib.import_module("lint_rules.debug_rules")
     return rules
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_arg_size_array_slices(rules, frontend):
     """
     Test for argument size mismatch when arguments are passed as array slices.
@@ -80,26 +81,37 @@ end subroutine kernel
     driver_source = Sourcefile.from_source(fcode_driver, frontend=frontend)
     kernel_source = Sourcefile.from_source(fcode_kernel, frontend=frontend)
 
-    driver = driver_source['driver']
-    kernel = kernel_source['kernel']
-    driver.enrich_calls([kernel,])
+    driver = driver_source["driver"]
+    kernel = kernel_source["kernel"]
+    driver.enrich_calls(
+        [
+            kernel,
+        ]
+    )
 
     messages = []
     handler = DefaultHandler(target=messages.append)
-    _ = run_linter(driver_source, [rules.ArgSizeMismatchRule], config={'ArgSizeMismatchRule': {'max_indirections': 3}},
-                   handlers=[handler], targets=['kernel',])
+    _ = run_linter(
+        driver_source,
+        [rules.ArgSizeMismatchRule],
+        config={"ArgSizeMismatchRule": {"max_indirections": 3}},
+        handlers=[handler],
+        targets=[
+            "kernel",
+        ],
+    )
 
     assert len(messages) == 3
-    keyword = 'ArgSizeMismatchRule'
+    keyword = "ArgSizeMismatchRule"
     assert all(keyword in msg for msg in messages)
 
-    args = ('var0', 'var1', 'var4')
+    args = ("var0", "var1", "var4")
     for msg, ref_arg in zip(messages, args):
-        assert f'arg: {ref_arg}' in msg
-        assert f'dummy_arg: {ref_arg}_d' in msg
+        assert f"arg: {ref_arg}" in msg
+        assert f"dummy_arg: {ref_arg}_d" in msg
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_arg_size_array_sequence(rules, frontend):
     """
     Test for argument size mismatch when arguments are passed as array sequences.
@@ -153,25 +165,36 @@ end subroutine kernel
     driver_source = Sourcefile.from_source(fcode_driver, frontend=frontend)
     kernel_source = Sourcefile.from_source(fcode_kernel, frontend=frontend)
 
-    driver = driver_source['driver']
-    kernel = kernel_source['kernel']
-    driver.enrich_calls([kernel,])
+    driver = driver_source["driver"]
+    kernel = kernel_source["kernel"]
+    driver.enrich_calls(
+        [
+            kernel,
+        ]
+    )
 
     messages = []
     handler = DefaultHandler(target=messages.append)
-    _ = run_linter(driver_source, [rules.ArgSizeMismatchRule], handlers=[handler], targets=['kernel',])
+    _ = run_linter(
+        driver_source,
+        [rules.ArgSizeMismatchRule],
+        handlers=[handler],
+        targets=[
+            "kernel",
+        ],
+    )
 
     assert len(messages) == 4
-    keyword = 'ArgSizeMismatchRule'
+    keyword = "ArgSizeMismatchRule"
     assert all(keyword in msg for msg in messages)
 
-    args = ('var0', 'var1', 'var5', 'var6')
+    args = ("var0", "var1", "var5", "var6")
     for msg, ref_arg in zip(messages, args):
-        assert f'arg: {ref_arg}' in msg
-        assert f'dummy_arg: {ref_arg}_d' in msg
+        assert f"arg: {ref_arg}" in msg
+        assert f"dummy_arg: {ref_arg}_d" in msg
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_dynamic_ubound_checks(rules, frontend):
     """
     Test the run-time UBOUND checking linter rule
@@ -214,41 +237,55 @@ end subroutine kernel
     """.strip()
 
     kernel = Sourcefile.from_source(fcode, frontend=frontend)
-    kernel.path = Path(__file__).parent / 'dynamic_ubound_test.F90'
+    kernel.path = Path(__file__).parent / "dynamic_ubound_test.F90"
 
     messages = []
     handler = DefaultHandler(target=messages.append)
-    _ = run_linter(kernel, [rules.DynamicUboundCheckRule], config={'fix': True}, handlers=[handler])
+    _ = run_linter(
+        kernel, [rules.DynamicUboundCheckRule], config={"fix": True}, handlers=[handler]
+    )
 
     # check rule violations
     assert len(messages) == 3
-    assert all('DynamicUboundCheckRule' in msg for msg in messages)
+    assert all("DynamicUboundCheckRule" in msg for msg in messages)
 
-    assert 'var0' in messages[0]
-    assert 'var2' in messages[1]
-    assert 'var4' in messages[2]
+    assert "var0" in messages[0]
+    assert "var2" in messages[1]
+    assert "var4" in messages[2]
 
     # check fixed subroutine
-    routine = kernel['kernel']
-    icalls = [call for call in FindInlineCalls(unique=False).visit(routine.body)
-              if call.function == 'ubound']
+    routine = kernel["kernel"]
+    icalls = [
+        call
+        for call in FindInlineCalls(unique=False).visit(routine.body)
+        if call.function == "ubound"
+    ]
 
     assert len(icalls) == 1
 
-    shape = ('klon', 'klev', 'nblk')
+    shape = ("klon", "klev", "nblk")
 
-    assert all(s.name == d for s, d in zip(routine.variable_map['var0'].shape, shape))
-    assert all(s.name == d for s, d in zip(routine.variable_map['var2'].shape, shape))
-    assert all(s.name == d for s, d in zip(routine.variable_map['var4'].shape, shape))
+    assert all(s.name == d for s, d in zip(routine.variable_map["var0"].shape, shape))
+    assert all(s.name == d for s, d in zip(routine.variable_map["var2"].shape, shape))
+    assert all(s.name == d for s, d in zip(routine.variable_map["var4"].shape, shape))
 
-    arg_names = ['klon', 'klev', 'nblk', 'var0', 'var1', 'var2', 'var3', 'var4']
+    arg_names = ["klon", "klev", "nblk", "var0", "var1", "var2", "var3", "var4"]
     assert [arg.name.lower() for arg in routine.arguments] == arg_names
 
     # check that variable declarations have not been duplicated
     declarations = FindNodes(VariableDeclaration).visit(routine.spec)
     symbols = [s.name.lower() for decl in declarations for s in decl.symbols]
     assert len(symbols) == 8
-    assert set(symbols) == {'klon', 'klev', 'nblk', 'var0', 'var1', 'var2', 'var3', 'var4'}
+    assert set(symbols) == {
+        "klon",
+        "klev",
+        "nblk",
+        "var0",
+        "var1",
+        "var2",
+        "var3",
+        "var4",
+    }
 
     # check number of declarations and symbols per declarations
     assert len(declarations) == 5

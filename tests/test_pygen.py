@@ -16,7 +16,7 @@ from conftest import available_frontends, jit_compile, clean_test
 from loki import Subroutine, FortranPythonTransformation, pygen, OFP, OMNI
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
@@ -41,7 +41,7 @@ def load_module(here, module):
         return import_module(module)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pygen_simple_loops(here, frontend):
     """
     A simple test routine to test Python transpilation of loops
@@ -72,45 +72,55 @@ end subroutine pygen_simple_loops
 
     # Generate reference code, compile run and verify
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'pygen_simple_loops_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='pygen_simple_loops')
+    filepath = here / (f"pygen_simple_loops_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="pygen_simple_loops")
 
     n, m = 3, 4
     scalar = 2.0
-    vector = np.zeros(shape=(n,), order='F') + 3.
-    tensor = np.zeros(shape=(n, m), order='F') + 4.
+    vector = np.zeros(shape=(n,), order="F") + 3.0
+    tensor = np.zeros(shape=(n, m), order="F") + 4.0
     function(n, m, scalar, vector, tensor)
 
-    assert np.all(vector == 8.)
-    assert np.all(tensor == [[11., 21., 31., 41.],
-                             [12., 22., 32., 42.],
-                             [13., 23., 33., 43.]])
+    assert np.all(vector == 8.0)
+    assert np.all(
+        tensor
+        == [
+            [11.0, 21.0, 31.0, 41.0],
+            [12.0, 22.0, 32.0, 42.0],
+            [13.0, 23.0, 33.0, 43.0],
+        ]
+    )
 
     # Rename routine to avoid problems with module import caching
-    routine.name = f'{routine.name}_{str(frontend)}'
+    routine.name = f"{routine.name}_{str(frontend)}"
 
     # Generate and test the transpiled Python kernel
-    f2p = FortranPythonTransformation(suffix='_py')
+    f2p = FortranPythonTransformation(suffix="_py")
     f2p.apply(source=routine, path=here)
     mod = load_module(here, f2p.mod_name)
     func = getattr(mod, f2p.mod_name)
 
     n, m = 3, 4
     scalar = 2.0
-    vector = np.zeros(shape=(n,), order='F') + 3.
-    tensor = np.zeros(shape=(n, m), order='F') + 4.
+    vector = np.zeros(shape=(n,), order="F") + 3.0
+    tensor = np.zeros(shape=(n, m), order="F") + 4.0
     func(n, m, scalar, vector, tensor)
 
-    assert np.all(vector == 8.)
-    assert np.all(tensor == [[11., 21., 31., 41.],
-                             [12., 22., 32., 42.],
-                             [13., 23., 33., 43.]])
+    assert np.all(vector == 8.0)
+    assert np.all(
+        tensor
+        == [
+            [11.0, 21.0, 31.0, 41.0],
+            [12.0, 22.0, 32.0, 42.0],
+            [13.0, 23.0, 33.0, 43.0],
+        ]
+    )
 
     clean_test(filepath)
     f2p.py_path.unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pygen_arguments(here, frontend):
     """
     Test the correct exchange of arguments with varying intents
@@ -151,43 +161,43 @@ end subroutine pygen_arguments
 
     # Test the reference solution
     n = 3
-    array = np.zeros(shape=(n,), order='F')
-    array_io = np.zeros(shape=(n,), order='F') + 3.
+    array = np.zeros(shape=(n,), order="F")
+    array_io = np.zeros(shape=(n,), order="F") + 3.0
     # To do scalar inout we allocate data in single-element arrays
-    a_io = np.zeros(shape=(1,), order='F', dtype=np.int32) + 1
-    b_io = np.zeros(shape=(1,), order='F', dtype=np.float32) + 2.
-    c_io = np.zeros(shape=(1,), order='F', dtype=np.float64) + 3.
+    a_io = np.zeros(shape=(1,), order="F", dtype=np.int32) + 1
+    b_io = np.zeros(shape=(1,), order="F", dtype=np.float32) + 2.0
+    c_io = np.zeros(shape=(1,), order="F", dtype=np.float64) + 3.0
 
     # Generate reference code, compile run and verify
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'pygen_arguments_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='pygen_arguments')
+    filepath = here / (f"pygen_arguments_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="pygen_arguments")
     a, b, c = function(n, array, array_io, a_io, b_io, c_io)
 
-    assert np.all(array == 3.) and array.size == n
-    assert np.all(array_io == 6.)
-    assert a_io[0] == 3. and np.isclose(b_io[0], 5.2) and np.isclose(c_io[0], 7.1)
+    assert np.all(array == 3.0) and array.size == n
+    assert np.all(array_io == 6.0)
+    assert a_io[0] == 3.0 and np.isclose(b_io[0], 5.2) and np.isclose(c_io[0], 7.1)
     assert a == 8 and np.isclose(b, 3.2) and np.isclose(c, 4.1)
 
     # Rename routine to avoid problems with module import caching
-    routine.name = f'{routine.name}_{str(frontend)}'
+    routine.name = f"{routine.name}_{str(frontend)}"
 
     # Generate and test the transpiled Python kernel
-    f2p = FortranPythonTransformation(suffix='_py')
+    f2p = FortranPythonTransformation(suffix="_py")
     f2p.apply(source=routine, path=here)
     mod = load_module(here, f2p.mod_name)
     func = getattr(mod, f2p.mod_name)
 
-    array = np.zeros(shape=(n,), order='F')
-    array_io = np.zeros(shape=(n,), order='F') + 3.
-    a_io = np.zeros(shape=(1,), order='F', dtype=np.int32) + 1
-    b_io = np.zeros(shape=(1,), order='F', dtype=np.float32) + 2.
-    c_io = np.zeros(shape=(1,), order='F', dtype=np.float64) + 3.
+    array = np.zeros(shape=(n,), order="F")
+    array_io = np.zeros(shape=(n,), order="F") + 3.0
+    a_io = np.zeros(shape=(1,), order="F", dtype=np.int32) + 1
+    b_io = np.zeros(shape=(1,), order="F", dtype=np.float32) + 2.0
+    c_io = np.zeros(shape=(1,), order="F", dtype=np.float64) + 3.0
     a, b, c, a_io, b_io, c_io = func(n, array, array_io, a_io, b_io, c_io)
 
-    assert np.all(array == 3.) and array.size == n
-    assert np.all(array_io == 6.)
-    assert a_io[0] == 3. and np.isclose(b_io[0], 5.2) and np.isclose(c_io[0], 7.1)
+    assert np.all(array == 3.0) and array.size == n
+    assert np.all(array_io == 6.0)
+    assert a_io[0] == 3.0 and np.isclose(b_io[0], 5.2) and np.isclose(c_io[0], 7.1)
     assert a == 8 and np.isclose(b, 3.2) and np.isclose(c, 4.1)
 
     clean_test(filepath)
@@ -201,7 +211,7 @@ end subroutine pygen_arguments
 # TODO: implement and test transpilation of modules
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pygen_vectorization(here, frontend):
     """
     Tests vector-notation conversion and local multi-dimensional arrays.
@@ -228,23 +238,23 @@ end subroutine pygen_vectorization
 
     # Generate reference code, compile run and verify
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'pygen_vectorization_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='pygen_vectorization')
+    filepath = here / (f"pygen_vectorization_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="pygen_vectorization")
 
     n, m = 3, 4
     scalar = 2.0
-    v1 = np.zeros(shape=(n,), order='F')
-    v2 = np.zeros(shape=(n,), order='F')
+    v1 = np.zeros(shape=(n,), order="F")
+    v2 = np.zeros(shape=(n,), order="F")
     function(n, m, scalar, v1, v2)
 
-    assert np.all(v1 == 3.)
-    assert v2[0] == 1. and np.all(v2[1:] == 4.)
+    assert np.all(v1 == 3.0)
+    assert v2[0] == 1.0 and np.all(v2[1:] == 4.0)
 
     # Rename routine to avoid problems with module import caching
-    routine.name = f'{routine.name}_{str(frontend)}'
+    routine.name = f"{routine.name}_{str(frontend)}"
 
     # Generate and test the transpiled Python kernel
-    f2p = FortranPythonTransformation(suffix='_py')
+    f2p = FortranPythonTransformation(suffix="_py")
     f2p.apply(source=routine, path=here)
     mod = load_module(here, f2p.mod_name)
     func = getattr(mod, f2p.mod_name)
@@ -252,18 +262,18 @@ end subroutine pygen_vectorization
     # Test the transpiled Python kernel
     n, m = 3, 4
     scalar = 2.0
-    v1 = np.zeros(shape=(n,), order='F')
-    v2 = np.zeros(shape=(n,), order='F')
+    v1 = np.zeros(shape=(n,), order="F")
+    v2 = np.zeros(shape=(n,), order="F")
     scalar = func(n, m, scalar, v1, v2)
 
-    assert np.all(v1 == 3.)
-    assert v2[0] == 1. and np.all(v2[1:] == 4.)
+    assert np.all(v1 == 3.0)
+    assert v2[0] == 1.0 and np.all(v2[1:] == 4.0)
 
     clean_test(filepath)
     f2p.py_path.unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pygen_intrinsics(here, frontend):
     """
     A simple test routine to test supported intrinsic functions
@@ -289,37 +299,41 @@ end subroutine pygen_intrinsics
 
     # Generate reference code, compile run and verify
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'pygen_intrinsics_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='pygen_intrinsics')
+    filepath = here / (f"pygen_intrinsics_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="pygen_intrinsics")
 
     # Test the reference solution
-    v1, v2, v3, v4 = 2., 4., 1., 5.
-    vmin, vmax, vabs, vmin_nested, vmax_nested, vexp, vsqrt, vsign = function(v1, v2, v3, v4)
-    assert vmin == 2. and vmax == 4. and vabs == 2.
-    assert vmin_nested == 1. and vmax_nested == 5.
-    assert vexp == np.exp(4.) and vsqrt == 2.
-    assert vsign == -5.
+    v1, v2, v3, v4 = 2.0, 4.0, 1.0, 5.0
+    vmin, vmax, vabs, vmin_nested, vmax_nested, vexp, vsqrt, vsign = function(
+        v1, v2, v3, v4
+    )
+    assert vmin == 2.0 and vmax == 4.0 and vabs == 2.0
+    assert vmin_nested == 1.0 and vmax_nested == 5.0
+    assert vexp == np.exp(4.0) and vsqrt == 2.0
+    assert vsign == -5.0
 
     # Rename routine to avoid problems with module import caching
-    routine.name = f'{routine.name}_{str(frontend)}'
+    routine.name = f"{routine.name}_{str(frontend)}"
 
     # Generate and test the transpiled Python kernel
-    f2p = FortranPythonTransformation(suffix='_py')
+    f2p = FortranPythonTransformation(suffix="_py")
     f2p.apply(source=routine, path=here)
     mod = load_module(here, f2p.mod_name)
     func = getattr(mod, f2p.mod_name)
 
-    vmin, vmax, vabs, vmin_nested, vmax_nested, vexp, vsqrt, vsign = func(v1, v2, v3, v4)
-    assert vmin == 2. and vmax == 4. and vabs == 2.
-    assert vmin_nested == 1. and vmax_nested == 5.
-    assert vexp == np.exp(4.) and vsqrt == 2.
-    assert vsign == -5.
+    vmin, vmax, vabs, vmin_nested, vmax_nested, vexp, vsqrt, vsign = func(
+        v1, v2, v3, v4
+    )
+    assert vmin == 2.0 and vmax == 4.0 and vabs == 2.0
+    assert vmin_nested == 1.0 and vmax_nested == 5.0
+    assert vexp == np.exp(4.0) and vsqrt == 2.0
+    assert vsign == -5.0
 
     clean_test(filepath)
     f2p.py_path.unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pygen_loop_indices(here, frontend):
     """
     Test to ensure loop indexing translates correctly
@@ -352,49 +366,49 @@ end subroutine pygen_loop_indices
 
     # Generate reference code, compile run and verify
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'pygen_loop_indices_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='pygen_loop_indices')
+    filepath = here / (f"pygen_loop_indices_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="pygen_loop_indices")
 
     # Test the reference solution
     n = 6
     cidx, fidx = 3, 4
-    mask1 = np.zeros(shape=(n,), order='F', dtype=np.int32)
-    mask2 = np.zeros(shape=(n,), order='F', dtype=np.int32)
-    mask3 = np.zeros(shape=(n,), order='F', dtype=np.float64)
+    mask1 = np.zeros(shape=(n,), order="F", dtype=np.int32)
+    mask2 = np.zeros(shape=(n,), order="F", dtype=np.int32)
+    mask3 = np.zeros(shape=(n,), order="F", dtype=np.float64)
 
     function(n=n, idx=fidx, mask1=mask1, mask2=mask2, mask3=mask3)
-    assert np.all(mask1[:cidx-1] == 1)
+    assert np.all(mask1[: cidx - 1] == 1)
     assert mask1[cidx] == 2
-    assert np.all(mask1[cidx+1:] == 0)
+    assert np.all(mask1[cidx + 1 :] == 0)
     assert np.all(mask2 == np.arange(n, dtype=np.int32) + 1)
-    assert np.all(mask3[:-1] == 0.)
-    assert mask3[-1] == 3.
+    assert np.all(mask3[:-1] == 0.0)
+    assert mask3[-1] == 3.0
 
     # Rename routine to avoid problems with module import caching
-    routine.name = f'{routine.name}_{str(frontend)}'
+    routine.name = f"{routine.name}_{str(frontend)}"
 
     # Generate and test the transpiled Python kernel
-    f2p = FortranPythonTransformation(suffix='_py')
+    f2p = FortranPythonTransformation(suffix="_py")
     f2p.apply(source=routine, path=here)
     mod = load_module(here, f2p.mod_name)
     func = getattr(mod, f2p.mod_name)
 
-    mask1 = np.zeros(shape=(n,), order='F', dtype=np.int32)
-    mask2 = np.zeros(shape=(n,), order='F', dtype=np.int32)
-    mask3 = np.zeros(shape=(n,), order='F', dtype=np.float64)
+    mask1 = np.zeros(shape=(n,), order="F", dtype=np.int32)
+    mask2 = np.zeros(shape=(n,), order="F", dtype=np.int32)
+    mask3 = np.zeros(shape=(n,), order="F", dtype=np.float64)
     func(n=n, idx=fidx, mask1=mask1, mask2=mask2, mask3=mask3)
-    assert np.all(mask1[:cidx-1] == 1)
+    assert np.all(mask1[: cidx - 1] == 1)
     assert mask1[cidx] == 2
-    assert np.all(mask1[cidx+1:] == 0)
+    assert np.all(mask1[cidx + 1 :] == 0)
     assert np.all(mask2 == np.arange(n, dtype=np.int32) + 1)
-    assert np.all(mask3[:-1] == 0.)
-    assert mask3[-1] == 3.
+    assert np.all(mask3[:-1] == 0.0)
+    assert mask3[-1] == 3.0
 
     clean_test(filepath)
     f2p.py_path.unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pygen_logical_statements(here, frontend):
     """
     A simple test routine to test logical statements
@@ -417,13 +431,15 @@ end subroutine pygen_logical_statements
 
     # Generate reference code, compile run and verify
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'pygen_logical_statements_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='pygen_logical_statements')
+    filepath = here / (f"pygen_logical_statements_{frontend}.f90")
+    function = jit_compile(
+        routine, filepath=filepath, objname="pygen_logical_statements"
+    )
 
     # Test the reference solution
     for v1 in range(2):
         for v2 in range(2):
-            v_val = np.zeros(shape=(2,), order='F', dtype=np.int32)
+            v_val = np.zeros(shape=(2,), order="F", dtype=np.int32)
             v_xor, v_xnor, v_nand, v_neqv = function(v1, v2, v_val)
             assert v_xor == (v1 and not v2) or (not v1 and v2)
             assert v_xnor == (v1 and v2) or not (v1 or v2)
@@ -432,17 +448,17 @@ end subroutine pygen_logical_statements
             assert v_val[0] and not v_val[1]
 
     # Rename routine to avoid problems with module import caching
-    routine.name = f'{routine.name}_{str(frontend)}'
+    routine.name = f"{routine.name}_{str(frontend)}"
 
     # Generate and test the transpiled Python kernel
-    f2p = FortranPythonTransformation(suffix='_py')
+    f2p = FortranPythonTransformation(suffix="_py")
     f2p.apply(source=routine, path=here)
     mod = load_module(here, f2p.mod_name)
     func = getattr(mod, f2p.mod_name)
 
     for v1 in range(2):
         for v2 in range(2):
-            v_val = np.zeros(shape=(2,), order='F', dtype=np.int32)
+            v_val = np.zeros(shape=(2,), order="F", dtype=np.int32)
             v_xor, v_xnor, v_nand, v_neqv = func(v1, v2, v_val)
             assert v_xor == (v1 and not v2) or (not v1 and v2)
             assert v_xnor == (v1 and v2) or not (v1 or v2)
@@ -454,7 +470,9 @@ end subroutine pygen_logical_statements
     f2p.py_path.unlink()
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OFP, 'OFP cannot handle stmt functions')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OFP, "OFP cannot handle stmt functions")])
+)
 def test_pygen_downcasing(here, frontend):
     """
     A simple test routine to test the conversion to lower case.
@@ -484,20 +502,20 @@ end subroutine pygen_downcasing
 
     # Generate reference code, compile run and verify
     routine = Subroutine.from_source(fcode, frontend=frontend)
-    filepath = here/(f'pygen_downcasing_{frontend}.f90')
-    function = jit_compile(routine, filepath=filepath, objname='pygen_downcasing')
+    filepath = here / (f"pygen_downcasing_{frontend}.f90")
+    function = jit_compile(routine, filepath=filepath, objname="pygen_downcasing")
 
     n = 3
     scalar = 2.0
-    vector = np.zeros(shape=(n,), order='F') + 2.
+    vector = np.zeros(shape=(n,), order="F") + 2.0
     function(n, scalar, vector)
-    assert np.all(vector == 6.)
+    assert np.all(vector == 6.0)
 
     # Rename routine to avoid problems with module import caching
-    routine.name = f'{routine.name}_{str(frontend)}'
+    routine.name = f"{routine.name}_{str(frontend)}"
 
     # Generate and test the transpiled Python kernel
-    f2p = FortranPythonTransformation(suffix='_py')
+    f2p = FortranPythonTransformation(suffix="_py")
     f2p.apply(source=routine, path=here)
     mod = load_module(here, f2p.mod_name)
     func = getattr(mod, f2p.mod_name)
@@ -506,13 +524,14 @@ end subroutine pygen_downcasing
 
     n = 3
     scalar = 2.0
-    vector = np.zeros(shape=(n,), order='F') + 2.
+    vector = np.zeros(shape=(n,), order="F") + 2.0
     func(n, scalar, vector)
-    assert np.all(vector == 6.)
+    assert np.all(vector == 6.0)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(
-    xfail=[(OMNI, 'OMNI strictly needs type definitions')])
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OMNI, "OMNI strictly needs type definitions")]),
 )
 def test_pygen_derived_type_members(here, frontend):
     """
@@ -545,13 +564,13 @@ end subroutine pygen_derived_type_members
     # Without the TypeDef, we can't test the reference either.
 
     # Generate and test the transpiled Python kernel
-    f2p = FortranPythonTransformation(suffix='_py')
+    f2p = FortranPythonTransformation(suffix="_py")
     f2p.apply(source=routine, path=here)
     mod = load_module(here, f2p.mod_name)
     func = getattr(mod, f2p.mod_name)
 
     n = 3
-    MyType = namedtuple('MyType', ['scalar', 'vector'])
-    obj = MyType(scalar=40.0, vector=np.zeros(shape=(n,), order='F') + 2.)
+    MyType = namedtuple("MyType", ["scalar", "vector"])
+    obj = MyType(scalar=40.0, vector=np.zeros(shape=(n,), order="F") + 2.0)
     func(n, obj)
-    assert np.all(obj.vector == 42.)
+    assert np.all(obj.vector == 42.0)

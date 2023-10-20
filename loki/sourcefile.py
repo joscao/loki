@@ -15,10 +15,21 @@ from codetiming import Timer
 from loki.backend.fgen import fgen
 from loki.backend.cufgen import cufgen
 from loki.frontend import (
-    OMNI, OFP, FP, REGEX, sanitize_input, Source, read_file, preprocess_cpp,
-    parse_omni_source, parse_ofp_source, parse_fparser_source,
-    parse_omni_ast, parse_ofp_ast, parse_fparser_ast, parse_regex_source
-
+    OMNI,
+    OFP,
+    FP,
+    REGEX,
+    sanitize_input,
+    Source,
+    read_file,
+    preprocess_cpp,
+    parse_omni_source,
+    parse_ofp_source,
+    parse_fparser_source,
+    parse_omni_ast,
+    parse_ofp_ast,
+    parse_fparser_ast,
+    parse_regex_source,
 )
 from loki.ir import Section, RawSource, Comment, PreprocessorDirective
 from loki.logging import info, perf
@@ -28,7 +39,7 @@ from loki.subroutine import Subroutine
 from loki.tools import flatten, as_tuple
 
 
-__all__ = ['Sourcefile']
+__all__ = ["Sourcefile"]
 
 
 class Sourcefile:
@@ -66,9 +77,18 @@ class Sourcefile:
         self._incomplete = incomplete
 
     @classmethod
-    def from_file(cls, filename, definitions=None, preprocess=False,
-                  includes=None, defines=None, omni_includes=None,
-                  xmods=None, frontend=FP, parser_classes=None):
+    def from_file(
+        cls,
+        filename,
+        definitions=None,
+        preprocess=False,
+        includes=None,
+        defines=None,
+        omni_includes=None,
+        xmods=None,
+        frontend=FP,
+        parser_classes=None,
+    ):
         """
         Constructor from raw source files that can apply a
         C-preprocessor before invoking frontend parsers.
@@ -105,7 +125,7 @@ class Sourcefile:
         """
 
         # Log full parses at INFO and regex scans at PERF level
-        log = f'[Loki::Sourcefile] Constructed from {filename}' + ' in {:.2f}s'
+        log = f"[Loki::Sourcefile] Constructed from {filename}" + " in {:.2f}s"
         with Timer(logger=perf if frontend is REGEX else info, text=log):
 
             filepath = Path(filename)
@@ -114,8 +134,12 @@ class Sourcefile:
             if preprocess:
                 # Trigger CPP-preprocessing explicitly, as includes and
                 # defines can also be used by our OMNI frontend
-                source = preprocess_cpp(source=raw_source, filepath=filepath,
-                                        includes=includes, defines=defines)
+                source = preprocess_cpp(
+                    source=raw_source,
+                    filepath=filepath,
+                    includes=includes,
+                    defines=defines,
+                )
             else:
                 source = raw_source
 
@@ -123,9 +147,15 @@ class Sourcefile:
                 return cls.from_regex(source, filepath, parser_classes=parser_classes)
 
             if frontend == OMNI:
-                return cls.from_omni(source, filepath, definitions=definitions,
-                                     includes=includes, defines=defines,
-                                     xmods=xmods, omni_includes=omni_includes)
+                return cls.from_omni(
+                    source,
+                    filepath,
+                    definitions=definitions,
+                    includes=includes,
+                    defines=defines,
+                    xmods=xmods,
+                    omni_includes=omni_includes,
+                )
 
             if frontend == OFP:
                 return cls.from_ofp(source, filepath, definitions=definitions)
@@ -133,11 +163,19 @@ class Sourcefile:
             if frontend == FP:
                 return cls.from_fparser(source, filepath, definitions=definitions)
 
-            raise NotImplementedError(f'Unknown frontend: {frontend}')
+            raise NotImplementedError(f"Unknown frontend: {frontend}")
 
     @classmethod
-    def from_omni(cls, raw_source, filepath, definitions=None, includes=None,
-                  defines=None, xmods=None, omni_includes=None):
+    def from_omni(
+        cls,
+        raw_source,
+        filepath,
+        definitions=None,
+        includes=None,
+        defines=None,
+        xmods=None,
+        omni_includes=None,
+    ):
         """
         Parse a given source string using the OMNI frontend
 
@@ -167,32 +205,43 @@ class Sourcefile:
         # (It's a hack, I know, but OMNI sucks, so what can I do...?)
         if omni_includes is not None and len(omni_includes) > 0:
             includes = omni_includes
-        source = preprocess_cpp(raw_source, filepath=filepath,
-                                includes=includes, defines=defines)
+        source = preprocess_cpp(
+            raw_source, filepath=filepath, includes=includes, defines=defines
+        )
 
         # Parse the file content into an OMNI Fortran AST
         ast = parse_omni_source(source=source, filepath=filepath, xmods=xmods)
-        typetable = ast.find('typeTable')
-        return cls._from_omni_ast(ast=ast, path=filepath, raw_source=raw_source,
-                                  definitions=definitions, typetable=typetable)
+        typetable = ast.find("typeTable")
+        return cls._from_omni_ast(
+            ast=ast,
+            path=filepath,
+            raw_source=raw_source,
+            definitions=definitions,
+            typetable=typetable,
+        )
 
     @classmethod
-    def _from_omni_ast(cls, ast, path=None, raw_source=None, definitions=None, typetable=None):
+    def _from_omni_ast(
+        cls, ast, path=None, raw_source=None, definitions=None, typetable=None
+    ):
         """
         Generate the full set of `Subroutine` and `Module` members of the `Sourcefile`.
         """
-        type_map = {t.attrib['type']: t for t in typetable}
-        if ast.find('symbols') is not None:
-            symbol_map = {s.attrib['type']: s for s in ast.find('symbols')}
+        type_map = {t.attrib["type"]: t for t in typetable}
+        if ast.find("symbols") is not None:
+            symbol_map = {s.attrib["type"]: s for s in ast.find("symbols")}
         else:
             symbol_map = None
 
         ir = parse_omni_ast(
-            ast=ast, definitions=definitions, raw_source=raw_source,
-            type_map=type_map, symbol_map=symbol_map
+            ast=ast,
+            definitions=definitions,
+            raw_source=raw_source,
+            type_map=type_map,
+            symbol_map=symbol_map,
         )
 
-        lines = (1, raw_source.count('\n') + 1)
+        lines = (1, raw_source.count("\n") + 1)
         source = Source(lines, string=raw_source, file=path)
         return cls(path=path, ir=ir, ast=ast, source=source)
 
@@ -217,18 +266,30 @@ class Sourcefile:
         # Parse the file content into a Fortran AST
         ast = parse_ofp_source(source, filepath=filepath)
 
-        return cls._from_ofp_ast(path=filepath, ast=ast, definitions=definitions,
-                                 pp_info=pp_info, raw_source=raw_source)
+        return cls._from_ofp_ast(
+            path=filepath,
+            ast=ast,
+            definitions=definitions,
+            pp_info=pp_info,
+            raw_source=raw_source,
+        )
 
     @classmethod
-    def _from_ofp_ast(cls, ast, path=None, raw_source=None, definitions=None, pp_info=None):
+    def _from_ofp_ast(
+        cls, ast, path=None, raw_source=None, definitions=None, pp_info=None
+    ):
         """
         Generate the full set of :any:`Subroutine` and :any:`Module` members
         in the :any:`Sourcefile`.
         """
-        ir = parse_ofp_ast(ast.find('file'), pp_info=pp_info, definitions=definitions, raw_source=raw_source)
+        ir = parse_ofp_ast(
+            ast.find("file"),
+            pp_info=pp_info,
+            definitions=definitions,
+            raw_source=raw_source,
+        )
 
-        lines = (1, raw_source.count('\n') + 1)
+        lines = (1, raw_source.count("\n") + 1)
         source = Source(lines, string=raw_source, file=path)
         return cls(path=path, ir=ir, ast=ast, source=source)
 
@@ -253,18 +314,27 @@ class Sourcefile:
         # Parse the file content into a Fortran AST
         ast = parse_fparser_source(source)
 
-        return cls._from_fparser_ast(path=filepath, ast=ast, definitions=definitions,
-                                     pp_info=pp_info, raw_source=raw_source)
+        return cls._from_fparser_ast(
+            path=filepath,
+            ast=ast,
+            definitions=definitions,
+            pp_info=pp_info,
+            raw_source=raw_source,
+        )
 
     @classmethod
-    def _from_fparser_ast(cls, ast, path=None, raw_source=None, definitions=None, pp_info=None):
+    def _from_fparser_ast(
+        cls, ast, path=None, raw_source=None, definitions=None, pp_info=None
+    ):
         """
         Generate the full set of :any:`Subroutine` and :any:`Module` members
         in the :any:`Sourcefile`.
         """
-        ir = parse_fparser_ast(ast, pp_info=pp_info, definitions=definitions, raw_source=raw_source)
+        ir = parse_fparser_ast(
+            ast, pp_info=pp_info, definitions=definitions, raw_source=raw_source
+        )
 
-        lines = (1, raw_source.count('\n') + 1)
+        lines = (1, raw_source.count("\n") + 1)
         source = Source(lines, string=raw_source, file=path)
         return cls(path=path, ir=ir, ast=ast, source=source)
 
@@ -276,12 +346,14 @@ class Sourcefile:
         source, _ = sanitize_input(source=raw_source, frontend=REGEX)
 
         ir = parse_regex_source(source, parser_classes=parser_classes)
-        lines = (1, raw_source.count('\n') + 1)
+        lines = (1, raw_source.count("\n") + 1)
         source = Source(lines, string=raw_source, file=filepath)
         return cls(path=filepath, ir=ir, source=source, incomplete=True)
 
     @classmethod
-    def from_source(cls, source, xmods=None, definitions=None, parser_classes=None, frontend=FP):
+    def from_source(
+        cls, source, xmods=None, definitions=None, parser_classes=None, frontend=FP
+    ):
         """
         Constructor from raw source string that invokes specified frontend parser
 
@@ -303,19 +375,28 @@ class Sourcefile:
 
         if frontend == OMNI:
             ast = parse_omni_source(source, xmods=xmods)
-            typetable = ast.find('typeTable')
-            return cls._from_omni_ast(path=None, ast=ast, raw_source=source,
-                                      definitions=definitions, typetable=typetable)
+            typetable = ast.find("typeTable")
+            return cls._from_omni_ast(
+                path=None,
+                ast=ast,
+                raw_source=source,
+                definitions=definitions,
+                typetable=typetable,
+            )
 
         if frontend == OFP:
             ast = parse_ofp_source(source)
-            return cls._from_ofp_ast(path=None, ast=ast, raw_source=source, definitions=definitions)
+            return cls._from_ofp_ast(
+                path=None, ast=ast, raw_source=source, definitions=definitions
+            )
 
         if frontend == FP:
             ast = parse_fparser_source(source)
-            return cls._from_fparser_ast(path=None, ast=ast, raw_source=source, definitions=definitions)
+            return cls._from_fparser_ast(
+                path=None, ast=ast, raw_source=source, definitions=definitions
+            )
 
-        raise NotImplementedError(f'Unknown frontend: {frontend}')
+        raise NotImplementedError(f"Unknown frontend: {frontend}")
 
     def make_complete(self, **frontend_args):
         """
@@ -331,21 +412,25 @@ class Sourcefile:
         if not self._incomplete:
             return
 
-        log = f'[Loki::Sourcefile] Finished constructing from {self.path}' + ' in {:.2f}s'
+        log = (
+            f"[Loki::Sourcefile] Finished constructing from {self.path}" + " in {:.2f}s"
+        )
         with Timer(logger=info, text=log):
 
             # Sanitize frontend_args
-            frontend = frontend_args.pop('frontend', FP)
+            frontend = frontend_args.pop("frontend", FP)
             if frontend == REGEX:
-                frontend_argnames = ['parser_classes']
+                frontend_argnames = ["parser_classes"]
             elif frontend == OMNI:
-                frontend_argnames = ['definitions', 'type_map', 'symbol_map', 'scope']
-                xmods = frontend_args.get('xmods')
+                frontend_argnames = ["definitions", "type_map", "symbol_map", "scope"]
+                xmods = frontend_args.get("xmods")
             elif frontend in (OFP, FP):
-                frontend_argnames = ['definitions', 'scope']
+                frontend_argnames = ["definitions", "scope"]
             else:
-                raise NotImplementedError(f'Unknown frontend: {frontend}')
-            sanitized_frontend_args = {k: frontend_args.get(k) for k in frontend_argnames}
+                raise NotImplementedError(f"Unknown frontend: {frontend}")
+            sanitized_frontend_args = {
+                k: frontend_args.get(k) for k in frontend_argnames
+            }
 
             body = []
             for node in self.ir.body:
@@ -356,7 +441,9 @@ class Sourcefile:
                     # Sanitize the input code to ensure non-supported features
                     # do not break frontend parsing ourside of program units
                     raw_source = node.source.string
-                    source, pp_info = sanitize_input(source=raw_source, frontend=frontend)
+                    source, pp_info = sanitize_input(
+                        source=raw_source, frontend=frontend
+                    )
 
                     # Typically, this should only be comments, PP statements etc., therefore
                     # we are not bothering with type tables, definitions or similar to parse them
@@ -364,30 +451,40 @@ class Sourcefile:
                         ir_ = parse_regex_source(source, **sanitized_frontend_args)
                     elif frontend == OMNI:
                         ast = parse_omni_source(source=source, xmods=xmods)
-                        ir_ = parse_omni_ast(ast=ast, raw_source=raw_source, **sanitized_frontend_args)
+                        ir_ = parse_omni_ast(
+                            ast=ast, raw_source=raw_source, **sanitized_frontend_args
+                        )
                     elif frontend == OFP:
                         ast = parse_ofp_source(source=source)
-                        ir_ = parse_ofp_ast(ast, raw_source=raw_source, pp_info=pp_info,
-                                            **sanitized_frontend_args)
+                        ir_ = parse_ofp_ast(
+                            ast,
+                            raw_source=raw_source,
+                            pp_info=pp_info,
+                            **sanitized_frontend_args,
+                        )
                     elif frontend == FP:
                         # Fparser is unable to parse comment-only source files/strings,
                         # so we see if this is only comments and convert them ourselves
                         # (https://github.com/stfc/fparser/issues/375)
                         # This can be removed once fparser 0.0.17 is released
                         lines = [l.lstrip() for l in source.splitlines()]
-                        if all(not l or l[0] in '!#' for l in lines):
+                        if all(not l or l[0] in "!#" for l in lines):
                             ir_ = [
                                 PreprocessorDirective(text=line.string, source=line)
-                                if line.string.lstrip().startswith('#')
+                                if line.string.lstrip().startswith("#")
                                 else Comment(text=line.string, source=line)
                                 for line in node.source.clone_lines()
                             ]
                         else:
                             ast = parse_fparser_source(source)
-                            ir_ = parse_fparser_ast(ast, raw_source=raw_source, pp_info=pp_info,
-                                                    **sanitized_frontend_args)
+                            ir_ = parse_fparser_ast(
+                                ast,
+                                raw_source=raw_source,
+                                pp_info=pp_info,
+                                **sanitized_frontend_args,
+                            )
                     else:
-                        raise NotImplementedError(f'Unknown frontend: {frontend}')
+                        raise NotImplementedError(f"Unknown frontend: {frontend}")
                     if isinstance(ir_, Section):
                         ir_ = ir_.body
                     body += flatten([ir_])
@@ -413,9 +510,7 @@ class Sourcefile:
         """
         if self.ir is None:
             return ()
-        return as_tuple(
-            module for module in self.ir.body if isinstance(module, Module)
-        )
+        return as_tuple(module for module in self.ir.body if isinstance(module, Module))
 
     @property
     def routines(self):
@@ -470,7 +565,9 @@ class Sourcefile:
         return None
 
     def __iter__(self):
-        raise TypeError('Sourcefiles alone cannot be traversed! Try traversing "Sourcefile.ir".')
+        raise TypeError(
+            'Sourcefiles alone cannot be traversed! Try traversing "Sourcefile.ir".'
+        )
 
     def __bool__(self):
         """
@@ -484,7 +581,11 @@ class Sourcefile:
         """
         Base definition for comparing :any:`Subroutine` objects.
         """
-        return (self.path, self.ir, self.source, )
+        return (
+            self.path,
+            self.ir,
+            self.source,
+        )
 
     def __eq__(self, other):
         if isinstance(other, Sourcefile):
@@ -496,7 +597,7 @@ class Sourcefile:
 
     def __getstate__(self):
         # Do not pickle the AST, as it is not pickle-safe for certain frontends
-        _ignore = ('_ast',)
+        _ignore = ("_ast",)
         return dict((k, v) for k, v in self.__dict__.items() if k not in _ignore)
 
     def apply(self, op, **kwargs):
@@ -534,8 +635,8 @@ class Sourcefile:
         """
         Same as :meth:`write` but can be called from a static context.
         """
-        info(f'[Loki::Sourcefile] Writing to {path}')
-        with path.open('w') as f:
+        info(f"[Loki::Sourcefile] Writing to {path}")
+        with path.open("w") as f:
             f.write(source)
-            if source[-1] != '\n':
-                f.write('\n')
+            if source[-1] != "\n":
+                f.write("\n")

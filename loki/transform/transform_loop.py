@@ -14,26 +14,38 @@ import operator as op
 import numpy as np
 
 from loki.expression import (
-    symbols as sym, SubstituteExpressions, FindVariables,
-    accumulate_polynomial_terms, simplify, is_constant, symbolic_op,
-    TypedSymbol
+    symbols as sym,
+    SubstituteExpressions,
+    FindVariables,
+    accumulate_polynomial_terms,
+    simplify,
+    is_constant,
+    symbolic_op,
+    TypedSymbol,
 )
 from loki.frontend.fparser import parse_fparser_expression
 from loki.ir import Loop, Conditional, Comment, Pragma
 from loki.logging import info, warning
 from loki.pragma_utils import is_loki_pragma, get_pragma_parameters, pragmas_attached
 from loki.transform.transform_array_indexing import (
-    promotion_dimensions_from_loop_nest, promote_nonmatching_variables
+    promotion_dimensions_from_loop_nest,
+    promote_nonmatching_variables,
 )
 from loki.tools import (
-    flatten, as_tuple, CaseInsensitiveDict, binary_insertion_sort, optional
+    flatten,
+    as_tuple,
+    CaseInsensitiveDict,
+    binary_insertion_sort,
+    optional,
 )
 from loki.visitors import FindNodes, Transformer, NestedMaskedTransformer, is_parent_of
 from loki.analyse import (
-    dataflow_analysis_attached, read_after_write_vars, loop_carried_dependencies
+    dataflow_analysis_attached,
+    read_after_write_vars,
+    loop_carried_dependencies,
 )
 
-__all__ = ['loop_interchange', 'loop_fusion', 'loop_fission', 'Polyhedron']
+__all__ = ["loop_interchange", "loop_fusion", "loop_fission", "Polyhedron"]
 
 
 class Polyhedron:
@@ -71,7 +83,7 @@ class Polyhedron:
 
     def variable_to_index(self, variable):
         if self.variable_names is None:
-            raise RuntimeError('No variables list associated with polyhedron.')
+            raise RuntimeError("No variables list associated with polyhedron.")
         if isinstance(variable, TypedSymbol):
             variable = variable.name.lower()
         assert isinstance(variable, str)
@@ -107,26 +119,39 @@ class Polyhedron:
             j = self.variable_to_index(index_or_variable)
 
         if ignore_variables:
-            ignore_variables = [i if isinstance(i, int) else self.variable_to_index(i)
-                                for i in ignore_variables]
+            ignore_variables = [
+                i if isinstance(i, int) else self.variable_to_index(i)
+                for i in ignore_variables
+            ]
 
         bounds = []
         for i in range(self.A.shape[0]):
-            if self.A[i,j] < 0:
-                if ignore_variables and any(self.A[i, k] != 0 for k in ignore_variables):
+            if self.A[i, j] < 0:
+                if ignore_variables and any(
+                    self.A[i, k] != 0 for k in ignore_variables
+                ):
                     # Skip constraint that depends on any of the ignored variables
                     continue
 
-                components = [self._to_literal(self.A[i,k]) * self.variables[k]
-                              for k in range(self.A.shape[1]) if k != j and self.A[i,k] != 0]
+                components = [
+                    self._to_literal(self.A[i, k]) * self.variables[k]
+                    for k in range(self.A.shape[1])
+                    if k != j and self.A[i, k] != 0
+                ]
                 if not components:
                     lhs = sym.IntLiteral(0)
                 elif len(components) == 1:
                     lhs = components[0]
                 else:
                     lhs = sym.Sum(as_tuple(components))
-                bounds += [simplify(sym.Quotient(self._to_literal(self.b[i]) - lhs,
-                                                 self._to_literal(self.A[i,j])))]
+                bounds += [
+                    simplify(
+                        sym.Quotient(
+                            self._to_literal(self.b[i]) - lhs,
+                            self._to_literal(self.A[i, j]),
+                        )
+                    )
+                ]
         return bounds
 
     def upper_bounds(self, index_or_variable, ignore_variables=None):
@@ -153,26 +178,39 @@ class Polyhedron:
             j = self.variable_to_index(index_or_variable)
 
         if ignore_variables:
-            ignore_variables = [i if isinstance(i, int) else self.variable_to_index(i)
-                                for i in ignore_variables]
+            ignore_variables = [
+                i if isinstance(i, int) else self.variable_to_index(i)
+                for i in ignore_variables
+            ]
 
         bounds = []
         for i in range(self.A.shape[0]):
-            if self.A[i,j] > 0:
-                if ignore_variables and any(self.A[i, k] != 0 for k in ignore_variables):
+            if self.A[i, j] > 0:
+                if ignore_variables and any(
+                    self.A[i, k] != 0 for k in ignore_variables
+                ):
                     # Skip constraint that depends on any of the ignored variables
                     continue
 
-                components = [self._to_literal(self.A[i,k]) * self.variables[k]
-                              for k in range(self.A.shape[1]) if k != j and self.A[i,k] != 0]
+                components = [
+                    self._to_literal(self.A[i, k]) * self.variables[k]
+                    for k in range(self.A.shape[1])
+                    if k != j and self.A[i, k] != 0
+                ]
                 if not components:
                     lhs = sym.IntLiteral(0)
                 elif len(components) == 1:
                     lhs = components[0]
                 else:
                     lhs = sym.Sum(as_tuple(components))
-                bounds += [simplify(sym.Quotient(self._to_literal(self.b[i]) - lhs,
-                                                 self._to_literal(self.A[i,j])))]
+                bounds += [
+                    simplify(
+                        sym.Quotient(
+                            self._to_literal(self.b[i]) - lhs,
+                            self._to_literal(self.A[i, j]),
+                        )
+                    )
+                ]
         return bounds
 
     @staticmethod
@@ -196,14 +234,14 @@ class Polyhedron:
         """
         supported_types = (sym.TypedSymbol, sym.MetaSymbol, sym.Sum, sym.Product)
         if not (is_constant(bound) or isinstance(bound, supported_types)):
-            raise ValueError(f'Cannot derive inequality from bound {str(bound)}')
+            raise ValueError(f"Cannot derive inequality from bound {str(bound)}")
         summands = accumulate_polynomial_terms(bound)
         b = -summands.pop(1, 0)  # Constant term or 0
         A = np.zeros([1, len(variables)], dtype=np.dtype(int))
         A[0, index] = -1
         for base, coef in summands.items():
             if not len(base) == 1:
-                raise ValueError(f'Non-affine bound {str(bound)}')
+                raise ValueError(f"Non-affine bound {str(bound)}")
             A[0, variables.index(base[0].name.lower())] = coef
         return A, b
 
@@ -217,7 +255,9 @@ class Polyhedron:
         # Add any variables that are not loop variables to the vector of variables
         variables = list(loop_variables)
         variable_names = [v.name.lower() for v in variables]
-        for v in sorted(FindVariables().visit(loop_ranges), key=lambda v: v.name.lower()):
+        for v in sorted(
+            FindVariables().visit(loop_ranges), key=lambda v: v.name.lower()
+        ):
             if v.name.lower() not in variable_names:
                 variables += [v]
                 variable_names += [v.name.lower()]
@@ -227,19 +267,25 @@ class Polyhedron:
         A = np.zeros([n, d], dtype=np.dtype(int))
         b = np.zeros([n], dtype=np.dtype(int))
 
-        for i, (loop_variable, loop_range) in enumerate(zip(loop_variables, loop_ranges)):
-            assert loop_range.step is None or loop_range.step == '1'
+        for i, (loop_variable, loop_range) in enumerate(
+            zip(loop_variables, loop_ranges)
+        ):
+            assert loop_range.step is None or loop_range.step == "1"
             j = variables.index(loop_variable.name.lower())
 
             # Create inequality from lower bound
-            lhs, rhs = cls.generate_entries_for_lower_bound(loop_range.start, variable_names, j)
-            A[2*i,:] = lhs
-            b[2*i] = rhs
+            lhs, rhs = cls.generate_entries_for_lower_bound(
+                loop_range.start, variable_names, j
+            )
+            A[2 * i, :] = lhs
+            b[2 * i] = rhs
 
             # Create inequality from upper bound
-            lhs, rhs = cls.generate_entries_for_lower_bound(loop_range.stop, variable_names, j)
-            A[2*i+1,:] = -lhs
-            b[2*i+1] = -rhs
+            lhs, rhs = cls.generate_entries_for_lower_bound(
+                loop_range.stop, variable_names, j
+            )
+            A[2 * i + 1, :] = -lhs
+            b[2 * i + 1] = -rhs
 
         return cls(A, b, variables)
 
@@ -267,11 +313,11 @@ def eliminate_variable(polyhedron, index_or_variable):
         j = polyhedron.variable_to_index(index_or_variable)
 
     # Indices of lower bounds on x_j
-    L = [i for i in range(polyhedron.A.shape[0]) if polyhedron.A[i,j] < 0]
+    L = [i for i in range(polyhedron.A.shape[0]) if polyhedron.A[i, j] < 0]
     # Indices of upper bounds on x_j
-    U = [i for i in range(polyhedron.A.shape[0]) if polyhedron.A[i,j] > 0]
+    U = [i for i in range(polyhedron.A.shape[0]) if polyhedron.A[i, j] > 0]
     # Indices of constraints not involving x_j
-    Z = [i for i in range(polyhedron.A.shape[0]) if i not in L+U]
+    Z = [i for i in range(polyhedron.A.shape[0]) if i not in L + U]
     # Cartesian product of lower and upper bounds
     R = [(l, u) for l in L for u in U]
 
@@ -280,22 +326,27 @@ def eliminate_variable(polyhedron, index_or_variable):
     b = np.zeros(polyhedron.b.shape, dtype=np.dtype(int))
     next_constraint = 0
     for idx in Z:
-        A[next_constraint,:] = polyhedron.A[idx,:]
+        A[next_constraint, :] = polyhedron.A[idx, :]
         b[next_constraint] = polyhedron.b[idx]
         next_constraint += 1
     for l, u in R:
-        A[next_constraint,:] = polyhedron.A[u,j] * polyhedron.A[l,:] - polyhedron.A[l,j] * polyhedron.A[u,:]
-        b[next_constraint] = polyhedron.A[u,j] * polyhedron.b[l] - polyhedron.A[l,j] * polyhedron.b[u]
+        A[next_constraint, :] = (
+            polyhedron.A[u, j] * polyhedron.A[l, :]
+            - polyhedron.A[l, j] * polyhedron.A[u, :]
+        )
+        b[next_constraint] = (
+            polyhedron.A[u, j] * polyhedron.b[l] - polyhedron.A[l, j] * polyhedron.b[u]
+        )
         next_constraint += 1
 
     # TODO: normalize rows
 
     # Trim matrix and right hand side, eliminate j-th column
-    A = np.delete(A[:next_constraint,:], j, axis=1)
+    A = np.delete(A[:next_constraint, :], j, axis=1)
     b = b[:next_constraint]
     variables = polyhedron.variables
     if variables is not None:
-        variables = variables[:j] + variables[j+1:]
+        variables = variables[:j] + variables[j + 1 :]
     return Polyhedron(A, b, variables)
 
 
@@ -317,8 +368,8 @@ def generate_loop_bounds(iteration_space, iteration_order):
     assert iteration_space.variables is not None
     assert len(iteration_order) <= len(iteration_space.variables)
 
-    lower_bounds= [None] * len(iteration_order)
-    upper_bounds= [None] * len(iteration_order)
+    lower_bounds = [None] * len(iteration_order)
+    upper_bounds = [None] * len(iteration_order)
     index_map = list(range(len(iteration_order)))
     reduced_polyhedron = iteration_space
 
@@ -336,27 +387,31 @@ def generate_loop_bounds(iteration_space, iteration_order):
         reduced_polyhedron = eliminate_variable(reduced_polyhedron, idx)
         # Update index map after variable elimination
         index_map[var_idx] = None
-        index_map[var_idx+1:] = [i-1 for i in index_map[var_idx+1:]]
+        index_map[var_idx + 1 :] = [i - 1 for i in index_map[var_idx + 1 :]]
 
     # Build new iteration space polyhedron
     variables = [iteration_space.variables[i] for i in iteration_order]
-    variables += iteration_space.variables[len(iteration_order):]
+    variables += iteration_space.variables[len(iteration_order) :]
     A = np.zeros([constraint_count, len(variables)], dtype=np.dtype(int))
     b = np.zeros([constraint_count], dtype=np.dtype(int))
     next_constraint = 0
     for new_idx, var_idx in enumerate(iteration_order):
         # TODO: skip lower/upper bounds already fulfilled
         for bound in lower_bounds[var_idx]:
-            lhs, rhs = Polyhedron.generate_entries_for_lower_bound(bound, variables, new_idx)
-            A[next_constraint,:] = lhs
+            lhs, rhs = Polyhedron.generate_entries_for_lower_bound(
+                bound, variables, new_idx
+            )
+            A[next_constraint, :] = lhs
             b[next_constraint] = rhs
             next_constraint += 1
         for bound in upper_bounds[var_idx]:
-            lhs, rhs = Polyhedron.generate_entries_for_lower_bound(bound, variables, new_idx)
-            A[next_constraint,:] = -lhs
+            lhs, rhs = Polyhedron.generate_entries_for_lower_bound(
+                bound, variables, new_idx
+            )
+            A[next_constraint, :] = -lhs
             b[next_constraint] = -rhs
             next_constraint += 1
-    A = A[:next_constraint,:]
+    A = A[:next_constraint, :]
     b = b[:next_constraint]
     return Polyhedron(A, b, variables)
 
@@ -378,7 +433,9 @@ def get_loop_components(loops):
     """
     Helper routine to extract loop variables, ranges and bodies of list of loops.
     """
-    loop_variables, loop_ranges, loop_bodies = zip(*[(loop.variable, loop.bounds, loop.body) for loop in loops])
+    loop_variables, loop_ranges, loop_bodies = zip(
+        *[(loop.variable, loop.bounds, loop.body) for loop in loops]
+    )
     return (as_tuple(loop_variables), as_tuple(loop_ranges), as_tuple(loop_bodies))
 
 
@@ -393,13 +450,15 @@ def loop_interchange(routine, project_bounds=False):
     with pragmas_attached(routine, Loop):
         loop_map = {}
         for loop_nest in FindNodes(Loop).visit(routine.body):
-            if not is_loki_pragma(loop_nest.pragma, starts_with='loop-interchange'):
+            if not is_loki_pragma(loop_nest.pragma, starts_with="loop-interchange"):
                 continue
 
             # Get variable order from pragma
-            var_order = get_pragma_parameters(loop_nest.pragma).get('loop-interchange', None)
+            var_order = get_pragma_parameters(loop_nest.pragma).get(
+                "loop-interchange", None
+            )
             if var_order:
-                var_order = [var.strip().lower() for var in var_order.split(',')]
+                var_order = [var.strip().lower() for var in var_order.split(",")]
                 depth = len(var_order)
             else:
                 depth = 2
@@ -416,53 +475,70 @@ def loop_interchange(routine, project_bounds=False):
 
             # Project iteration space
             if project_bounds:
-                iteration_space = Polyhedron.from_loop_ranges(loop_variables, loop_ranges)
+                iteration_space = Polyhedron.from_loop_ranges(
+                    loop_variables, loop_ranges
+                )
                 iteration_space = generate_loop_bounds(iteration_space, loop_order)
 
             # Rebuild loops starting with innermost
             inner_loop_map = None
-            for idx, (loop, loop_idx) in enumerate(zip(reversed(loops), reversed(loop_order))):
+            for idx, (loop, loop_idx) in enumerate(
+                zip(reversed(loops), reversed(loop_order))
+            ):
                 if project_bounds:
                     new_idx = len(loop_order) - idx - 1
-                    ignore_variables = list(range(new_idx+1, len(loop_order)))
-                    lower_bounds = iteration_space.lower_bounds(new_idx, ignore_variables)
-                    upper_bounds = iteration_space.upper_bounds(new_idx, ignore_variables)
+                    ignore_variables = list(range(new_idx + 1, len(loop_order)))
+                    lower_bounds = iteration_space.lower_bounds(
+                        new_idx, ignore_variables
+                    )
+                    upper_bounds = iteration_space.upper_bounds(
+                        new_idx, ignore_variables
+                    )
 
                     if len(lower_bounds) == 1:
                         lower_bounds = lower_bounds[0]
                     else:
-                        fct_symbol = sym.ProcedureSymbol('max', scope=routine)
-                        lower_bounds = sym.InlineCall(fct_symbol, parameters=as_tuple(lower_bounds))
+                        fct_symbol = sym.ProcedureSymbol("max", scope=routine)
+                        lower_bounds = sym.InlineCall(
+                            fct_symbol, parameters=as_tuple(lower_bounds)
+                        )
 
                     if len(upper_bounds) == 1:
                         upper_bounds = upper_bounds[0]
                     else:
-                        fct_symbol = sym.ProcedureSymbol('min', scope=routine)
-                        upper_bounds = sym.InlineCall(fct_symbol, parameters=as_tuple(upper_bounds))
+                        fct_symbol = sym.ProcedureSymbol("min", scope=routine)
+                        upper_bounds = sym.InlineCall(
+                            fct_symbol, parameters=as_tuple(upper_bounds)
+                        )
 
                     bounds = sym.LoopRange((lower_bounds, upper_bounds))
                 else:
                     bounds = loop_ranges[loop_idx]
 
-                outer_loop = loop.clone(variable=loop_variables[loop_idx], bounds=bounds)
+                outer_loop = loop.clone(
+                    variable=loop_variables[loop_idx], bounds=bounds
+                )
                 if inner_loop_map is not None:
                     outer_loop = Transformer(inner_loop_map).visit(outer_loop)
                 inner_loop_map = {loop: outer_loop}
 
             # Annotate loop-interchange in a comment
-            old_vars = ', '.join(loop_variable_names)
-            new_vars = ', '.join(var_order)
-            comment = Comment(f'! Loki loop-interchange ({old_vars} <--> {new_vars})')
+            old_vars = ", ".join(loop_variable_names)
+            new_vars = ", ".join(var_order)
+            comment = Comment(f"! Loki loop-interchange ({old_vars} <--> {new_vars})")
 
             # Strip loop-interchange pragma and register new loop nest in map
-            pragmas = tuple(p for p in as_tuple(loops[0].pragma)
-                            if not is_loki_pragma(p, starts_with='loop-interchange'))
+            pragmas = tuple(
+                p
+                for p in as_tuple(loops[0].pragma)
+                if not is_loki_pragma(p, starts_with="loop-interchange")
+            )
             loop_map[loop_nest] = (comment, outer_loop.clone(pragma=pragmas))
 
         # Apply loop-interchange mapping
         if loop_map:
             routine.body = Transformer(loop_map).visit(routine.body)
-            info('%s: interchanged %d loop nest(s)', routine.name, len(loop_map))
+            info("%s: interchanged %d loop nest(s)", routine.name, len(loop_map))
 
 
 def pragma_ranges_to_loop_ranges(parameters, scope):
@@ -470,11 +546,13 @@ def pragma_ranges_to_loop_ranges(parameters, scope):
     Convert loop ranges given in the pragma parameters from string to a tuple of `LoopRange`
     objects.
     """
-    if 'range' not in parameters:
+    if "range" not in parameters:
         return None
     ranges = []
-    for item in parameters['range'].split(','):
-        bounds = [parse_fparser_expression(bound, scope=scope) for bound in item.split(':')]
+    for item in parameters["range"].split(","):
+        bounds = [
+            parse_fparser_expression(bound, scope=scope) for bound in item.split(":")
+        ]
         ranges += [sym.LoopRange(as_tuple(bounds))]
 
     return as_tuple(ranges)
@@ -490,9 +568,11 @@ def loop_fusion(routine):
     with pragmas_attached(routine, Loop):
         # Extract all annotated loops and sort them into fusion groups
         for loop in FindNodes(Loop).visit(routine.body):
-            if is_loki_pragma(loop.pragma, starts_with='loop-fusion'):
-                parameters = get_pragma_parameters(loop.pragma, starts_with='loop-fusion')
-                group = parameters.get('group', 'default')
+            if is_loki_pragma(loop.pragma, starts_with="loop-fusion"):
+                parameters = get_pragma_parameters(
+                    loop.pragma, starts_with="loop-fusion"
+                )
+                group = parameters.get("group", "default")
                 fusion_groups[group] += [(loop, parameters)]
 
     if not fusion_groups:
@@ -503,17 +583,21 @@ def loop_fusion(routine):
         loop_list, parameters = zip(*loop_parameter_lists)
 
         # First, determine the collapse depth and extract user-annotated loop ranges from pragmas
-        collapse = [param.get('collapse', None) for param in parameters]
+        collapse = [param.get("collapse", None) for param in parameters]
         if collapse != [collapse[0]] * len(collapse):
             raise RuntimeError(f'Conflicting collapse values in group "{group}"')
         collapse = int(collapse[0]) if collapse[0] is not None else 1
 
-        pragma_ranges = [pragma_ranges_to_loop_ranges(param, routine) for param in parameters]
+        pragma_ranges = [
+            pragma_ranges_to_loop_ranges(param, routine) for param in parameters
+        ]
 
         # If we have a pragma somewhere with an explicit loop range, we use that for the fused loop
         range_set = {r for r in pragma_ranges if r is not None}
         if len(range_set) not in (0, 1):
-            raise RuntimeError(f'Pragma-specified loop ranges in group "{group}" do not match')
+            raise RuntimeError(
+                f'Pragma-specified loop ranges in group "{group}" do not match'
+            )
 
         fusion_ranges = None
         if range_set:
@@ -521,17 +605,23 @@ def loop_fusion(routine):
 
         # Next, extract loop ranges for all loops in group and convert to iteration space
         # polyhedrons for easier alignment
-        loop_variables, loop_ranges, loop_bodies = \
-                zip(*[get_loop_components(get_nested_loops(loop, collapse)) for loop in loop_list])
-        iteration_spaces = [Polyhedron.from_loop_ranges(variables, ranges)
-                            for variables, ranges in zip(loop_variables, loop_ranges)]
+        loop_variables, loop_ranges, loop_bodies = zip(
+            *[
+                get_loop_components(get_nested_loops(loop, collapse))
+                for loop in loop_list
+            ]
+        )
+        iteration_spaces = [
+            Polyhedron.from_loop_ranges(variables, ranges)
+            for variables, ranges in zip(loop_variables, loop_ranges)
+        ]
 
         # Find the fused iteration space (if not given by a pragma)
         if fusion_ranges is None:
             fusion_ranges = []
             for level in range(collapse):
                 lower_bounds, upper_bounds = [], []
-                ignored_variables = list(range(level+1, collapse))
+                ignored_variables = list(range(level + 1, collapse))
 
                 for p in iteration_spaces:
                     for bound in p.lower_bounds(level, ignored_variables):
@@ -540,14 +630,24 @@ def loop_fusion(routine):
                         # (2) bound is smaller than existing lower bounds (i.e. diff < 0)
                         # (3) bound is not constant and none of the existing bounds are lower (i.e. diff >= 0)
                         diff = [simplify(bound - b) for b in lower_bounds]
-                        is_any_negative = any(is_constant(d) and symbolic_op(d, op.lt, 0) for d in diff)
-                        is_any_not_negative = any(is_constant(d) and symbolic_op(d, op.ge, 0) for d in diff)
-                        is_new_bound = (not lower_bounds or is_any_negative or
-                                        (not is_constant(bound) and not is_any_not_negative))
+                        is_any_negative = any(
+                            is_constant(d) and symbolic_op(d, op.lt, 0) for d in diff
+                        )
+                        is_any_not_negative = any(
+                            is_constant(d) and symbolic_op(d, op.ge, 0) for d in diff
+                        )
+                        is_new_bound = (
+                            not lower_bounds
+                            or is_any_negative
+                            or (not is_constant(bound) and not is_any_not_negative)
+                        )
                         if is_new_bound:
                             # Remove any lower bounds made redundant by bound:
-                            lower_bounds = [b for b, d in zip(lower_bounds, diff)
-                                            if not (is_constant(d) and symbolic_op(d, op.lt, 0))]
+                            lower_bounds = [
+                                b
+                                for b, d in zip(lower_bounds, diff)
+                                if not (is_constant(d) and symbolic_op(d, op.lt, 0))
+                            ]
                             lower_bounds += [bound]
 
                     for bound in p.upper_bounds(level, ignored_variables):
@@ -556,27 +656,41 @@ def loop_fusion(routine):
                         # (2) bound is larger than existing upper bounds (i.e. diff > 0)
                         # (3) bound is not constant and none of the existing bounds are larger (i.e. diff <= 0)
                         diff = [simplify(bound - b) for b in upper_bounds]
-                        is_any_positive = any(is_constant(d) and symbolic_op(d, op.gt, 0) for d in diff)
-                        is_any_not_positive = any(is_constant(d) and symbolic_op(d, op.le, 0) for d in diff)
-                        is_new_bound = (not upper_bounds or is_any_positive or
-                                        (not is_constant(bound) and not is_any_not_positive))
+                        is_any_positive = any(
+                            is_constant(d) and symbolic_op(d, op.gt, 0) for d in diff
+                        )
+                        is_any_not_positive = any(
+                            is_constant(d) and symbolic_op(d, op.le, 0) for d in diff
+                        )
+                        is_new_bound = (
+                            not upper_bounds
+                            or is_any_positive
+                            or (not is_constant(bound) and not is_any_not_positive)
+                        )
                         if is_new_bound:
                             # Remove any lower bounds made redundant by bound:
-                            upper_bounds = [b for b, d in zip(upper_bounds, diff)
-                                            if not (is_constant(d) and symbolic_op(d, op.gt, 0))]
+                            upper_bounds = [
+                                b
+                                for b, d in zip(upper_bounds, diff)
+                                if not (is_constant(d) and symbolic_op(d, op.gt, 0))
+                            ]
                             upper_bounds += [bound]
 
                 if len(lower_bounds) == 1:
                     lower_bounds = lower_bounds[0]
                 else:
-                    fct_symbol = sym.ProcedureSymbol('min', scope=routine)
-                    lower_bounds = sym.InlineCall(fct_symbol, parameters=as_tuple(lower_bounds))
+                    fct_symbol = sym.ProcedureSymbol("min", scope=routine)
+                    lower_bounds = sym.InlineCall(
+                        fct_symbol, parameters=as_tuple(lower_bounds)
+                    )
 
                 if len(upper_bounds) == 1:
                     upper_bounds = upper_bounds[0]
                 else:
-                    fct_symbol = sym.ProcedureSymbol('max', scope=routine)
-                    upper_bounds = sym.InlineCall(fct_symbol, parameters=as_tuple(upper_bounds))
+                    fct_symbol = sym.ProcedureSymbol("max", scope=routine)
+                    upper_bounds = sym.InlineCall(
+                        fct_symbol, parameters=as_tuple(upper_bounds)
+                    )
 
                 fusion_ranges += [sym.LoopRange((lower_bounds, upper_bounds))]
 
@@ -584,51 +698,75 @@ def loop_fusion(routine):
         fusion_bodies = []
         fusion_variables = loop_variables[0]
         for idx, (variables, ranges, bodies, p) in enumerate(
-                zip(loop_variables, loop_ranges, loop_bodies, iteration_spaces)):
+            zip(loop_variables, loop_ranges, loop_bodies, iteration_spaces)
+        ):
             # TODO: This throws away anything that is not in the inner-most loop body.
-            body = flatten([Comment(f'! Loki loop-fusion - body {idx} begin'),
-                            bodies[-1],
-                            Comment(f'! Loki loop-fusion - body {idx} end')])
+            body = flatten(
+                [
+                    Comment(f"! Loki loop-fusion - body {idx} begin"),
+                    bodies[-1],
+                    Comment(f"! Loki loop-fusion - body {idx} end"),
+                ]
+            )
 
             # Replace loop variables if necessary
             var_map = {}
             for loop_variable, fusion_variable in zip(variables, fusion_variables):
                 if loop_variable != fusion_variable:
-                    var_map.update({var: fusion_variable for var in FindVariables().visit(body)
-                                    if var.name.lower() == loop_variable.name})
+                    var_map.update(
+                        {
+                            var: fusion_variable
+                            for var in FindVariables().visit(body)
+                            if var.name.lower() == loop_variable.name
+                        }
+                    )
             if var_map:
                 body = SubstituteExpressions(var_map).visit(body)
 
             # Wrap in conditional if loop bounds are different
             conditions = []
-            for loop_range, fusion_range, variable in zip(ranges, fusion_ranges, fusion_variables):
+            for loop_range, fusion_range, variable in zip(
+                ranges, fusion_ranges, fusion_variables
+            ):
                 if symbolic_op(loop_range.start, op.ne, fusion_range.start):
-                    conditions += [sym.Comparison(variable, '>=', loop_range.start)]
+                    conditions += [sym.Comparison(variable, ">=", loop_range.start)]
                 if symbolic_op(loop_range.stop, op.ne, fusion_range.stop):
-                    conditions += [sym.Comparison(variable, '<=', loop_range.stop)]
+                    conditions += [sym.Comparison(variable, "<=", loop_range.stop)]
             if conditions:
                 if len(conditions) == 1:
                     condition = conditions[0]
                 else:
                     condition = sym.LogicalAnd(as_tuple(conditions))
-                body = Conditional(condition=condition, body=as_tuple(body), else_body=())
+                body = Conditional(
+                    condition=condition, body=as_tuple(body), else_body=()
+                )
 
             fusion_bodies += [body]
 
         # Create the nested fused loop and replace original loops
         fusion_loop = flatten(fusion_bodies)
-        for fusion_variable, fusion_range in zip(reversed(fusion_variables), reversed(fusion_ranges)):
-            fusion_loop = Loop(variable=fusion_variable, body=as_tuple(fusion_loop), bounds=fusion_range)
+        for fusion_variable, fusion_range in zip(
+            reversed(fusion_variables), reversed(fusion_ranges)
+        ):
+            fusion_loop = Loop(
+                variable=fusion_variable,
+                body=as_tuple(fusion_loop),
+                bounds=fusion_range,
+            )
 
-        comment = Comment(f'! Loki loop-fusion group({group})')
+        comment = Comment(f"! Loki loop-fusion group({group})")
         loop_map[loop_list[0]] = (comment, fusion_loop)
-        comment = Comment(f'! Loki loop-fusion group({group}) - loop hoisted')
+        comment = Comment(f"! Loki loop-fusion group({group}) - loop hoisted")
         loop_map.update({loop: comment for loop in loop_list[1:]})
 
     # Apply transformation
     routine.body = Transformer(loop_map).visit(routine.body)
-    info('%s: fused %d loops in %d groups.', routine.name,
-         sum(len(loop_list) for loop_list in fusion_groups.values()), len(fusion_groups))
+    info(
+        "%s: fused %d loops in %d groups.",
+        routine.name,
+        sum(len(loop_list) for loop_list in fusion_groups.values()),
+        len(fusion_groups),
+    )
 
 
 class FissionTransformer(NestedMaskedTransformer):
@@ -653,7 +791,9 @@ class FissionTransformer(NestedMaskedTransformer):
     """
 
     def __init__(self, loop_pragmas, active=True, **kwargs):
-        super().__init__(active=active, require_all_start=True, greedy_stop=True, **kwargs)
+        super().__init__(
+            active=active, require_all_start=True, greedy_stop=True, **kwargs
+        )
         self.loop_pragmas = loop_pragmas
         self.split_loops = {}
 
@@ -671,8 +811,10 @@ class FissionTransformer(NestedMaskedTransformer):
             return None
 
         # Recurse for all children except the body
-        body_index = o._traversable.index('body')
-        visited = tuple(self.visit(c, **kwargs) for i, c in enumerate(o.children) if i != body_index)
+        body_index = o._traversable.index("body")
+        visited = tuple(
+            self.visit(c, **kwargs) for i, c in enumerate(o.children) if i != body_index
+        )
 
         # Save current state so we can restore for each subtree
         _start, _stop, _active = self.start, self.stop, self.active
@@ -697,8 +839,14 @@ class FissionTransformer(NestedMaskedTransformer):
             if not body:
                 return [()]
             # inject a comment to mark where the loop was split
-            comment = [] if start_node is None else [Comment(f'! Loki - {start_node.content}')]
-            return comment + [self._rebuild(o, visited[:body_index] + (body,) + visited[body_index:])]
+            comment = (
+                []
+                if start_node is None
+                else [Comment(f"! Loki - {start_node.content}")]
+            )
+            return comment + [
+                self._rebuild(o, visited[:body_index] + (body,) + visited[body_index:])
+            ]
 
         # Use masked transformer to build subtrees from/to pragma
         rebuilt = rebuild_fission_branch(None, self.loop_pragmas[o][0], **kwargs)
@@ -708,7 +856,9 @@ class FissionTransformer(NestedMaskedTransformer):
 
         # Register the new loops in the mapping
         loops = [l for l in rebuilt if isinstance(l, Loop)]
-        self.split_loops.update({pragma: loops[i:] for i, pragma in enumerate(self.loop_pragmas[o])})
+        self.split_loops.update(
+            {pragma: loops[i:] for i, pragma in enumerate(self.loop_pragmas[o])}
+        )
 
         # Restore original state (except for the active status because this has potentially
         # been changed when traversing the loop body)
@@ -752,7 +902,7 @@ def loop_fission(routine, promote=True, warn_loop_carries=True):
     # First, find the loops enclosing each pragma
     for loop in FindNodes(Loop).visit(routine.body):
         for pragma in FindNodes(Pragma).visit(loop.body):
-            if is_loki_pragma(pragma, starts_with='loop-fission'):
+            if is_loki_pragma(pragma, starts_with="loop-fission"):
                 pragma_loops[pragma] += [loop]
 
     if not pragma_loops:
@@ -763,7 +913,7 @@ def loop_fission(routine, promote=True, warn_loop_carries=True):
             # Now, sort the loops enclosing each pragma from outside to inside and
             # keep only the ones relevant for fission
             loops = binary_insertion_sort(pragma_loops[pragma], lt=is_parent_of)
-            collapse = int(get_pragma_parameters(pragma).get('collapse', 1))
+            collapse = int(get_pragma_parameters(pragma).get("collapse", 1))
             pragma_loops[pragma] = loops[-collapse:]
 
             # Attach the pragma to the list of pragmas to be processed for the
@@ -771,23 +921,43 @@ def loop_fission(routine, promote=True, warn_loop_carries=True):
             loop_pragmas[loops[-collapse]] += [pragma]
 
             # Promote variables given in promotion list
-            promote_vars = [var.strip().lower()
-                            for var in get_pragma_parameters(pragma).get('promote', '').split(',') if var]
+            promote_vars = [
+                var.strip().lower()
+                for var in get_pragma_parameters(pragma).get("promote", "").split(",")
+                if var
+            ]
 
             # Automatically determine promotion variables
             if promote:
-                promote_vars += [v.name.lower() for v in read_after_write_vars(loops[-1].body, pragma)
-                                 if v.name.lower() not in promote_vars]
-            promotion_vars_dims, promotion_vars_index = promotion_dimensions_from_loop_nest(
-                promote_vars, pragma_loops[pragma], promotion_vars_dims, promotion_vars_index)
+                promote_vars += [
+                    v.name.lower()
+                    for v in read_after_write_vars(loops[-1].body, pragma)
+                    if v.name.lower() not in promote_vars
+                ]
+            (
+                promotion_vars_dims,
+                promotion_vars_index,
+            ) = promotion_dimensions_from_loop_nest(
+                promote_vars,
+                pragma_loops[pragma],
+                promotion_vars_dims,
+                promotion_vars_index,
+            )
 
             # Store loop-carried dependencies for later analysis
             if warn_loop_carries:
-                loop_carried_vars[pragma] = loop_carried_dependencies(pragma_loops[pragma][0])
+                loop_carried_vars[pragma] = loop_carried_dependencies(
+                    pragma_loops[pragma][0]
+                )
 
     fission_trafo = FissionTransformer(loop_pragmas)
     routine.body = fission_trafo.visit(routine.body)
-    info('%s: split %d loop(s) at %d loop-fission pragma(s).', routine.name, len(loop_pragmas), len(pragma_loops))
+    info(
+        "%s: split %d loop(s) at %d loop-fission pragma(s).",
+        routine.name,
+        len(loop_pragmas),
+        len(pragma_loops),
+    )
 
     # Warn about broken loop-carried dependencies
     if warn_loop_carries:
@@ -800,14 +970,18 @@ def loop_fission(routine, promote=True, warn_loop_carries=True):
                 # The loop before the pragma has to read the variable ...
                 broken_loop_carries = loop_carries & loop.uses_symbols
                 # ... but it is written after the pragma
-                broken_loop_carries &= set.union(*[l.defines_symbols for l in remainder])
+                broken_loop_carries &= set.union(
+                    *[l.defines_symbols for l in remainder]
+                )
 
                 if broken_loop_carries:
                     if pragma.source and pragma.source.lines:
-                        line_info = f' at l. {pragma.source.lines[0]}'
+                        line_info = f" at l. {pragma.source.lines[0]}"
                     else:
-                        line_info = ''
-                    warning(f'Loop-fission{line_info} potentially breaks loop-carried dependencies' +
-                            f'for variables: {", ".join(str(v) for v in broken_loop_carries)}')
+                        line_info = ""
+                    warning(
+                        f"Loop-fission{line_info} potentially breaks loop-carried dependencies"
+                        + f'for variables: {", ".join(str(v) for v in broken_loop_carries)}'
+                    )
 
     promote_nonmatching_variables(routine, promotion_vars_dims, promotion_vars_index)

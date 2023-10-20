@@ -9,8 +9,11 @@
 Contains the declaration of :any:`Module` to represent Fortran modules.
 """
 from loki.frontend import (
-    get_fparser_node, parse_omni_ast, parse_ofp_ast, parse_fparser_ast,
-    parse_regex_source
+    get_fparser_node,
+    parse_omni_ast,
+    parse_ofp_ast,
+    parse_fparser_ast,
+    parse_regex_source,
 )
 from loki.ir import VariableDeclaration
 from loki.pragma_utils import pragmas_attached, process_dimension_pragmas
@@ -21,7 +24,7 @@ from loki.tools import as_tuple
 from loki.types import ModuleType, SymbolAttributes
 
 
-__all__ = ['Module']
+__all__ = ["Module"]
 
 
 class Module(ProgramUnit):
@@ -70,10 +73,20 @@ class Module(ProgramUnit):
     """
 
     def __init__(
-            self, name=None, docstring=None, spec=None, contains=None,
-            default_access_spec=None, public_access_spec=None, private_access_spec=None,
-            ast=None, source=None, parent=None, symbol_attrs=None, rescope_symbols=False,
-            incomplete=False
+        self,
+        name=None,
+        docstring=None,
+        spec=None,
+        contains=None,
+        default_access_spec=None,
+        public_access_spec=None,
+        private_access_spec=None,
+        ast=None,
+        source=None,
+        parent=None,
+        symbol_attrs=None,
+        rescope_symbols=False,
+        incomplete=False,
     ):
         super().__init__(parent=parent)
 
@@ -81,16 +94,32 @@ class Module(ProgramUnit):
             self.symbol_attrs.update(symbol_attrs)
 
         self.__initialize__(
-            name=name, docstring=docstring, spec=spec, contains=contains,
-            default_access_spec=default_access_spec, public_access_spec=public_access_spec,
-            private_access_spec=private_access_spec, ast=ast, source=source,
-            rescope_symbols=rescope_symbols, incomplete=incomplete
+            name=name,
+            docstring=docstring,
+            spec=spec,
+            contains=contains,
+            default_access_spec=default_access_spec,
+            public_access_spec=public_access_spec,
+            private_access_spec=private_access_spec,
+            ast=ast,
+            source=source,
+            rescope_symbols=rescope_symbols,
+            incomplete=incomplete,
         )
 
     def __initialize__(
-            self, name=None, docstring=None, spec=None, contains=None,
-            ast=None, source=None, rescope_symbols=False, incomplete=False,
-            default_access_spec=None, public_access_spec=None, private_access_spec=None
+        self,
+        name=None,
+        docstring=None,
+        spec=None,
+        contains=None,
+        ast=None,
+        source=None,
+        rescope_symbols=False,
+        incomplete=False,
+        default_access_spec=None,
+        public_access_spec=None,
+        private_access_spec=None,
     ):
         # Apply dimension pragma annotations to declarations
         if spec:
@@ -98,19 +127,31 @@ class Module(ProgramUnit):
                 spec = process_dimension_pragmas(spec)
 
         # Store the access spec properties
-        self.default_access_spec = None if not default_access_spec else default_access_spec.lower()
+        self.default_access_spec = (
+            None if not default_access_spec else default_access_spec.lower()
+        )
         if not public_access_spec:
             self.public_access_spec = ()
         else:
-            self.public_access_spec = tuple(v.lower() for v in as_tuple(public_access_spec))
+            self.public_access_spec = tuple(
+                v.lower() for v in as_tuple(public_access_spec)
+            )
         if not private_access_spec:
             self.private_access_spec = ()
         else:
-            self.private_access_spec = tuple(v.lower() for v in as_tuple(private_access_spec))
+            self.private_access_spec = tuple(
+                v.lower() for v in as_tuple(private_access_spec)
+            )
 
         super().__initialize__(
-            name=name, docstring=docstring, spec=spec, contains=contains, ast=ast,
-            source=source, rescope_symbols=rescope_symbols, incomplete=incomplete
+            name=name,
+            docstring=docstring,
+            spec=spec,
+            contains=contains,
+            ast=ast,
+            source=source,
+            rescope_symbols=rescope_symbols,
+            incomplete=incomplete,
         )
 
     @classmethod
@@ -133,11 +174,14 @@ class Module(ProgramUnit):
             OMNI's ``typeTable`` parse tree node
         """
         type_map = type_map or {}
-        if ast.tag != 'FmoduleDefinition':
-            ast = ast.find('globalDeclarations/FmoduleDefinition')
+        if ast.tag != "FmoduleDefinition":
+            ast = ast.find("globalDeclarations/FmoduleDefinition")
         return parse_omni_ast(
-            ast=ast, definitions=definitions, raw_source=raw_source,
-            type_map=type_map, scope=parent
+            ast=ast,
+            definitions=definitions,
+            raw_source=raw_source,
+            type_map=type_map,
+            scope=parent,
         )
 
     @classmethod
@@ -158,11 +202,14 @@ class Module(ProgramUnit):
         parent : :any:`Scope`, optional
             The enclosing parent scope of the module.
         """
-        if ast.tag != 'module':
-            ast = ast.find('file/module')
+        if ast.tag != "module":
+            ast = ast.find("file/module")
         return parse_ofp_ast(
-            ast=ast, pp_info=pp_info, raw_source=raw_source,
-            definitions=definitions, scope=parent
+            ast=ast,
+            pp_info=pp_info,
+            raw_source=raw_source,
+            definitions=definitions,
+            scope=parent,
         )
 
     @classmethod
@@ -183,14 +230,17 @@ class Module(ProgramUnit):
         parent : :any:`Scope`, optional
             The enclosing parent scope of the module.
         """
-        if ast.__class__.__name__ != 'Module':
-            ast = get_fparser_node(ast, 'Module')
+        if ast.__class__.__name__ != "Module":
+            ast = get_fparser_node(ast, "Module")
         # Note that our Fparser interface returns a tuple with the
         # Module object always last but potentially containing
         # comments before the Module object
         return parse_fparser_ast(
-            ast, pp_info=pp_info, definitions=definitions,
-            raw_source=raw_source, scope=parent
+            ast,
+            pp_info=pp_info,
+            definitions=definitions,
+            raw_source=raw_source,
+            scope=parent,
         )[-1]
 
     @classmethod
@@ -205,7 +255,9 @@ class Module(ProgramUnit):
         parent : :any:`Scope`, optional
             The enclosing parent scope of the subroutine, typically a :any:`Module`.
         """
-        ir_ = parse_regex_source(raw_source, parser_classes=parser_classes, scope=parent)
+        ir_ = parse_regex_source(
+            raw_source, parser_classes=parser_classes, scope=parent
+        )
         return [node for node in ir_.body if isinstance(node, cls)][0]
 
     def register_in_parent_scope(self):
@@ -233,12 +285,12 @@ class Module(ProgramUnit):
             The cloned module object.
         """
         # Collect all properties bespoke to Subroutine
-        if self.default_access_spec and 'default_access_spec' not in kwargs:
-            kwargs['default_access_spec'] = self.default_access_spec
-        if self.public_access_spec and 'public_access_spec' not in kwargs:
-            kwargs['public_access_spec'] = self.public_access_spec
-        if self.private_access_spec and 'private_access_spec' not in kwargs:
-            kwargs['private_access_spec'] = self.private_access_spec
+        if self.default_access_spec and "default_access_spec" not in kwargs:
+            kwargs["default_access_spec"] = self.default_access_spec
+        if self.public_access_spec and "public_access_spec" not in kwargs:
+            kwargs["public_access_spec"] = self.public_access_spec
+        if self.private_access_spec and "private_access_spec" not in kwargs:
+            kwargs["private_access_spec"] = self.private_access_spec
 
         # Escalate to parent class
         return super().clone(**kwargs)
@@ -256,8 +308,14 @@ class Module(ProgramUnit):
         Base definition for comparing :any:`Module` objects.
         """
         return (
-            self.name, self.docstring, self.spec, self.contains, self.symbol_attrs,
-            self.default_access_spec, self.public_access_spec, self.private_access_spec,
+            self.name,
+            self.docstring,
+            self.spec,
+            self.contains,
+            self.symbol_attrs,
+            self.default_access_spec,
+            self.public_access_spec,
+            self.private_access_spec,
         )
 
     def __eq__(self, other):
@@ -272,7 +330,7 @@ class Module(ProgramUnit):
         s = self.__dict__.copy()
         # TODO: We need to remove the AST, as certain AST types
         # (eg. FParser) are not pickle-safe.
-        del s['_ast']
+        del s["_ast"]
         return s
 
     def __setstate__(self, s):

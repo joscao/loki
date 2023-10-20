@@ -12,8 +12,18 @@ import io
 import pytest
 
 from loki import (
-    Sourcefile, Module, Subroutine, fgen, OFP, compile_and_load, FindNodes, CallStatement,
-    as_tuple, Frontend, Section, REGEX
+    Sourcefile,
+    Module,
+    Subroutine,
+    fgen,
+    OFP,
+    compile_and_load,
+    FindNodes,
+    CallStatement,
+    as_tuple,
+    Frontend,
+    Section,
+    REGEX,
 )
 from loki.build import Builder, Lib, Obj
 from loki.tools import gettempdir, filehash
@@ -21,34 +31,46 @@ import loki.frontend
 
 
 __all__ = [
-    'generate_identity', 'jit_compile', 'jit_compile_lib', 'clean_test',
-    'stdchannel_redirected', 'stdchannel_is_captured', 'available_frontends'
+    "generate_identity",
+    "jit_compile",
+    "jit_compile_lib",
+    "clean_test",
+    "stdchannel_redirected",
+    "stdchannel_is_captured",
+    "available_frontends",
 ]
 
-_f90wrap_kind_map = Path(__file__).parent/'kind_map'
+_f90wrap_kind_map = Path(__file__).parent / "kind_map"
 
 
 def generate_identity(refpath, routinename, modulename=None, frontend=OFP):
     """
     Generate the "identity" of a single subroutine with a frontend-specific suffix.
     """
-    testname = refpath.parent/(f'{refpath.stem}_{routinename}_{frontend}.f90')
+    testname = refpath.parent / (f"{refpath.stem}_{routinename}_{frontend}.f90")
     source = Sourcefile.from_file(refpath, frontend=frontend)
 
     if modulename:
         module = [m for m in source.modules if m.name == modulename][0]
-        module.name += f'_{routinename}_{frontend}'
+        module.name += f"_{routinename}_{frontend}"
         for routine in source.all_subroutines:
-            routine.name += f'_{frontend}'
-            for call in FindNodes(CallStatement).visit(routine.body):  # pylint: disable=no-member
-                call.name += f'_{frontend}'
+            routine.name += f"_{frontend}"
+            for call in FindNodes(CallStatement).visit(
+                routine.body
+            ):  # pylint: disable=no-member
+                call.name += f"_{frontend}"
         source.write(path=testname, source=fgen(module))
     else:
         routine = [r for r in source.subroutines if r.name == routinename][0]
-        routine.name += f'_{frontend}'
+        routine.name += f"_{frontend}"
         source.write(path=testname, source=fgen(routine))
 
-    pymod = compile_and_load(testname, cwd=str(refpath.parent), use_f90wrap=True, f90wrap_kind_map=_f90wrap_kind_map)
+    pymod = compile_and_load(
+        testname,
+        cwd=str(refpath.parent),
+        use_f90wrap=True,
+        f90wrap_kind_map=_f90wrap_kind_map,
+    )
 
     if modulename:
         # modname = '_'.join(s.capitalize() for s in refpath.stem.split('_'))
@@ -76,12 +98,17 @@ def jit_compile(source, filepath=None, objname=None):
     else:
         source = fgen(source)
         if filepath is None:
-            filepath = gettempdir()/filehash(source, prefix='', suffix='.f90')
+            filepath = gettempdir() / filehash(source, prefix="", suffix=".f90")
         else:
             filepath = Path(filepath)
         Sourcefile(filepath).write(source=source)
 
-    pymod = compile_and_load(filepath, cwd=str(filepath.parent), use_f90wrap=True, f90wrap_kind_map=_f90wrap_kind_map)
+    pymod = compile_and_load(
+        filepath,
+        cwd=str(filepath.parent),
+        use_f90wrap=True,
+        f90wrap_kind_map=_f90wrap_kind_map,
+    )
 
     if objname:
         return getattr(pymod, objname)
@@ -114,12 +141,12 @@ def jit_compile_lib(sources, path, name, wrap=None, builder=None):
             sourcefiles.append(source)
 
         if isinstance(source, Sourcefile):
-            filepath = source.path or path/f'{source.name}.f90'
+            filepath = source.path or path / f"{source.name}.f90"
             source.write(path=filepath)
             sourcefiles.append(source.path)
 
         elif isinstance(source, (Module, Subroutine)):
-            filepath = path/f'{source.name}.f90'
+            filepath = path / f"{source.name}.f90"
             source = Sourcefile(filepath, ir=Section(body=as_tuple(source)))
             source.write(path=filepath)
             sourcefiles.append(source.path)
@@ -128,22 +155,29 @@ def jit_compile_lib(sources, path, name, wrap=None, builder=None):
     lib = Lib(name=name, objs=objects, shared=False)
     lib.build(builder=builder)
     wrap = wrap or sourcefiles
-    return lib.wrap(modname=name, sources=wrap, builder=builder, kind_map=_f90wrap_kind_map)
+    return lib.wrap(
+        modname=name, sources=wrap, builder=builder, kind_map=_f90wrap_kind_map
+    )
 
 
 def clean_test(filepath):
     """
     Clean test directory based on JIT'ed source file.
     """
-    file_list = [filepath.with_suffix('.f90'), filepath.with_suffix('.o'),
-                 filepath.with_suffix('.py'), filepath.parent/'f90wrap_toplevel.f90',
-                 filepath.with_suffix('.mod'), filepath.with_suffix('.xmod')]
+    file_list = [
+        filepath.with_suffix(".f90"),
+        filepath.with_suffix(".o"),
+        filepath.with_suffix(".py"),
+        filepath.parent / "f90wrap_toplevel.f90",
+        filepath.with_suffix(".mod"),
+        filepath.with_suffix(".xmod"),
+    ]
     for f in file_list:
         if f.exists():
             f.unlink()
-    for sofile in filepath.parent.glob(f'_{filepath.stem}.*.so'):
+    for sofile in filepath.parent.glob(f"_{filepath.stem}.*.so"):
         sofile.unlink()
-    f90wrap_path = filepath.parent/f'f90wrap_{filepath.name}'
+    f90wrap_path = filepath.parent / f"f90wrap_{filepath.name}"
     if f90wrap_path.exists():
         f90wrap_path.unlink()
 
@@ -194,7 +228,7 @@ def stdchannel_redirected(stdchannel, dest_filename):
     oldstdchannel, dest_file = None, None
     try:
         oldstdchannel = try_dup(stdchannel)
-        dest_file = open(dest_filename, 'w')
+        dest_file = open(dest_filename, "w")
         try_dup2(dest_file, stdchannel)
 
         yield
@@ -268,8 +302,9 @@ def available_frontends(xfail=None, skip=None, include_regex=False):
 
     # Unavailable frontends
     unavailable_frontends = {
-        f: f'{f} is not available' for f in Frontend
-        if not getattr(loki.frontend, f'HAVE_{str(f).upper()}')
+        f: f"{f} is not available"
+        for f in Frontend
+        if not getattr(loki.frontend, f"HAVE_{str(f).upper()}")
     }
     skip.update(unavailable_frontends)
 
@@ -293,7 +328,7 @@ def graphviz_present():
     but the underlying binaries may be missing.
     """
     try:
-        import graphviz as gviz # pylint: disable=import-outside-toplevel
+        import graphviz as gviz  # pylint: disable=import-outside-toplevel
     except ImportError:
         return False
 

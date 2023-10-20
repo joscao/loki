@@ -9,23 +9,21 @@ from pathlib import Path
 
 from loki.backend import pygen, dacegen
 from loki import ir
-from loki.expression import (
-    symbols as sym, FindInlineCalls, SubstituteExpressions
-)
+from loki.expression import symbols as sym, FindInlineCalls, SubstituteExpressions
 from loki.pragma_utils import pragmas_attached
 from loki.sourcefile import Sourcefile
 from loki.transform.transformation import Transformation
 from loki.transform.transform_array_indexing import (
-    shift_to_zero_indexing, invert_array_indices, normalize_range_indexing
+    shift_to_zero_indexing,
+    invert_array_indices,
+    normalize_range_indexing,
 )
 from loki.transform.transform_associates import resolve_associates
-from loki.transform.transform_utilities import (
-    convert_to_lower_case, replace_intrinsics
-)
+from loki.transform.transform_utilities import convert_to_lower_case, replace_intrinsics
 from loki.visitors import FindNodes, Transformer
 
 
-__all__ = ['FortranPythonTransformation']
+__all__ = ["FortranPythonTransformation"]
 
 
 class FortranPythonTransformation(Transformation):
@@ -49,20 +47,21 @@ class FortranPythonTransformation(Transformation):
     """
 
     def __init__(self, **kwargs):
-        self.with_dace = kwargs.pop('with_dace', False)
-        self.invert_indices = kwargs.pop('invert_indices', False)
-        self.suffix = kwargs.pop('suffix', '')
+        self.with_dace = kwargs.pop("with_dace", False)
+        self.invert_indices = kwargs.pop("invert_indices", False)
+        self.suffix = kwargs.pop("suffix", "")
 
     def transform_subroutine(self, routine, **kwargs):
-        path = Path(kwargs.get('path'))
+        path = Path(kwargs.get("path"))
 
         # Rename subroutine to generate Python kernel
-        routine.name = f'{routine.name}{self.suffix}'.lower()
+        routine.name = f"{routine.name}{self.suffix}".lower()
 
         # Remove all "IMPLICT" intrinsic statements
         mapper = {
-            i: None for i in FindNodes(ir.Intrinsic).visit(routine.spec)
-            if 'implicit' in i.text.lower()
+            i: None
+            for i in FindNodes(ir.Intrinsic).visit(routine.spec)
+            if "implicit" in i.text.lower()
         }
         routine.spec = Transformer(mapper).visit(routine.spec)
 
@@ -83,19 +82,22 @@ class FortranPythonTransformation(Transformation):
         # this seemingly identity mapping to make sure Python function names are
         # lower-case
         intrinsic_map = {
-            'min': 'min', 'max': 'max', 'abs': 'abs',
-            'exp': 'np.exp', 'sqrt': 'np.sqrt',
+            "min": "min",
+            "max": "max",
+            "abs": "abs",
+            "exp": "np.exp",
+            "sqrt": "np.sqrt",
         }
         replace_intrinsics(routine, function_map=intrinsic_map)
 
         # Sign intrinsic function takes a little more thought
         sign_map = {}
         for c in FindInlineCalls(unique=False).visit(routine.ir):
-            if c.function == 'sign':
+            if c.function == "sign":
                 assert len(c.parameters) == 2
                 sign = sym.InlineCall(
-                    function=sym.ProcedureSymbol(name='np.sign', scope=routine),
-                    parameters=(c.parameters[1],)
+                    function=sym.ProcedureSymbol(name="np.sign", scope=routine),
+                    parameters=(c.parameters[1],),
                 )
                 sign_map[c] = sym.Product((c.parameters[0], sign))
 
@@ -103,7 +105,7 @@ class FortranPythonTransformation(Transformation):
         routine.body = SubstituteExpressions(sign_map).visit(routine.body)
 
         # Rename subroutine to generate Python kernel
-        self.py_path = (path/routine.name.lower()).with_suffix('.py')
+        self.py_path = (path / routine.name.lower()).with_suffix(".py")
         self.mod_name = routine.name.lower()
         # Need to attach Loop pragmas to honour dataflow pragmas for loops
         with pragmas_attached(routine, ir.Loop):

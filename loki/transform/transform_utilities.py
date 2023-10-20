@@ -13,9 +13,16 @@ import platform
 from collections import defaultdict
 from pymbolic.primitives import Expression
 from loki.expression import (
-    symbols as sym, FindVariables, FindInlineCalls, FindLiterals,
-    SubstituteExpressions, SubstituteExpressionsMapper, ExpressionFinder,
-    ExpressionRetriever, TypedSymbol, MetaSymbol
+    symbols as sym,
+    FindVariables,
+    FindInlineCalls,
+    FindLiterals,
+    SubstituteExpressions,
+    SubstituteExpressionsMapper,
+    ExpressionFinder,
+    ExpressionRetriever,
+    TypedSymbol,
+    MetaSymbol,
 )
 from loki.ir import Import, TypeDef, VariableDeclaration, StatementFunction
 from loki.module import Module
@@ -26,8 +33,12 @@ from loki.visitors import Transformer, FindNodes
 
 
 __all__ = [
-    'convert_to_lower_case', 'replace_intrinsics', 'sanitise_imports',
-    'replace_selected_kind', 'single_variable_declaration', 'recursive_expression_map_update'
+    "convert_to_lower_case",
+    "replace_intrinsics",
+    "sanitise_imports",
+    "replace_selected_kind",
+    "single_variable_declaration",
+    "recursive_expression_map_update",
 ]
 
 
@@ -55,23 +66,36 @@ def single_variable_declaration(routine, variables=None, group_by_shape=False):
     for decl in FindNodes(VariableDeclaration).visit(routine.spec):
         if len(decl.symbols) > 1:
             if not group_by_shape:
-                unique_symbols = [s for s in decl.symbols if variables is None or s.name in variables]
+                unique_symbols = [
+                    s for s in decl.symbols if variables is None or s.name in variables
+                ]
                 if unique_symbols:
                     new_decls = tuple(decl.clone(symbols=(s,)) for s in unique_symbols)
-                    retain_symbols = tuple(s for s in decl.symbols if variables is not None and s.name not in variables)
+                    retain_symbols = tuple(
+                        s
+                        for s in decl.symbols
+                        if variables is not None and s.name not in variables
+                    )
                     if retain_symbols:
-                        decl_map[decl] = (decl.clone(symbols=retain_symbols),) + new_decls
+                        decl_map[decl] = (
+                            decl.clone(symbols=retain_symbols),
+                        ) + new_decls
                     else:
                         decl_map[decl] = new_decls
             else:
                 smbls_by_shape = defaultdict(list)
                 for smbl in decl.symbols:
-                    smbls_by_shape[getattr(smbl, 'shape', None)] += [smbl]
-                decl_map[decl] = tuple(decl.clone(symbols=as_tuple(smbls)) for smbls in smbls_by_shape.values())
+                    smbls_by_shape[getattr(smbl, "shape", None)] += [smbl]
+                decl_map[decl] = tuple(
+                    decl.clone(symbols=as_tuple(smbls))
+                    for smbls in smbls_by_shape.values()
+                )
     routine.spec = Transformer(decl_map).visit(routine.spec)
     # if variables defined and group_by_shape, first call ignores the variables, thus second call
     if variables and group_by_shape:
-        single_variable_declaration(routine=routine, variables=variables, group_by_shape=False)
+        single_variable_declaration(
+            routine=routine, variables=variables, group_by_shape=False
+        )
 
 
 def convert_to_lower_case(routine):
@@ -86,8 +110,10 @@ def convert_to_lower_case(routine):
     # Force all variables in a subroutine body to lower-caps
     variables = FindVariables(unique=False).visit(routine.ir)
     vmap = {
-        v: v.clone(name=v.name.lower()) for v in variables
-        if isinstance(v, (sym.Scalar, sym.Array, sym.DeferredTypeSymbol)) and not v.name.islower()
+        v: v.clone(name=v.name.lower())
+        for v in variables
+        if isinstance(v, (sym.Scalar, sym.Array, sym.DeferredTypeSymbol))
+        and not v.name.islower()
     }
 
     # Capture nesting by applying map to itself before applying to the routine
@@ -99,7 +125,8 @@ def convert_to_lower_case(routine):
     # so that we  capture the updates from the variable update in the arguments
     mapper = {
         c: c.clone(function=c.function.clone(name=c.name.lower()))
-        for c in FindInlineCalls().visit(routine.ir) if not c.name.islower()
+        for c in FindInlineCalls().visit(routine.ir)
+        if not c.name.islower()
     }
     mapper.update(
         (stmt.variable, stmt.variable.clone(name=stmt.variable.name.lower()))
@@ -109,7 +136,9 @@ def convert_to_lower_case(routine):
     routine.body = SubstituteExpressions(mapper).visit(routine.body)
 
 
-def replace_intrinsics(routine, function_map=None, symbol_map=None, case_sensitive=False):
+def replace_intrinsics(
+    routine, function_map=None, symbol_map=None, case_sensitive=False
+):
     """
     Replace known intrinsic functions and symbols.
 
@@ -137,7 +166,9 @@ def replace_intrinsics(routine, function_map=None, symbol_map=None, case_sensiti
             callmap[call] = sym.Variable(name=symbol_map[call.name], scope=routine)
 
         if call.name in function_map:
-            callmap[call.function] = sym.ProcedureSymbol(name=function_map[call.name], scope=routine)
+            callmap[call.function] = sym.ProcedureSymbol(
+                name=function_map[call.name], scope=routine
+            )
 
     routine.spec = SubstituteExpressions(callmap).visit(routine.spec)
     routine.body = SubstituteExpressions(callmap).visit(routine.body)
@@ -152,7 +183,9 @@ def used_names_from_symbol(symbol, modifier=str.lower):
         return {modifier(symbol)}
 
     if isinstance(symbol, (sym.TypedSymbol, sym.MetaSymbol)):
-        return {modifier(symbol.name)} | used_names_from_symbol(symbol.type, modifier=modifier)
+        return {modifier(symbol.name)} | used_names_from_symbol(
+            symbol.type, modifier=modifier
+        )
 
     if isinstance(symbol, SymbolAttributes):
         if isinstance(symbol.dtype, BasicType) and symbol.kind is not None:
@@ -173,7 +206,9 @@ def eliminate_unused_imports(module_or_routine, used_symbols):
     imports = FindNodes(Import).visit(module_or_routine.spec)
     imported_symbols = [s for im in imports for s in im.symbols or []]
 
-    redundant_symbols = {s for s in imported_symbols if s.name.lower() not in used_symbols}
+    redundant_symbols = {
+        s for s in imported_symbols if s.name.lower() not in used_symbols
+    }
 
     if redundant_symbols:
         imprt_map = {}
@@ -200,17 +235,25 @@ def find_and_eliminate_unused_imports(routine):
     # We need a custom expression retriever that does not return symbols used in Imports
     class SymbolRetriever(ExpressionFinder):
 
-        retriever = ExpressionRetriever(lambda e: isinstance(e, (TypedSymbol, MetaSymbol)))
+        retriever = ExpressionRetriever(
+            lambda e: isinstance(e, (TypedSymbol, MetaSymbol))
+        )
 
         def visit_Import(self, o, **kwargs):  # pylint: disable=unused-argument
             return ()
 
     # Find all used symbols
-    used_symbols = set.union(*[used_names_from_symbol(s)
-                               for s in SymbolRetriever().visit([routine.spec, routine.body])])
+    used_symbols = set.union(
+        *[
+            used_names_from_symbol(s)
+            for s in SymbolRetriever().visit([routine.spec, routine.body])
+        ]
+    )
     used_symbols |= set.union(*[used_names_from_symbol(s) for s in routine.variables])
     for typedef in FindNodes(TypeDef).visit(routine.spec):
-        used_symbols |= set.union(*[used_names_from_symbol(s) for s in typedef.variables])
+        used_symbols |= set.union(
+            *[used_names_from_symbol(s) for s in typedef.variables]
+        )
 
     # Recurse for contained subroutines/functions
     for member in routine.members:
@@ -243,7 +286,7 @@ class IsoFortranEnvMapper:
     from ``iso_fortran_env``.
     """
 
-    selected_kind_calls = ('selected_int_kind', 'selected_real_kind')
+    selected_kind_calls = ("selected_int_kind", "selected_real_kind")
 
     def __init__(self, arch=None):
         if arch is None:
@@ -257,7 +300,10 @@ class IsoFortranEnvMapper:
         Return ``True`` if the given call is a transformational function to
         select the kind of an integer or real type.
         """
-        return isinstance(call, sym.InlineCall) and call.name.lower() in cls.selected_kind_calls
+        return (
+            isinstance(call, sym.InlineCall)
+            and call.name.lower() in cls.selected_kind_calls
+        )
 
     @staticmethod
     def _selected_int_kind(r):
@@ -291,7 +337,7 @@ class IsoFortranEnvMapper:
         ``iso_fortran_env`` that is able to represent all integers n
         in the range -10**r < n < 10**r.
         """
-        byte_kind_map = {b: f'INT{8 * b}' for b in [1, 2, 4, 8]}
+        byte_kind_map = {b: f"INT{8 * b}" for b in [1, 2, 4, 8]}
         kind = self._selected_int_kind(r)
         if kind in byte_kind_map:
             kind_name = byte_kind_map[kind]
@@ -320,7 +366,7 @@ class IsoFortranEnvMapper:
             return 4
         if p < 16:
             return 8
-        if self.arch.startswith(('aarch64', 'power', 'ppc', 'riscv', 's390x', 'sparc')):
+        if self.arch.startswith(("aarch64", "power", "ppc", "riscv", "s390x", "sparc")):
             if p <= 20:
                 return 16
         else:
@@ -337,7 +383,7 @@ class IsoFortranEnvMapper:
         for decimal precision (``p``), decimal exponent range (``r``) and
         radix (``r``).
         """
-        byte_kind_map = {b: f'REAL{8 * b}' for b in [4, 8, 16]}
+        byte_kind_map = {b: f"REAL{8 * b}" for b in [4, 8, 16]}
         kind = self._selected_real_kind(p, r, radix)
         if kind in byte_kind_map:
             kind_name = byte_kind_map[kind]
@@ -349,7 +395,7 @@ class IsoFortranEnvMapper:
         if not self.is_selected_kind_call(call):
             return call
 
-        func = getattr(self, f'map_{call.name.lower()}')
+        func = getattr(self, f"map_{call.name.lower()}")
         args = [int(arg) for arg in call.parameters]
         kwargs = {key: int(val) for key, val in call.kw_parameters.items()}
 
@@ -366,12 +412,18 @@ def replace_selected_kind(routine):
     mapper = IsoFortranEnvMapper()
 
     # Find all selected_x_kind calls in spec and body
-    calls = [call for call in FindInlineCalls().visit(routine.ir)
-             if mapper.is_selected_kind_call(call)]
+    calls = [
+        call
+        for call in FindInlineCalls().visit(routine.ir)
+        if mapper.is_selected_kind_call(call)
+    ]
 
     # Need to pick out kinds in Literals explicitly
-    calls += [literal.kind for literal in FindLiterals().visit(routine.ir)
-              if hasattr(literal, 'kind') and mapper.is_selected_kind_call(literal.kind)]
+    calls += [
+        literal.kind
+        for literal in FindLiterals().visit(routine.ir)
+        if hasattr(literal, "kind") and mapper.is_selected_kind_call(literal.kind)
+    ]
 
     map_call = {call: mapper.map_call(call, routine) for call in calls}
 
@@ -381,36 +433,56 @@ def replace_selected_kind(routine):
 
     # Replace calls and literals hidden in variable kinds and inits
     for variable in routine.variables:
-        if variable.type.kind is not None and mapper.is_selected_kind_call(variable.type.kind):
+        if variable.type.kind is not None and mapper.is_selected_kind_call(
+            variable.type.kind
+        ):
             kind = mapper.map_call(variable.type.kind, routine)
             routine.symbol_attrs[variable.name] = variable.type.clone(kind=kind)
         if variable.type.initial is not None:
             if mapper.is_selected_kind_call(variable.type.initial):
                 initial = mapper.map_call(variable.type.initial, routine)
-                routine.symbol_attrs[variable.name] = variable.type.clone(initial=initial)
+                routine.symbol_attrs[variable.name] = variable.type.clone(
+                    initial=initial
+                )
             else:
-                init_calls = [literal.kind for literal in FindLiterals().visit(variable.type.initial)
-                              if hasattr(literal, 'kind') and mapper.is_selected_kind_call(literal.kind)]
+                init_calls = [
+                    literal.kind
+                    for literal in FindLiterals().visit(variable.type.initial)
+                    if hasattr(literal, "kind")
+                    and mapper.is_selected_kind_call(literal.kind)
+                ]
                 if init_calls:
-                    init_map = {call: mapper.map_call(call, routine) for call in init_calls}
-                    initial = SubstituteExpressions(init_map).visit(variable.type.initial)
-                    routine.symbol_attrs[variable.name] = variable.type.clone(initial=initial)
+                    init_map = {
+                        call: mapper.map_call(call, routine) for call in init_calls
+                    }
+                    initial = SubstituteExpressions(init_map).visit(
+                        variable.type.initial
+                    )
+                    routine.symbol_attrs[variable.name] = variable.type.clone(
+                        initial=initial
+                    )
 
     # Make sure iso_fortran_env symbols are imported
     if mapper.used_names:
         for imprt in FindNodes(Import).visit(routine.spec):
-            if imprt.module.lower() == 'iso_fortran_env':
+            if imprt.module.lower() == "iso_fortran_env":
                 # Update the existing iso_fortran_env import
                 imprt_symbols = {str(s).lower() for s in imprt.symbols}
                 missing_symbols = set(mapper.used_names.keys()) - imprt_symbols
-                symbols = as_tuple(imprt.symbols) + tuple(mapper.used_names[s] for s in missing_symbols)
+                symbols = as_tuple(imprt.symbols) + tuple(
+                    mapper.used_names[s] for s in missing_symbols
+                )
 
                 # Flush the change through the spec
-                routine.spec = Transformer({imprt: Import(imprt.module, symbols=symbols)}).visit(routine.spec)
+                routine.spec = Transformer(
+                    {imprt: Import(imprt.module, symbols=symbols)}
+                ).visit(routine.spec)
                 break
         else:
             # No iso_fortran_env import present, need to insert a new one
-            imprt = Import('iso_fortran_env', symbols=as_tuple(mapper.used_names.values()))
+            imprt = Import(
+                "iso_fortran_env", symbols=as_tuple(mapper.used_names.values())
+            )
             routine.spec.prepend(imprt)
 
 
@@ -437,12 +509,13 @@ def recursive_expression_map_update(expr_map, max_iterations=10):
         Maximum number of iterations, corresponds to the maximum level of
         nesting that can be replaced.
     """
+
     def apply_to_init_arg(name, arg, expr, mapper):
         # Helper utility to apply the mapper only to expression arguments and
         # retain the scope while rebuilding the node
         if isinstance(arg, (tuple, Expression)):
             return mapper(arg)
-        if name == 'scope':
+        if name == "scope":
             return expr.scope
         return arg
 
@@ -452,10 +525,14 @@ def recursive_expression_map_update(expr_map, max_iterations=10):
         # e.g. call arguments or array subscripts etc.
         mapper = SubstituteExpressionsMapper(expr_map)
         prev_map, expr_map = expr_map, {
-            expr: type(replacement)(**{
-                name: apply_to_init_arg(name, arg, expr, mapper)
-                for name, arg in zip(replacement.init_arg_names, replacement.__getinitargs__())
-            })
+            expr: type(replacement)(
+                **{
+                    name: apply_to_init_arg(name, arg, expr, mapper)
+                    for name, arg in zip(
+                        replacement.init_arg_names, replacement.__getinitargs__()
+                    )
+                }
+            )
             for expr, replacement in expr_map.items()
         }
 

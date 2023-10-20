@@ -85,8 +85,11 @@ class GenericRule:
         """
         Return list of strings that identify this rule
         """
-        if cls.docs and 'id' in cls.docs:  # pylint: disable=unsupported-membership-test
-            return [cls.__name__, cls.docs['id']]  # pylint: disable=unsubscriptable-object
+        if cls.docs and "id" in cls.docs:  # pylint: disable=unsupported-membership-test
+            return [
+                cls.__name__,
+                cls.docs["id"],
+            ]  # pylint: disable=unsubscriptable-object
         return [cls.__name__]
 
     @classmethod
@@ -138,10 +141,10 @@ class GenericRule:
             cls.check_file(ast, rule_report, config)
 
             # Then recurse for all modules and subroutines in that file
-            if hasattr(ast, 'modules') and ast.modules is not None:
+            if hasattr(ast, "modules") and ast.modules is not None:
                 for module in ast.modules:
                     cls.check(module, rule_report, config, **kwargs)
-            if hasattr(ast, 'subroutines') and ast.subroutines is not None:
+            if hasattr(ast, "subroutines") and ast.subroutines is not None:
                 for subroutine in ast.subroutines:
                     cls.check(subroutine, rule_report, config, **kwargs)
 
@@ -153,7 +156,7 @@ class GenericRule:
             cls.check_module(ast, rule_report, config)
 
             # Then recurse for all subroutines in that module
-            if hasattr(ast, 'subroutines') and ast.subroutines is not None:
+            if hasattr(ast, "subroutines") and ast.subroutines is not None:
                 for subroutine in ast.subroutines:
                     cls.check(subroutine, rule_report, config, **kwargs)
 
@@ -162,15 +165,19 @@ class GenericRule:
             if is_rule_disabled(ast.ir, cls.identifiers()):
                 return
 
-            if not (targets := kwargs.pop('targets', None)):
-                items = kwargs.get('items', ())
-                item = [item for item in items if item.local_name.lower() == ast.name.lower()]
+            if not (targets := kwargs.pop("targets", None)):
+                items = kwargs.get("items", ())
+                item = [
+                    item
+                    for item in items
+                    if item.local_name.lower() == ast.name.lower()
+                ]
                 if len(item) > 0:
                     targets = item[0].targets
             cls.check_subroutine(ast, rule_report, config, targets=targets, **kwargs)
 
             # Recurse for any procedures contained in a subroutine
-            if hasattr(ast, 'members') and ast.members is not None:
+            if hasattr(ast, "members") and ast.members is not None:
                 for member in ast.members:
                     cls.check(member, rule_report, config, **kwargs)
 

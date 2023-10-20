@@ -23,7 +23,7 @@ from loki.ir import VariableDeclaration, Intrinsic
 from loki.frontend.util import OMNI, OFP, FP, REGEX
 
 
-__all__ = ['preprocess_cpp', 'sanitize_input', 'sanitize_registry', 'PPRule']
+__all__ = ["preprocess_cpp", "sanitize_input", "sanitize_registry", "PPRule"]
 
 
 def preprocess_cpp(source, filepath=None, includes=None, defines=None):
@@ -47,14 +47,13 @@ def preprocess_cpp(source, filepath=None, includes=None, defines=None):
     """
 
     class _LokiCPreprocessor(pcpp.Preprocessor):
-
         def on_comment(self, tok):  # pylint: disable=unused-argument
             # Pass through C-style comments
             return True
 
         def on_error(self, file, line, msg):
             # Redirect CPP error to our logger and increment return code
-            debug(f'[Loki-CPP] {file}:{line: d} error: {msg}')
+            debug(f"[Loki-CPP] {file}:{line: d} error: {msg}")
             self.return_code += 1
 
     # Add include paths to PP
@@ -67,26 +66,26 @@ def preprocess_cpp(source, filepath=None, includes=None, defines=None):
 
     # Add and sanitize defines to PP
     for d in as_tuple(defines):
-        if '=' not in d:
-            d += '=1'
-        d = d.replace('=', ' ', 1)
+        if "=" not in d:
+            d += "=1"
+        d = d.replace("=", " ", 1)
         pp.define(d)
 
     # Parse source through preprocessor
     pp.parse(source)
 
-    if config['cpp-dump-files']:
+    if config["cpp-dump-files"]:
         if filepath is None:
-            pp_path = Path(filehash(source, suffix='.cpp.f90'))
+            pp_path = Path(filehash(source, suffix=".cpp.f90"))
         else:
-            pp_path = filepath.with_suffix('.cpp.f90')
-        pp_path = gettempdir()/pp_path.name
-        debug(f'[Loki] C-preprocessor, writing {str(pp_path)}')
+            pp_path = filepath.with_suffix(".cpp.f90")
+        pp_path = gettempdir() / pp_path.name
+        debug(f"[Loki] C-preprocessor, writing {str(pp_path)}")
 
         # Dump preprocessed source to file and read it
-        with pp_path.open('w') as f:
+        with pp_path.open("w") as f:
             pp.write(f)
-        with pp_path.open('r') as f:
+        with pp_path.open("r") as f:
             preprocessed = f.read()
         return preprocessed
 
@@ -96,7 +95,9 @@ def preprocess_cpp(source, filepath=None, includes=None, defines=None):
     return s.getvalue()
 
 
-@Timer(logger=perf, text=lambda s: f'[Loki::Frontend] Executed sanitize_input in {s:.2f}s')
+@Timer(
+    logger=perf, text=lambda s: f"[Loki::Frontend] Executed sanitize_input in {s:.2f}s"
+)
 def sanitize_input(source, frontend):
     """
     Apply internal regex-based sanitisation rules to filter out known
@@ -115,7 +116,7 @@ def sanitize_input(source, frontend):
     for name, rule in sanitize_registry[frontend].items():
         # Apply rule filter over source file
         rule.reset()
-        new_source = ''
+        new_source = ""
         for ll, line in enumerate(source.splitlines(keepends=True)):
             ll += 1  # Correct for Fortran counting
             new_source += rule.filter(line, lineno=ll)
@@ -135,7 +136,9 @@ def reinsert_contiguous(ir, pp_info):
         for decl in FindNodes(VariableDeclaration).visit(ir):
             if decl.source.lines[0] in pp_info:
                 for var in decl.symbols:
-                    var.scope.symbol_attrs[var.name] = var.scope.symbol_attrs[var.name].clone(contiguous=True)
+                    var.scope.symbol_attrs[var.name] = var.scope.symbol_attrs[
+                        var.name
+                    ].clone(contiguous=True)
     return ir
 
 
@@ -150,9 +153,11 @@ def reinsert_convert_endian(ir, pp_info):
             if match is not None:
                 source = intr.source
                 assert source is not None
-                text = match['ws'] + match['pre'] + match['convert'] + match['post']
-                if match['post'].rstrip().endswith('&'):
-                    cont_line_index = source.string.find(match['post']) + len(match['post'])
+                text = match["ws"] + match["pre"] + match["convert"] + match["post"]
+                if match["post"].rstrip().endswith("&"):
+                    cont_line_index = source.string.find(match["post"]) + len(
+                        match["post"]
+                    )
                     text += source.string[cont_line_index:].rstrip()
                 source.string = text
                 intr._update(text=text, source=source)
@@ -169,10 +174,17 @@ def reinsert_open_newunit(ir, pp_info):
             if match is not None:
                 source = intr.source
                 assert source is not None
-                text = match['ws'] + match['open'] + match['args1'] + (match['delim'] or '')
-                text += match['newunit_key'] + match['newunit_val'] + match['args2']
-                if match['args2'].rstrip().endswith('&'):
-                    cont_line_index = source.string.find(match['args2']) + len(match['args2'])
+                text = (
+                    match["ws"]
+                    + match["open"]
+                    + match["args1"]
+                    + (match["delim"] or "")
+                )
+                text += match["newunit_key"] + match["newunit_val"] + match["args2"]
+                if match["args2"].rstrip().endswith("&"):
+                    cont_line_index = source.string.find(match["args2"]) + len(
+                        match["args2"]
+                    )
                     text += source.string[cont_line_index:].rstrip()
                 source.string = text
                 intr._update(text=text, source=source)
@@ -185,7 +197,7 @@ class PPRule:
     and collects associated meta-data.
     """
 
-    _empty_pattern = re.compile('')
+    _empty_pattern = re.compile("")
 
     def __init__(self, match, replace, postprocess=None):
         self.match = match
@@ -228,55 +240,74 @@ class PPRule:
 sanitize_registry = {
     REGEX: {
         # Strip line annotations from Fypp preprocessor
-        'FYPP ANNOTATIONS': PPRule(match=re.compile(r'(# [1-9].*\".*\.fypp\"\n)'), replace=''),
+        "FYPP ANNOTATIONS": PPRule(
+            match=re.compile(r"(# [1-9].*\".*\.fypp\"\n)"), replace=""
+        ),
     },
     OMNI: {},
     OFP: {
         # Remove various IBM directives
-        'IBM_DIRECTIVES': PPRule(match=re.compile(r'(@PROCESS.*\n)'), replace='\n'),
-
+        "IBM_DIRECTIVES": PPRule(match=re.compile(r"(@PROCESS.*\n)"), replace="\n"),
         # Despite F2008 compatability, OFP does not recognise the CONTIGUOUS keyword :(
-        'CONTIGUOUS': PPRule(
-            match=re.compile(r', CONTIGUOUS', re.I), replace='', postprocess=reinsert_contiguous),
-
+        "CONTIGUOUS": PPRule(
+            match=re.compile(r", CONTIGUOUS", re.I),
+            replace="",
+            postprocess=reinsert_contiguous,
+        ),
         # Strip line annotations from Fypp preprocessor
-        'FYPP ANNOTATIONS': PPRule(match=re.compile(r'(# [1-9].*\".*\.fypp\"\n)'), replace=''),
+        "FYPP ANNOTATIONS": PPRule(
+            match=re.compile(r"(# [1-9].*\".*\.fypp\"\n)"), replace=""
+        ),
     },
     FP: {
         # Remove various IBM directives
-        'IBM_DIRECTIVES': PPRule(match=re.compile(r'(@PROCESS.*\n)'), replace='\n'),
-
+        "IBM_DIRECTIVES": PPRule(match=re.compile(r"(@PROCESS.*\n)"), replace="\n"),
         # Enquote string CPP directives in Fortran source lines to make them string constants
         # Note: this is a bit tricky as we need to make sure that we don't replace it inside CPP
         #       directives as this can produce invalid code
-        'STRING_PP_DIRECTIVES': PPRule(
-            match=re.compile((
-                r'(?P<pp>^\s*#.*__(?:FILE|FILENAME|DATE|VERSION)__)|'  # Match inside a directive
-                r'(?P<else>__(?:FILE|FILENAME|DATE|VERSION)__)')),     # Match elsewhere
-            replace=lambda m: m['pp'] or f'"{m["else"]}"'),
-
+        "STRING_PP_DIRECTIVES": PPRule(
+            match=re.compile(
+                (
+                    r"(?P<pp>^\s*#.*__(?:FILE|FILENAME|DATE|VERSION)__)|"  # Match inside a directive
+                    r"(?P<else>__(?:FILE|FILENAME|DATE|VERSION)__)"
+                )
+            ),  # Match elsewhere
+            replace=lambda m: m["pp"] or f'"{m["else"]}"',
+        ),
         # Replace integer CPP directives by 0
-        'INTEGER_PP_DIRECTIVES': PPRule(match='__LINE__', replace='0'),
-
+        "INTEGER_PP_DIRECTIVES": PPRule(match="__LINE__", replace="0"),
         # Replace CONVERT argument in OPEN calls
-        'CONVERT_ENDIAN': PPRule(
-            match=re.compile((r'(?P<ws>^\s*)(?P<pre>OPEN\s*\(.*?)'
-                              r'(?P<convert>,?\s*CONVERT=[\'\"](?:BIG|LITTLE)_ENDIAN[\'\"]\s*)'
-                              r'(?P<post>.*?$)'), re.I),
-            replace=r'\g<ws>\g<pre>\g<post>', postprocess=reinsert_convert_endian),
-
+        "CONVERT_ENDIAN": PPRule(
+            match=re.compile(
+                (
+                    r"(?P<ws>^\s*)(?P<pre>OPEN\s*\(.*?)"
+                    r"(?P<convert>,?\s*CONVERT=[\'\"](?:BIG|LITTLE)_ENDIAN[\'\"]\s*)"
+                    r"(?P<post>.*?$)"
+                ),
+                re.I,
+            ),
+            replace=r"\g<ws>\g<pre>\g<post>",
+            postprocess=reinsert_convert_endian,
+        ),
         # Replace NEWUNIT argument in OPEN calls
-        'OPEN_NEWUNIT': PPRule(
-            match=re.compile((r'(?P<ws>^\s*)(?P<open>OPEN\s*\()(?P<args1>.*?)(?P<delim>,)?'
-                              r'(?P<newunit_key>,?\s*NEWUNIT=)(?P<newunit_val>.*?(?=,|\)|&))'
-                              r'(?P<args2>.*?$)'), re.I),
-            replace=lambda m: f'{m["ws"]}{m["open"]}{m["newunit_val"]}{m["delim"] or ""}' +
-                              f'{m["args1"]}{m["args2"]}',
-            postprocess=reinsert_open_newunit),
-
+        "OPEN_NEWUNIT": PPRule(
+            match=re.compile(
+                (
+                    r"(?P<ws>^\s*)(?P<open>OPEN\s*\()(?P<args1>.*?)(?P<delim>,)?"
+                    r"(?P<newunit_key>,?\s*NEWUNIT=)(?P<newunit_val>.*?(?=,|\)|&))"
+                    r"(?P<args2>.*?$)"
+                ),
+                re.I,
+            ),
+            replace=lambda m: f'{m["ws"]}{m["open"]}{m["newunit_val"]}{m["delim"] or ""}'
+            + f'{m["args1"]}{m["args2"]}',
+            postprocess=reinsert_open_newunit,
+        ),
         # Strip line annotations from Fypp preprocessor
-        'FYPP ANNOTATIONS': PPRule(match=re.compile(r'(# [1-9].*\".*\.fypp\"\n)'), replace=''),
-    }
+        "FYPP ANNOTATIONS": PPRule(
+            match=re.compile(r"(# [1-9].*\".*\.fypp\"\n)"), replace=""
+        ),
+    },
 }
 """
 The frontend sanitization registry dict holds workaround rules for

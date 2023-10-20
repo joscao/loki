@@ -5,5 +5,5 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from loki.bulk.scheduler import * # noqa
-from loki.bulk.item import * # noqa
+from loki.bulk.scheduler import *  # noqa
+from loki.bulk.item import *  # noqa

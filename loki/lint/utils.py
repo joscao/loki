@@ -15,7 +15,7 @@ from loki.subroutine import Subroutine
 from loki.visitors import FindNodes, Transformer
 
 
-__all__ = ['Fixer', 'get_filename_from_parent', 'get_location_hash', 'is_rule_disabled']
+__all__ = ["Fixer", "get_filename_from_parent", "get_location_hash", "is_rule_disabled"]
 
 
 class Fixer:
@@ -41,7 +41,9 @@ class Fixer:
         mapper = {}
         for report in reports:
             rule_config = config[report.rule.__name__]
-            mapper.update(report.rule.fix_subroutine(subroutine, report, rule_config) or {})
+            mapper.update(
+                report.rule.fix_subroutine(subroutine, report, rule_config) or {}
+            )
 
         if mapper:
             # Apply the changes and invalidate source objects
@@ -51,12 +53,14 @@ class Fixer:
             parent = subroutine.parent
             while parent is not None:
                 parent._source = None
-                parent = getattr(parent, 'parent', None)
+                parent = getattr(parent, "parent", None)
 
         return subroutine
 
     @classmethod
-    def fix_sourcefile(cls, sourcefile, reports, config):  # pylint: disable=unused-argument
+    def fix_sourcefile(
+        cls, sourcefile, reports, config
+    ):  # pylint: disable=unused-argument
         """
         Call `fix_sourcefile` for all rules and apply the transformations.
         """
@@ -86,10 +90,10 @@ class Fixer:
         # Fix on source file level
         if isinstance(ast, Sourcefile):
             # Depth-first traversal
-            if hasattr(ast, 'subroutines') and ast.subroutines is not None:
+            if hasattr(ast, "subroutines") and ast.subroutines is not None:
                 for routine in ast.subroutines:
                     cls.fix_subroutine(routine, reports, config)
-            if hasattr(ast, 'modules') and ast.modules is not None:
+            if hasattr(ast, "modules") and ast.modules is not None:
                 for module in ast.modules:
                     cls.fix_module(module, reports, config)
 
@@ -98,7 +102,7 @@ class Fixer:
         # Fix on module level
         elif isinstance(ast, Module):
             # Depth-first traversal
-            if hasattr(ast, 'subroutines') and ast.subroutines is not None:
+            if hasattr(ast, "subroutines") and ast.subroutines is not None:
                 for routine in ast.subroutines:
                     cls.fix_subroutine(routine, reports, config)
 
@@ -107,7 +111,7 @@ class Fixer:
         # Fix on subroutine level
         elif isinstance(ast, Subroutine):
             # Depth-first traversal
-            if hasattr(ast, 'members') and ast.members is not None:
+            if hasattr(ast, "members") and ast.members is not None:
                 for routine in ast.members:
                     cls.fix_subroutine(routine, reports, config)
 
@@ -133,10 +137,10 @@ def get_filename_from_parent(obj):
         The filename if found, else `None`.
     """
     scope = obj
-    while hasattr(scope, 'parent') and scope.parent:
+    while hasattr(scope, "parent") and scope.parent:
         # Go up until we are at Sourcefile level
         scope = scope.parent
-    if hasattr(scope, 'path'):
+    if hasattr(scope, "path"):
         return scope.path
     return None
 
@@ -156,14 +160,17 @@ def get_location_hash(location):
         The hash as a string or, if no hash can be created for :data:`location`,
         `None` is returned.
     """
-    if getattr(location, 'source', None) and location.source.string:
-        first_line = location.source.string[:location.source.string.find('\n')]
+    if getattr(location, "source", None) and location.source.string:
+        first_line = location.source.string[: location.source.string.find("\n")]
         line_hash = str(md5(first_line.encode()).hexdigest())
         return line_hash
     return None
 
 
-_disabled_rules_re = re.compile(r'^\s*!\s*loki-lint\s*:(?:.*?)disable=(?P<rules>[\w\.,]*)')
+_disabled_rules_re = re.compile(
+    r"^\s*!\s*loki-lint\s*:(?:.*?)disable=(?P<rules>[\w\.,]*)"
+)
+
 
 def is_rule_disabled(ir, identifiers, disabled_line_hashes=None):
     """
@@ -196,10 +203,11 @@ def is_rule_disabled(ir, identifiers, disabled_line_hashes=None):
     bool
         Returns `True` if a rule is disabled, otherwise `False`
     """
+
     def _match_disabled_rules(comment):
         match = _disabled_rules_re.match(comment.text)
         if match:
-            for rule in match.group('rules').split(','):
+            for rule in match.group("rules").split(","):
                 if rule in identifiers:
                     return True
         return False
@@ -211,13 +219,13 @@ def is_rule_disabled(ir, identifiers, disabled_line_hashes=None):
 
     # If we have a leaf node, we check for in-line comments
     if isinstance(ir, LeafNode):
-        if hasattr(ir, 'comment') and ir.comment:
+        if hasattr(ir, "comment") and ir.comment:
             return _match_disabled_rules(ir.comment)
         return False
 
     # Otherwise: look in the entire subtree
     for comments in FindNodes((Comment, CommentBlock)).visit(ir):
-        for comment in getattr(comments, 'comments', [comments]):
+        for comment in getattr(comments, "comments", [comments]):
             if _match_disabled_rules(comment):
                 return True
     return False

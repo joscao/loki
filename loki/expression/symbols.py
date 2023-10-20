@@ -26,24 +26,51 @@ from loki.config import config
 
 
 __all__ = [
-    'loki_make_stringifier',
+    "loki_make_stringifier",
     # Mix-ins
-    'StrCompareMixin',
+    "StrCompareMixin",
     # Typed leaf nodes
-    'TypedSymbol', 'DeferredTypeSymbol', 'VariableSymbol', 'ProcedureSymbol',
-    'MetaSymbol', 'Scalar', 'Array', 'Variable',
+    "TypedSymbol",
+    "DeferredTypeSymbol",
+    "VariableSymbol",
+    "ProcedureSymbol",
+    "MetaSymbol",
+    "Scalar",
+    "Array",
+    "Variable",
     # Non-typed leaf nodes
-    'FloatLiteral', 'IntLiteral', 'LogicLiteral', 'StringLiteral',
-    'IntrinsicLiteral', 'Literal', 'LiteralList', 'InlineDo',
+    "FloatLiteral",
+    "IntLiteral",
+    "LogicLiteral",
+    "StringLiteral",
+    "IntrinsicLiteral",
+    "Literal",
+    "LiteralList",
+    "InlineDo",
     # Internal nodes
-    'Sum', 'Product', 'Quotient', 'Power', 'Comparison', 'LogicalAnd', 'LogicalOr',
-    'LogicalNot', 'InlineCall', 'Cast', 'Range', 'LoopRange', 'RangeIndex', 'ArraySubscript',
-    'StringSubscript',
+    "Sum",
+    "Product",
+    "Quotient",
+    "Power",
+    "Comparison",
+    "LogicalAnd",
+    "LogicalOr",
+    "LogicalNot",
+    "InlineCall",
+    "Cast",
+    "Range",
+    "LoopRange",
+    "RangeIndex",
+    "ArraySubscript",
+    "StringSubscript",
 ]
 
 # pylint: disable=abstract-method,too-many-lines
 
-def loki_make_stringifier(self, originating_stringifier=None):  # pylint: disable=unused-argument
+
+def loki_make_stringifier(
+    self, originating_stringifier=None
+):  # pylint: disable=unused-argument
     """
     Return a :any:`LokiStringifyMapper` instance that can be used to generate a
     human-readable representation of :data:`self`.
@@ -51,7 +78,10 @@ def loki_make_stringifier(self, originating_stringifier=None):  # pylint: disabl
     This is used as common abstraction for the :meth:`make_stringifier` method in
     Pymbolic expression nodes.
     """
-    from loki.expression.mappers import LokiStringifyMapper  # pylint: disable=import-outside-toplevel
+    from loki.expression.mappers import (
+        LokiStringifyMapper,
+    )  # pylint: disable=import-outside-toplevel
+
     return LokiStringifyMapper()
 
 
@@ -65,10 +95,10 @@ class StrCompareMixin:
 
     @staticmethod
     def _canonical(s):
-        """ Define canonical string representations (lower-case, no spaces) """
-        if config['case-sensitive']:
-            return str(s).replace(' ', '')
-        return str(s).lower().replace(' ', '')
+        """Define canonical string representations (lower-case, no spaces)"""
+        if config["case-sensitive"]:
+            return str(s).replace(" ", "")
+        return str(s).lower().replace(" ", "")
 
     def __hash__(self):
         return hash(self._canonical(self))
@@ -120,28 +150,33 @@ class TypedSymbol:
         Any other keyword arguments for other parent classes
     """
 
-    init_arg_names = ('name', 'scope', 'parent', 'type', )
+    init_arg_names = (
+        "name",
+        "scope",
+        "parent",
+        "type",
+    )
 
     def __init__(self, *args, **kwargs):
-        self.name = kwargs['name']
-        self.parent = kwargs.pop('parent', None)
-        self.scope = kwargs.pop('scope', None)
+        self.name = kwargs["name"]
+        self.parent = kwargs.pop("parent", None)
+        self.scope = kwargs.pop("scope", None)
 
         # Use provided type or try to determine from scope
         self._type = None
-        self.type = kwargs.pop('type', None) or self.type
+        self.type = kwargs.pop("type", None) or self.type
 
         super().__init__(*args, **kwargs)
 
     @property
     def name(self):
         if self.parent:
-            return f'{self.parent.name}%{self._name}'
+            return f"{self.parent.name}%{self._name}"
         return self._name
 
     @name.setter
     def name(self, name):
-        self._name = name.split('%')[-1]
+        self._name = name.split("%")[-1]
 
     def __getinitargs__(self):
         """
@@ -152,7 +187,12 @@ class TypedSymbol:
         symbol objects. We do not recurse here, since we own the
         "name" attribute, which pymbolic will otherwise replicate.
         """
-        return (self.name, None, self._parent, self._type, )
+        return (
+            self.name,
+            None,
+            self._parent,
+            self._type,
+        )
 
     @property
     def scope(self):
@@ -286,7 +326,12 @@ class TypedSymbol:
             if _type.dtype.typedef is BasicType.DEFERRED:
                 return ()
             return tuple(
-                v.clone(name=f'{self.name}%{v.name}', scope=self.scope, type=v.type, parent=self)
+                v.clone(
+                    name=f"{self.name}%{v.name}",
+                    scope=self.scope,
+                    type=v.type,
+                    parent=self,
+                )
                 for v in _type.dtype.typedef.variables
             )
         return None
@@ -324,18 +369,22 @@ class TypedSymbol:
         Replicate the object with the provided overrides.
         """
         # Add existing meta-info to the clone arguments, only if we have them.
-        if 'name' not in kwargs and self.name:
-            kwargs['name'] = self.name
-        if 'scope' not in kwargs and self.scope:
-            kwargs['scope'] = self.scope
-        if 'type' not in kwargs:
+        if "name" not in kwargs and self.name:
+            kwargs["name"] = self.name
+        if "scope" not in kwargs and self.scope:
+            kwargs["scope"] = self.scope
+        if "type" not in kwargs:
             # If no type is given, check new scope
-            if 'scope' in kwargs and kwargs['scope'] and kwargs['name'] in kwargs['scope'].symbol_attrs:
-                kwargs['type'] = kwargs['scope'].symbol_attrs[kwargs['name']]
+            if (
+                "scope" in kwargs
+                and kwargs["scope"]
+                and kwargs["name"] in kwargs["scope"].symbol_attrs
+            ):
+                kwargs["type"] = kwargs["scope"].symbol_attrs[kwargs["name"]]
             else:
-                kwargs['type'] = self.type
-        if 'parent' not in kwargs and self.parent:
-            kwargs['parent'] = self.parent
+                kwargs["type"] = self.type
+        if "parent" not in kwargs and self.parent:
+            kwargs["parent"] = self.parent
 
         return Variable(**kwargs)
 
@@ -355,7 +404,9 @@ class TypedSymbol:
         return self.clone(scope=scope)
 
 
-class DeferredTypeSymbol(StrCompareMixin, TypedSymbol, pmbl.Variable):  # pylint: disable=too-many-ancestors
+class DeferredTypeSymbol(
+    StrCompareMixin, TypedSymbol, pmbl.Variable
+):  # pylint: disable=too-many-ancestors
     """
     Internal representation of symbols with deferred type
 
@@ -375,15 +426,17 @@ class DeferredTypeSymbol(StrCompareMixin, TypedSymbol, pmbl.Variable):  # pylint
     """
 
     def __init__(self, name, scope=None, **kwargs):
-        if kwargs.get('type') is None:
-            kwargs['type'] = SymbolAttributes(BasicType.DEFERRED)
-        assert kwargs['type'].dtype is BasicType.DEFERRED
+        if kwargs.get("type") is None:
+            kwargs["type"] = SymbolAttributes(BasicType.DEFERRED)
+        assert kwargs["type"].dtype is BasicType.DEFERRED
         super().__init__(name=name, scope=scope, **kwargs)
 
-    mapper_method = intern('map_deferred_type_symbol')
+    mapper_method = intern("map_deferred_type_symbol")
 
 
-class VariableSymbol(StrCompareMixin, TypedSymbol, pmbl.Variable):  # pylint: disable=too-many-ancestors
+class VariableSymbol(
+    StrCompareMixin, TypedSymbol, pmbl.Variable
+):  # pylint: disable=too-many-ancestors
     """
     Expression node to represent a variable symbol
 
@@ -421,7 +474,7 @@ class VariableSymbol(StrCompareMixin, TypedSymbol, pmbl.Variable):  # pylint: di
     def initial(self, value):
         self.type.initial = value
 
-    mapper_method = intern('map_variable_symbol')
+    mapper_method = intern("map_variable_symbol")
 
 
 class _FunctionSymbol(pmbl.FunctionSymbol):
@@ -437,7 +490,9 @@ class _FunctionSymbol(pmbl.FunctionSymbol):
         super().__init__()
 
 
-class ProcedureSymbol(StrCompareMixin, TypedSymbol, _FunctionSymbol):  # pylint: disable=too-many-ancestors
+class ProcedureSymbol(
+    StrCompareMixin, TypedSymbol, _FunctionSymbol
+):  # pylint: disable=too-many-ancestors
     """
     Internal representation of a symbol that represents a callable
     subroutine or function
@@ -454,11 +509,17 @@ class ProcedureSymbol(StrCompareMixin, TypedSymbol, _FunctionSymbol):  # pylint:
 
     def __init__(self, name, scope=None, type=None, **kwargs):
         # pylint: disable=redefined-builtin
-        assert type is None or isinstance(type.dtype, ProcedureType) or \
-                (isinstance(type.dtype, DerivedType) and name.lower() == type.dtype.name.lower())
+        assert (
+            type is None
+            or isinstance(type.dtype, ProcedureType)
+            or (
+                isinstance(type.dtype, DerivedType)
+                and name.lower() == type.dtype.name.lower()
+            )
+        )
         super().__init__(name=name, scope=scope, type=type, **kwargs)
 
-    mapper_method = intern('map_procedure_symbol')
+    mapper_method = intern("map_procedure_symbol")
 
 
 class MetaSymbol(StrCompareMixin, pmbl.AlgebraicLeaf):
@@ -599,7 +660,7 @@ class MetaSymbol(StrCompareMixin, pmbl.AlgebraicLeaf):
         """
         return self.type.initial
 
-    mapper_method = intern('map_meta_symbol')
+    mapper_method = intern("map_meta_symbol")
     make_stringifier = loki_make_stringifier
 
     def __getinitargs__(self):
@@ -649,7 +710,7 @@ class Scalar(MetaSymbol):  # pylint: disable=too-many-ancestors
         symbol = VariableSymbol(name=name, scope=scope, type=type, **kwargs)
         super().__init__(symbol=symbol)
 
-    mapper_method = intern('map_scalar')
+    mapper_method = intern("map_scalar")
 
 
 class Array(MetaSymbol):
@@ -711,13 +772,13 @@ class Array(MetaSymbol):
         return self.type.shape
 
     def __getinitargs__(self):
-        return super().__getinitargs__() + (self.dimensions, )
+        return super().__getinitargs__() + (self.dimensions,)
 
     @property
     def init_arg_names(self):
-        return super().init_arg_names + ('dimensions', )
+        return super().init_arg_names + ("dimensions",)
 
-    mapper_method = intern('map_array')
+    mapper_method = intern("map_array")
 
     def clone(self, **kwargs):
         """
@@ -727,8 +788,8 @@ class Array(MetaSymbol):
         to have no shape, this will create a :any:`Scalar` variable.
         """
         # Add existing meta-info to the clone arguments, only if we have them.
-        if self.dimensions and 'dimensions' not in kwargs:
-            kwargs['dimensions'] = self.dimensions
+        if self.dimensions and "dimensions" not in kwargs:
+            kwargs["dimensions"] = self.dimensions
         return super().clone(**kwargs)
 
     def rescope(self, scope):
@@ -743,7 +804,9 @@ class Array(MetaSymbol):
         if self.type:
             existing_type = scope.symbol_attrs.lookup(self.name)
             if existing_type:
-                return self.clone(scope=scope, type=existing_type, dimensions=self.dimensions)
+                return self.clone(
+                    scope=scope, type=existing_type, dimensions=self.dimensions
+                )
         return self.clone(scope=scope, dimensions=self.dimensions)
 
 
@@ -815,29 +878,33 @@ class Variable:
     """
 
     def __new__(cls, **kwargs):
-        name = kwargs['name']
-        scope = kwargs.get('scope')
-        _type = kwargs.get('type')
+        name = kwargs["name"]
+        scope = kwargs.get("scope")
+        _type = kwargs.get("type")
 
         if scope is not None and _type is None:
             # Determine type information from scope if not provided explicitly
-            _type = cls._get_type_from_scope(name, scope, kwargs.get('parent'))
-        kwargs['type'] = _type
+            _type = cls._get_type_from_scope(name, scope, kwargs.get("parent"))
+        kwargs["type"] = _type
 
         if _type and isinstance(_type.dtype, ProcedureType):
             # This is the name in a function/subroutine call
             return ProcedureSymbol(**kwargs)
 
-        if _type and isinstance(_type.dtype, DerivedType) and name.lower() == _type.dtype.name.lower():
+        if (
+            _type
+            and isinstance(_type.dtype, DerivedType)
+            and name.lower() == _type.dtype.name.lower()
+        ):
             # This is a constructor call (or a type imported in an ``IMPORT`` statement, in which
             # case this is classified wrong...)
             return ProcedureSymbol(**kwargs)
 
-        if 'dimensions' in kwargs and kwargs['dimensions'] is None:
+        if "dimensions" in kwargs and kwargs["dimensions"] is None:
             # Convenience: This way we can construct Scalar variables with `dimensions=None`
-            kwargs.pop('dimensions')
+            kwargs.pop("dimensions")
 
-        if kwargs.get('dimensions') is not None or (_type and _type.shape):
+        if kwargs.get("dimensions") is not None or (_type and _type.shape):
             return Array(**kwargs)
         if _type and _type.dtype is not BasicType.DEFERRED:
             return Scalar(**kwargs)
@@ -869,8 +936,8 @@ class Variable:
         stored_type = scope.symbol_attrs.lookup(name)
 
         # 2. For derived type members, we can try to find it via the parent instead
-        if '%' in name and (not stored_type or stored_type.dtype is BasicType.DEFERRED):
-            name_parts = name.split('%')
+        if "%" in name and (not stored_type or stored_type.dtype is BasicType.DEFERRED):
+            name_parts = name.split("%")
             if not parent:
                 # Build the parent if not given
                 parent_type = scope.symbol_attrs.lookup(name_parts[0])
@@ -923,7 +990,7 @@ class FloatLiteral(StrCompareMixin, _Literal):
         # We store float literals as strings to make sure no information gets
         # lost in the conversion
         self.value = str(value)
-        self.kind = kwargs.pop('kind', None)
+        self.kind = kwargs.pop("kind", None)
         super().__init__(**kwargs)
 
     def __hash__(self):
@@ -970,12 +1037,12 @@ class FloatLiteral(StrCompareMixin, _Literal):
         except ValueError:
             return super().__ge__(other)
 
-    init_arg_names = ('value', 'kind')
+    init_arg_names = ("value", "kind")
 
     def __getinitargs__(self):
         return (self.value, self.kind)
 
-    mapper_method = intern('map_float_literal')
+    mapper_method = intern("map_float_literal")
 
 
 class IntLiteral(StrCompareMixin, _Literal):
@@ -995,7 +1062,7 @@ class IntLiteral(StrCompareMixin, _Literal):
 
     def __init__(self, value, **kwargs):
         self.value = int(value)
-        self.kind = kwargs.pop('kind', None)
+        self.kind = kwargs.pop("kind", None)
         super().__init__(**kwargs)
 
     def __hash__(self):
@@ -1040,7 +1107,7 @@ class IntLiteral(StrCompareMixin, _Literal):
             return self.value >= other
         return super().__ge__(other)
 
-    init_arg_names = ('value', 'kind')
+    init_arg_names = ("value", "kind")
 
     def __getinitargs__(self):
         return (self.value, self.kind)
@@ -1051,7 +1118,7 @@ class IntLiteral(StrCompareMixin, _Literal):
     def __bool__(self):
         return bool(self.value)
 
-    mapper_method = intern('map_int_literal')
+    mapper_method = intern("map_int_literal")
 
 
 # Register IntLiteral as a constant class in Pymbolic
@@ -1069,15 +1136,15 @@ class LogicLiteral(StrCompareMixin, _Literal):
     """
 
     def __init__(self, value, **kwargs):
-        self.value = str(value).lower() in ('true', '.true.')
+        self.value = str(value).lower() in ("true", ".true.")
         super().__init__(**kwargs)
 
-    init_arg_names = ('value', )
+    init_arg_names = ("value",)
 
     def __getinitargs__(self):
-        return (self.value, )
+        return (self.value,)
 
-    mapper_method = intern('map_logic_literal')
+    mapper_method = intern("map_logic_literal")
 
 
 class StringLiteral(StrCompareMixin, _Literal):
@@ -1092,7 +1159,7 @@ class StringLiteral(StrCompareMixin, _Literal):
 
     def __init__(self, value, **kwargs):
         # Remove quotation marks
-        if value[0] == value[-1] and value[0] in '"\'':
+        if value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
 
         self.value = value
@@ -1109,12 +1176,12 @@ class StringLiteral(StrCompareMixin, _Literal):
             return self.value == other
         return False
 
-    init_arg_names = ('value', )
+    init_arg_names = ("value",)
 
     def __getinitargs__(self):
-        return (self.value, )
+        return (self.value,)
 
-    mapper_method = intern('map_string_literal')
+    mapper_method = intern("map_string_literal")
 
 
 class IntrinsicLiteral(StrCompareMixin, _Literal):
@@ -1135,12 +1202,12 @@ class IntrinsicLiteral(StrCompareMixin, _Literal):
         self.value = value
         super().__init__(**kwargs)
 
-    init_arg_names = ('value', )
+    init_arg_names = ("value",)
 
     def __getinitargs__(self):
-        return (self.value, )
+        return (self.value,)
 
-    mapper_method = intern('map_intrinsic_literal')
+    mapper_method = intern("map_intrinsic_literal")
 
 
 class Literal:
@@ -1163,17 +1230,21 @@ class Literal:
     @staticmethod
     def _from_literal(value, **kwargs):
 
-        cls_map = {BasicType.INTEGER: IntLiteral, BasicType.REAL: FloatLiteral,
-                   BasicType.LOGICAL: LogicLiteral, BasicType.CHARACTER: StringLiteral}
+        cls_map = {
+            BasicType.INTEGER: IntLiteral,
+            BasicType.REAL: FloatLiteral,
+            BasicType.LOGICAL: LogicLiteral,
+            BasicType.CHARACTER: StringLiteral,
+        }
 
-        _type = kwargs.pop('type', None)
+        _type = kwargs.pop("type", None)
         if _type is None:
             if isinstance(value, int):
                 _type = BasicType.INTEGER
             elif isinstance(value, float):
                 _type = BasicType.REAL
             elif isinstance(value, str):
-                if str(value).lower() in ('.true.', 'true', '.false.', 'false'):
+                if str(value).lower() in (".true.", "true", ".false.", "false"):
                     _type = BasicType.LOGICAL
                 else:
                     _type = BasicType.CHARACTER
@@ -1187,8 +1258,8 @@ class Literal:
             obj = IntrinsicLiteral(value, **kwargs)
 
         # And attach our own meta-data
-        if hasattr(obj, 'kind'):
-            obj.kind = kwargs.get('kind', None)
+        if hasattr(obj, "kind"):
+            obj.kind = kwargs.get("kind", None)
         return obj
 
 
@@ -1202,7 +1273,7 @@ class LiteralList(pmbl.AlgebraicLeaf):
         self.dtype = dtype
         super().__init__(**kwargs)
 
-    mapper_method = intern('map_literal_list')
+    mapper_method = intern("map_literal_list")
     make_stringifier = loki_make_stringifier
 
     def __getinitargs__(self):
@@ -1220,7 +1291,7 @@ class InlineDo(pmbl.AlgebraicLeaf):
         self.bounds = bounds
         super().__init__(**kwargs)
 
-    mapper_method = intern('map_inline_do')
+    mapper_method = intern("map_inline_do")
     make_stringifier = loki_make_stringifier
 
     def __getinitargs__(self):
@@ -1264,11 +1335,10 @@ class InlineCall(pmbl.CallWithKwargs):
     Internal representation of an in-line function call.
     """
 
-    init_arg_names = ('function', 'parameters', 'kw_parameters')
+    init_arg_names = ("function", "parameters", "kw_parameters")
 
     def __getinitargs__(self):
         return (self.function, self.parameters, self.kw_parameters)
-
 
     def __init__(self, function, parameters=None, kw_parameters=None, **kwargs):
         # Unfortunately, have to accept MetaSymbol here for the time being as
@@ -1278,10 +1348,14 @@ class InlineCall(pmbl.CallWithKwargs):
         parameters = parameters or ()
         kw_parameters = kw_parameters or {}
 
-        super().__init__(function=function, parameters=parameters,
-                         kw_parameters=kw_parameters, **kwargs)
+        super().__init__(
+            function=function,
+            parameters=parameters,
+            kw_parameters=kw_parameters,
+            **kwargs,
+        )
 
-    mapper_method = intern('map_inline_call')
+    mapper_method = intern("map_inline_call")
     make_stringifier = loki_make_stringifier
 
     @property
@@ -1360,9 +1434,9 @@ class InlineCall(pmbl.CallWithKwargs):
         """
         Replicate the object with the provided overrides.
         """
-        function = kwargs.get('function', self.function)
-        parameters = kwargs.get('parameters', self.parameters)
-        kw_parameters = kwargs.get('kw_parameters', self.kw_parameters)
+        function = kwargs.get("function", self.function)
+        parameters = kwargs.get("parameters", self.parameters)
+        kw_parameters = kwargs.get("kw_parameters", self.kw_parameters)
         return InlineCall(function, parameters, kw_parameters)
 
 
@@ -1376,7 +1450,7 @@ class Cast(pmbl.Call):
         self.kind = kind
         super().__init__(pmbl.make_variable(name), as_tuple(expression), **kwargs)
 
-    mapper_method = intern('map_cast')
+    mapper_method = intern("map_cast")
 
     @property
     def name(self):
@@ -1394,14 +1468,14 @@ class Range(StrCompareMixin, pmbl.Slice):
             children += (None,)
         super().__init__(children, **kwargs)
 
-    mapper_method = intern('map_range')
+    mapper_method = intern("map_range")
 
     def __hash__(self):
-        """ Need custom hashing function if we sepcialise :meth:`__eq__` """
-        return hash(super().__str__().lower().replace(' ', ''))
+        """Need custom hashing function if we sepcialise :meth:`__eq__`"""
+        return hash(super().__str__().lower().replace(" ", ""))
 
     def __eq__(self, other):
-        """ Specialization to capture ``a(1:n) == a(n)`` """
+        """Specialization to capture ``a(1:n) == a(n)``"""
         if self.children[0] == 1 and self.children[2] is None:
             return self.children[1] == other or super().__eq__(other)
         return super().__eq__(other)
@@ -1421,16 +1495,16 @@ class RangeIndex(Range):
     """
 
     def __hash__(self):
-        """ Need custom hashing function if we specialise :meth:`__eq__` """
-        return hash(super().__str__().lower().replace(' ', ''))
+        """Need custom hashing function if we specialise :meth:`__eq__`"""
+        return hash(super().__str__().lower().replace(" ", ""))
 
     def __eq__(self, other):
-        """ Specialization to capture `a(1:n) == a(n)` """
+        """Specialization to capture `a(1:n) == a(n)`"""
         if self.children[0] == 1 and self.children[2] is None:
             return self.children[1] == other or super().__eq__(other)
         return super().__eq__(other)
 
-    mapper_method = intern('map_range_index')
+    mapper_method = intern("map_range_index")
 
 
 class LoopRange(Range):
@@ -1438,21 +1512,23 @@ class LoopRange(Range):
     Internal representation of a loop range.
     """
 
-    mapper_method = intern('map_loop_range')
+    mapper_method = intern("map_loop_range")
 
 
 class ArraySubscript(StrCompareMixin, pmbl.Subscript):
     """
     Internal representation of an array subscript.
     """
-    mapper_method = intern('map_array_subscript')
+
+    mapper_method = intern("map_array_subscript")
 
 
 class StringSubscript(StrCompareMixin, pmbl.Subscript):
     """
     Internal representation of a substring subscript operator.
     """
-    mapper_method = intern('map_string_subscript')
+
+    mapper_method = intern("map_string_subscript")
 
     @property
     def symbol(self):

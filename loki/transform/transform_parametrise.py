@@ -89,7 +89,7 @@ from loki.transform.transformation import Transformation
 from loki.transform.transform_inline import inline_constant_parameters
 
 
-__all__ = ['ParametriseTransformation']
+__all__ = ["ParametriseTransformation"]
 
 
 class ParametriseTransformation(Transformation):
@@ -121,7 +121,7 @@ class ParametriseTransformation(Transformation):
 
         dic2p = {'a': 12, 'b': 11}
 
-        transformation = ParametriseTransformation(dic2p=dic2p, abort_callback=error_stop, 
+        transformation = ParametriseTransformation(dic2p=dic2p, abort_callback=error_stop,
                                 entry_points=("driver1", "driver2"))
 
         scheduler.process(transformation=transformation)
@@ -150,7 +150,14 @@ class ParametriseTransformation(Transformation):
 
     _key = "ParametriseTransformation"
 
-    def __init__(self, dic2p, replace_by_value=False, entry_points=None, abort_callback=None, key=None):
+    def __init__(
+        self,
+        dic2p,
+        replace_by_value=False,
+        entry_points=None,
+        abort_callback=None,
+        key=None,
+    ):
         self.dic2p = dic2p
         self.replace_by_value = replace_by_value
         if entry_points is not None:
@@ -178,10 +185,10 @@ class ParametriseTransformation(Transformation):
             Keyword arguments for the transformation.
         """
 
-        item = kwargs.get('item', None)
-        role = kwargs.get('role', None)
+        item = kwargs.get("item", None)
+        role = kwargs.get("role", None)
 
-        _successors = kwargs.get('successors', None)
+        _successors = kwargs.get("successors", None)
         successor_map = {successor.routine.name: successor for successor in _successors}
         successors = [successor.local_name.upper() for successor in _successors]
 
@@ -217,33 +224,53 @@ class ParametriseTransformation(Transformation):
                     if arg.name not in vars2p:
                         arguments.append(arg)
                     else:
-                        arguments.append(arg.clone(name=f'parametrised_{arg.name}'))
+                        arguments.append(arg.clone(name=f"parametrised_{arg.name}"))
                 routine.arguments = arguments
                 # introduce sanity check
                 for key, value in reversed(dic2p.items()):
-                    if f'parametrised_{key}' in routine.variable_map:
-                        error_msg = f"Variable {key} parametrised to value {value}, but subroutine {routine.name} " \
-                                    f"received another value"
-                        condition = sym.Comparison(routine.variable_map[f'parametrised_{key}'], '!=',
-                                                   sym.IntLiteral(value))
+                    if f"parametrised_{key}" in routine.variable_map:
+                        error_msg = (
+                            f"Variable {key} parametrised to value {value}, but subroutine {routine.name} "
+                            f"received another value"
+                        )
+                        condition = sym.Comparison(
+                            routine.variable_map[f"parametrised_{key}"],
+                            "!=",
+                            sym.IntLiteral(value),
+                        )
                         comment = ir.Comment(f"! Stop execution: {error_msg}")
-                        parametrised_var = routine.variable_map[f'parametrised_{key}']
+                        parametrised_var = routine.variable_map[f"parametrised_{key}"]
                         # use default abort mechanism
                         if self.abort_callback is None:
-                            abort = (ir.Intrinsic(text=f'PRINT *, "{error_msg}: ", {parametrised_var.name}'),
-                                     ir.Intrinsic(text="STOP 1"))
+                            abort = (
+                                ir.Intrinsic(
+                                    text=f'PRINT *, "{error_msg}: ", {parametrised_var.name}'
+                                ),
+                                ir.Intrinsic(text="STOP 1"),
+                            )
                         # use user define abort/warn mechanism
                         else:
-                            kwargs = {"msg": error_msg, "routine": routine.name, "var": parametrised_var,
-                                      "value": value}
+                            kwargs = {
+                                "msg": error_msg,
+                                "routine": routine.name,
+                                "var": parametrised_var,
+                                "value": value,
+                            }
                             abort = self.abort_callback(**kwargs)
                         body = (comment,) + abort
-                        conditional = ir.Conditional(condition=condition,
-                                                     body=body, else_body=None)
+                        conditional = ir.Conditional(
+                            condition=condition, body=body, else_body=None
+                        )
                         routine.body.prepend(conditional)
-                        routine.body.prepend(ir.Comment(f"! Sanity check for parametrised variable: {key}"))
+                        routine.body.prepend(
+                            ir.Comment(
+                                f"! Sanity check for parametrised variable: {key}"
+                            )
+                        )
             else:
-                routine.arguments = [arg for arg in routine.arguments if arg.name not in vars2p]
+                routine.arguments = [
+                    arg for arg in routine.arguments if arg.name not in vars2p
+                ]
 
             # remove variables to be parametrised from all call statements
             call_map = {}
@@ -252,12 +279,19 @@ class ParametriseTransformation(Transformation):
                     successor_map[str(call.name)].trafo_data[self._key] = {}
                     arg_map = dict(call.arg_iter())
                     arg_map_reversed = {v: k for k, v in arg_map.items()}
-                    indices = [call.arguments.index(var2p) for var2p in vars2p if var2p in call.arguments]
+                    indices = [
+                        call.arguments.index(var2p)
+                        for var2p in vars2p
+                        if var2p in call.arguments
+                    ]
                     for index in indices:
                         name = str(call.name)
-                        successor_map[name].trafo_data[self._key][str(arg_map_reversed[call.arguments[index]])] = \
-                            dic2p[call.arguments[index].name]
-                    arguments = tuple(arg for arg in call.arguments if arg not in vars2p)
+                        successor_map[name].trafo_data[self._key][
+                            str(arg_map_reversed[call.arguments[index]])
+                        ] = dic2p[call.arguments[index].name]
+                    arguments = tuple(
+                        arg for arg in call.arguments if arg not in vars2p
+                    )
                     call_map[call] = call.clone(arguments=arguments)
             routine.body = Transformer(call_map).visit(routine.body)
 
@@ -269,10 +303,19 @@ class ParametriseTransformation(Transformation):
                 symbols = []
                 for smbl in decl.symbols:
                     if smbl in vars2p:
-                        parameter_declarations.append(decl.clone(symbols=(smbl.clone(
-                            type=decl.symbols[0].type.clone(parameter=True, intent=None,
-                                                            initial=sym.IntLiteral(
-                                                                dic2p[smbl.name]))),))) # or smbl.name?
+                        parameter_declarations.append(
+                            decl.clone(
+                                symbols=(
+                                    smbl.clone(
+                                        type=decl.symbols[0].type.clone(
+                                            parameter=True,
+                                            intent=None,
+                                            initial=sym.IntLiteral(dic2p[smbl.name]),
+                                        )
+                                    ),
+                                )
+                            )
+                        )  # or smbl.name?
                     else:
                         symbols.append(smbl.clone())
 
@@ -285,7 +328,9 @@ class ParametriseTransformation(Transformation):
             # introduce parameter declarations
             declarations = FindNodes(ir.VariableDeclaration).visit(routine.spec)
             for parameter_declaration in parameter_declarations:
-                routine.spec.insert(routine.spec.body.index(declarations[0]), parameter_declaration)
+                routine.spec.insert(
+                    routine.spec.body.index(declarations[0]), parameter_declaration
+                )
 
             # replace all parameter variables with their corresponding value (inline constant parameters)
             if self.replace_by_value:

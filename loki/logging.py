@@ -9,12 +9,20 @@ import logging
 import sys
 
 
-__all__ = ['logger', 'log_levels', 'set_log_level', 'FileLogger',
-           'debug', 'info', 'warning', 'error', 'log']
+__all__ = [
+    "logger",
+    "log_levels",
+    "set_log_level",
+    "FileLogger",
+    "debug",
+    "info",
+    "warning",
+    "error",
+    "log",
+]
 
 
-def FileLogger(name, filename, level=None, file_level=None, fmt=None,
-               mode='a'):
+def FileLogger(name, filename, level=None, file_level=None, fmt=None, mode="a"):
     """
     Logger that emits to a single logfile, as well as stdout/stderr.
     """
@@ -24,7 +32,7 @@ def FileLogger(name, filename, level=None, file_level=None, fmt=None,
     _logger = logging.getLogger(name)
     _logger.setLevel(level if level <= file_level else file_level)
 
-    fmt = fmt or '%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s'
+    fmt = fmt or "%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s"
     fh = logging.FileHandler(str(filename), mode=mode)
     fh.setFormatter(logging.Formatter(fmt))
     fh.setLevel(file_level)
@@ -33,6 +41,7 @@ def FileLogger(name, filename, level=None, file_level=None, fmt=None,
     # Install the colored logging handlers
     try:
         import coloredlogs  # pylint: disable=import-outside-toplevel
+
         coloredlogs.install(level=level, logger=_logger)
     except ImportError:
         pass
@@ -44,7 +53,7 @@ def FileLogger(name, filename, level=None, file_level=None, fmt=None,
 
 
 # Initialize base logger
-logger = logging.getLogger('Loki')
+logger = logging.getLogger("Loki")
 stream_handler = logging.StreamHandler()
 logger.addHandler(stream_handler)
 
@@ -67,17 +76,17 @@ PERF = 15
 
 # Internally accepted log levels
 log_levels = {
-    'DEBUG': DEBUG,
-    'PERF': PERF,
-    'INFO': INFO,
-    'WARNING': WARNING,
-    'ERROR': ERROR,
+    "DEBUG": DEBUG,
+    "PERF": PERF,
+    "INFO": INFO,
+    "WARNING": WARNING,
+    "ERROR": ERROR,
     # Lower case keywords for env variables
-    'debug': DEBUG,
-    'perf': PERF,
-    'info': INFO,
-    'warning': WARNING,
-    'error': ERROR,
+    "debug": DEBUG,
+    "perf": PERF,
+    "info": INFO,
+    "warning": WARNING,
+    "error": ERROR,
     # Enum keys for idempotence
     DEBUG: DEBUG,
     PERF: PERF,
@@ -87,10 +96,10 @@ log_levels = {
 }
 
 # Internally used log colours (in simple mode)
-NOCOLOR = '%s'
-RED = '\033[1;37;31m%s\033[0m'
-BLUE = '\033[1;37;34m%s\033[0m'
-GREEN = '\033[1;37;32m%s\033[0m'
+NOCOLOR = "%s"
+RED = "\033[1;37;31m%s\033[0m"
+BLUE = "\033[1;37;34m%s\033[0m"
+GREEN = "\033[1;37;32m%s\033[0m"
 colors = {
     DEBUG: NOCOLOR,
     PERF: GREEN,
@@ -99,12 +108,13 @@ colors = {
     ERROR: RED,
 }
 
+
 def set_log_level(level):
     """
     Set the log level for the Loki logger.
     """
     if level not in log_levels.values():
-        raise ValueError(f'Illegal logging level {level}')
+        raise ValueError(f"Illegal logging level {level}")
 
     logger.setLevel(level)
 
@@ -116,7 +126,7 @@ def log(msg, level, *args, **kwargs):
 
     :param msg: the message to be printed.
     """
-    color = colors[level] if sys.stdout.isatty() and sys.stderr.isatty() else '%s'
+    color = colors[level] if sys.stdout.isatty() and sys.stderr.isatty() else "%s"
     logger.log(level, color % msg, *args, **kwargs)
 
 
@@ -127,8 +137,10 @@ def debug(msg, *args, **kwargs):
 def info(msg, *args, **kwargs):
     log(msg, INFO, *args, **kwargs)
 
+
 def perf(msg, *args, **kwargs):
     log(msg, PERF, *args, **kwargs)
+
 
 def warning(msg, *args, **kwargs):
     log(msg, WARNING, *args, **kwargs)

@@ -197,7 +197,9 @@ def test_graph_collector_node_edge_count_only(
     graph_collector = GraphCollector(
         show_comments=show_comments, show_expressions=show_expressions
     )
-    node_edge_info = [item for item in graph_collector.visit(source.ir) if item is not None]
+    node_edge_info = [
+        item for item in graph_collector.visit(source.ir) if item is not None
+    ]
 
     node_names = [name for (name, _) in get_property(node_edge_info, "name")]
     node_labels = [label for (label, _) in get_property(node_edge_info, "label")]
@@ -224,7 +226,9 @@ def test_graph_collector_detail(here, test_file):
     source = Sourcefile.from_file(here / test_file)
 
     graph_collector = GraphCollector()
-    node_edge_info = [item for item in graph_collector.visit(source.ir) if item is not None]
+    node_edge_info = [
+        item for item in graph_collector.visit(source.ir) if item is not None
+    ]
 
     node_names = [name for (name, _) in get_property(node_edge_info, "name")]
     node_labels = [label for (label, _) in get_property(node_edge_info, "label")]
@@ -252,7 +256,9 @@ def test_graph_collector_maximum_label_length(here, test_file, linewidth):
     graph_collector = GraphCollector(
         show_comments=True, show_expressions=True, linewidth=linewidth
     )
-    node_edge_info = [item for item in graph_collector.visit(source.ir) if item is not None]
+    node_edge_info = [
+        item for item in graph_collector.visit(source.ir) if item is not None
+    ]
     node_labels = [label for (label, _) in get_property(node_edge_info, "label")]
 
     for label in node_labels:

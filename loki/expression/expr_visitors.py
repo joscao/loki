@@ -14,15 +14,33 @@ from pymbolic.primitives import Expression
 from loki.ir import Node
 from loki.visitors import Visitor, Transformer
 from loki.tools import flatten, as_tuple
-from loki.expression.mappers import SubstituteExpressionsMapper, ExpressionRetriever, AttachScopesMapper
+from loki.expression.mappers import (
+    SubstituteExpressionsMapper,
+    ExpressionRetriever,
+    AttachScopesMapper,
+)
 from loki.expression.symbols import (
-    Array, Scalar, InlineCall, TypedSymbol, FloatLiteral, IntLiteral, LogicLiteral,
-    StringLiteral, IntrinsicLiteral, DeferredTypeSymbol
+    Array,
+    Scalar,
+    InlineCall,
+    TypedSymbol,
+    FloatLiteral,
+    IntLiteral,
+    LogicLiteral,
+    StringLiteral,
+    IntrinsicLiteral,
+    DeferredTypeSymbol,
 )
 
 __all__ = [
-    'FindExpressions', 'FindVariables', 'FindTypedSymbols', 'FindInlineCalls',
-    'FindLiterals', 'SubstituteExpressions', 'ExpressionFinder', 'AttachScopes'
+    "FindExpressions",
+    "FindVariables",
+    "FindTypedSymbols",
+    "FindInlineCalls",
+    "FindLiterals",
+    "SubstituteExpressions",
+    "ExpressionFinder",
+    "AttachScopes",
 ]
 
 
@@ -52,6 +70,7 @@ class ExpressionFinder(Visitor):
         sub-expression and the corresponding IR node in which the
         expression is contained.
     """
+
     # pylint: disable=unused-argument
 
     retriever = ExpressionRetriever(lambda _: False)
@@ -71,12 +90,15 @@ class ExpressionFinder(Visitor):
         - :attr:`parent.name` (or `None`)
         - :attr:`dimensions` (for :any:`Array`)
         """
+
         def dict_key(var):
             assert isinstance(var, Expression)
             if isinstance(var, (Scalar, Array)):
-                return (var.name,
-                        var.parent.name if hasattr(var, 'parent') and var.parent else None,
-                        var.dimensions if isinstance(var, Array) else None)
+                return (
+                    var.name,
+                    var.parent.name if hasattr(var, "parent") and var.parent else None,
+                    var.dimensions if isinstance(var, Array) else None,
+                )
             return str(var)
 
         if self.unique:
@@ -102,7 +124,10 @@ class ExpressionFinder(Visitor):
             # sort through the list and single out existing tuple-value pairs and
             # plain expressions before finding uniques
             def is_leaf(el):
-                return isinstance(el, tuple) and len(el) == 2 and isinstance(el[0], Node)
+                return (
+                    isinstance(el, tuple) and len(el) == 2 and isinstance(el[0], Node)
+                )
+
             newlist = flatten(expressions, is_leaf=is_leaf)
             tuple_list = [el for el in newlist if is_leaf(el)]
             exprs = [el for el in newlist if not is_leaf(el)]
@@ -145,6 +170,7 @@ class FindExpressions(ExpressionFinder):
 
     See :any:`ExpressionFinder`
     """
+
     retriever = ExpressionRetriever(lambda e: isinstance(e, Expression))
 
 
@@ -154,6 +180,7 @@ class FindTypedSymbols(ExpressionFinder):
 
     See :any:`ExpressionFinder`
     """
+
     retriever = ExpressionRetriever(lambda e: isinstance(e, TypedSymbol))
 
 
@@ -166,7 +193,10 @@ class FindVariables(ExpressionFinder):
 
     See :class:`ExpressionFinder` for further details
     """
-    retriever = ExpressionRetriever(lambda e: isinstance(e, (Scalar, Array, DeferredTypeSymbol)))
+
+    retriever = ExpressionRetriever(
+        lambda e: isinstance(e, (Scalar, Array, DeferredTypeSymbol))
+    )
 
 
 class FindInlineCalls(ExpressionFinder):
@@ -175,6 +205,7 @@ class FindInlineCalls(ExpressionFinder):
 
     See :class:`ExpressionFinder`
     """
+
     retriever = ExpressionRetriever(lambda e: isinstance(e, InlineCall))
 
 
@@ -186,9 +217,12 @@ class FindLiterals(ExpressionFinder):
 
     See :class:`ExpressionFinder`
     """
-    retriever = ExpressionRetriever(lambda e: isinstance(e, (
-        FloatLiteral, IntLiteral, LogicLiteral, StringLiteral, IntrinsicLiteral
-    )))
+
+    retriever = ExpressionRetriever(
+        lambda e: isinstance(
+            e, (FloatLiteral, IntLiteral, LogicLiteral, StringLiteral, IntrinsicLiteral)
+        )
+    )
 
 
 class SubstituteExpressions(Transformer):
@@ -220,19 +254,21 @@ class SubstituteExpressions(Transformer):
         when rebuilding the node, setting this to `False` allows to
         retain that information
     """
+
     # pylint: disable=unused-argument
 
     def __init__(self, expr_map, invalidate_source=True, **kwargs):
         super().__init__(invalidate_source=invalidate_source, **kwargs)
 
-        self.expr_mapper = SubstituteExpressionsMapper(expr_map,
-                                                       invalidate_source=invalidate_source)
+        self.expr_mapper = SubstituteExpressionsMapper(
+            expr_map, invalidate_source=invalidate_source
+        )
 
     def visit_Expression(self, o, **kwargs):
         """
         call :any:`SubstituteExpressionsMapper` for the given expression node
         """
-        if kwargs.get('recurse_to_declaration_attributes'):
+        if kwargs.get("recurse_to_declaration_attributes"):
             return self.expr_mapper(o, recurse_to_declaration_attributes=True)
         return self.expr_mapper(o)
 
@@ -242,7 +278,7 @@ class SubstituteExpressions(Transformer):
         we set ``recurse_to_declaration_attributes=True`` to make sure properties in the symbol
         table are updated during dispatch to the expression mapper
         """
-        kwargs['recurse_to_declaration_attributes'] = True
+        kwargs["recurse_to_declaration_attributes"] = True
         return super().visit_Node(o, **kwargs)
 
     visit_VariableDeclaration = visit_Import
@@ -286,16 +322,18 @@ class AttachScopes(Visitor):
         """
         Default visitor method that dispatches the node-specific handler
         """
-        kwargs.setdefault('scope', None)
+        kwargs.setdefault("scope", None)
         return super().visit(o, *args, **kwargs)
 
     def visit_Expression(self, o, **kwargs):
         """
         Dispatch :any:`AttachScopesMapper` for :any:`Expression` tree nodes
         """
-        if kwargs.get('recurse_to_declaration_attributes'):
-            return self.expr_mapper(o, scope=kwargs['scope'], recurse_to_declaration_attributes=True)
-        return self.expr_mapper(o, scope=kwargs['scope'])
+        if kwargs.get("recurse_to_declaration_attributes"):
+            return self.expr_mapper(
+                o, scope=kwargs["scope"], recurse_to_declaration_attributes=True
+            )
+        return self.expr_mapper(o, scope=kwargs["scope"])
 
     def visit_list(self, o, **kwargs):
         """
@@ -320,7 +358,7 @@ class AttachScopes(Visitor):
         we set ``recurse_to_declaration_attributes=True`` to make sure properties in the symbol
         table are updated during dispatch to the expression mapper
         """
-        kwargs['recurse_to_declaration_attributes'] = True
+        kwargs["recurse_to_declaration_attributes"] = True
         return self.visit_Node(o, **kwargs)
 
     visit_VariableDeclaration = visit_Import
@@ -339,9 +377,11 @@ class AttachScopes(Visitor):
         self._update_symbol_table_with_decls_and_imports(o)
 
         # Then recurse to all children
-        kwargs['scope'] = o
+        kwargs["scope"] = o
         children = tuple(self.visit(i, **kwargs) for i in o.children)
-        return self._update(o, children, symbol_attrs=o.symbol_attrs, rescope_symbols=False)
+        return self._update(
+            o, children, symbol_attrs=o.symbol_attrs, rescope_symbols=False
+        )
 
     @staticmethod
     def _update_symbol_table_with_decls_and_imports(o):
@@ -349,9 +389,9 @@ class AttachScopes(Visitor):
         Utility function to insert default entries for symbols declared or
         imported in a node
         """
-        for v in getattr(o, 'variables', ()):
+        for v in getattr(o, "variables", ()):
             o.symbol_attrs.setdefault(v.name, v.type)
-        for s in getattr(o, 'imported_symbols', ()):
+        for s in getattr(o, "imported_symbols", ()):
             o.symbol_attrs.setdefault(s.name, s.type)
 
     def visit_Subroutine(self, o, **kwargs):
@@ -367,7 +407,7 @@ class AttachScopes(Visitor):
         self._update_symbol_table_with_decls_and_imports(o)
 
         # Then recurse to all children
-        kwargs['scope'] = o
+        kwargs["scope"] = o
         o.spec = self.visit(o.spec, **kwargs)
         o.body = self.visit(o.body, **kwargs)
         o._members = self.visit(o.members, **kwargs)
@@ -386,7 +426,7 @@ class AttachScopes(Visitor):
         self._update_symbol_table_with_decls_and_imports(o)
 
         # Then recurse to all children
-        kwargs['scope'] = o
+        kwargs["scope"] = o
         o.spec = self.visit(o.spec, **kwargs)
         o.contains = self.visit(o.contains, **kwargs)
         return o

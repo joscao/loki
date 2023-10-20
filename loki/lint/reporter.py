@@ -9,18 +9,24 @@ from pathlib import Path
 
 try:
     import yaml
+
     HAVE_YAML = True
 except ImportError:
     HAVE_YAML = False
 
 try:
     from junit_xml import TestSuite, TestCase, to_xml_report_string
+
     HAVE_JUNIT_XML = True
 except ImportError:
     HAVE_JUNIT_XML = False
 
 from loki.ir import Node
-from loki.lint.utils import get_filename_from_parent, is_rule_disabled, get_location_hash
+from loki.lint.utils import (
+    get_filename_from_parent,
+    is_rule_disabled,
+    get_location_hash,
+)
 from loki.logging import logger, error
 from loki.module import Module
 from loki.sourcefile import Sourcefile
@@ -28,9 +34,15 @@ from loki.subroutine import Subroutine
 from loki.tools import filehash
 
 __all__ = [
-    'ProblemReport', 'RuleReport', 'FileReport', 'Reporter',
-    'GenericHandler', 'DefaultHandler', 'ViolationFileHandler',
-    'JunitXmlHandler', 'LazyTextfile'
+    "ProblemReport",
+    "RuleReport",
+    "FileReport",
+    "Reporter",
+    "GenericHandler",
+    "DefaultHandler",
+    "ViolationFileHandler",
+    "JunitXmlHandler",
+    "LazyTextfile",
 ]
 
 
@@ -74,7 +86,7 @@ class RuleReport:
         self.rule = rule
         self.problem_reports = reports or []
         self.disabled = disabled or []
-        self.elapsed_sec = 0.
+        self.elapsed_sec = 0.0
 
     def add(self, msg, location):
         """
@@ -91,7 +103,9 @@ class RuleReport:
         if self.disabled is True:
             return
         if not isinstance(location, (Sourcefile, Module, Subroutine, Node)):
-            raise TypeError(f'Invalid type for report location: {type(location).__name__}')
+            raise TypeError(
+                f"Invalid type for report location: {type(location).__name__}"
+            )
         if not is_rule_disabled(location, self.rule.identifiers(), self.disabled):
             self.problem_reports.append(ProblemReport(msg, location))
 
@@ -110,7 +124,9 @@ class FileReport:
         List of :py:class:`RuleReport`.
     """
 
-    def __init__(self, filename, hash=None, reports=None):  # pylint: disable=redefined-builtin
+    def __init__(
+        self, filename, hash=None, reports=None
+    ):  # pylint: disable=redefined-builtin
         self.filename = filename
         self.hash = hash or filehash(Path(filename).read_text())
         self.reports = reports or []
@@ -125,7 +141,7 @@ class FileReport:
             The report to be stored.
         """
         if not isinstance(rule_report, RuleReport):
-            raise TypeError(f'{type(rule_report)} given, {RuleReport} expected')
+            raise TypeError(f"{type(rule_report)} given, {RuleReport} expected")
         self.reports.append(rule_report)
 
     @property
@@ -133,8 +149,11 @@ class FileReport:
         """
         Yield only those rule reports that belong to a rule that can be fixed.
         """
-        fixable_reports = [report for report in self.reports
-                           if report.rule.fixable and report.problem_reports]
+        fixable_reports = [
+            report
+            for report in self.reports
+            if report.rule.fixable and report.problem_reports
+        ]
         return fixable_reports
 
 
@@ -189,7 +208,7 @@ class Reporter:
         :param :py:class:`FileReport` file_report: the file report to be processed.
         """
         if not isinstance(file_report, FileReport):
-            raise TypeError(f'{type(file_report)} given, {FileReport} expected')
+            raise TypeError(f"{type(file_report)} given, {FileReport} expected")
         for handler, reports in self.handlers_reports.items():
             reports.append(handler.handle(file_report))
 
@@ -243,7 +262,6 @@ class GenericHandler:
                 pass
         return filename
 
-
     def format_location(self, filename, location):
         """
         Create a string representation of the location given in a `ProblemReport`.
@@ -267,22 +285,22 @@ class GenericHandler:
             "<filename> (l. <line(s)>) [in routine/module ...]"
         """
         if not filename:
-            filename = get_filename_from_parent(location) or ''
+            filename = get_filename_from_parent(location) or ""
         filename = self.get_relative_filename(filename)
 
-        source = getattr(location, '_source', getattr(location, 'source', None))
+        source = getattr(location, "_source", getattr(location, "source", None))
         if source is not None:
-            line = f' (l. {source.lines[0]})'
+            line = f" (l. {source.lines[0]})"
         else:
-            line = ''
+            line = ""
 
         if isinstance(location, Subroutine):
             scope = f' in routine "{location.name}"'
         elif isinstance(location, Module):
             scope = f' in module "{location.name}"'
         else:
-            scope = ''
-        return f'{filename}{line}{scope}'
+            scope = ""
+        return f"{filename}{line}{scope}"
 
     def handle(self, file_report):  # pylint: disable=unused-argument
         """
@@ -321,7 +339,7 @@ class DefaultHandler(GenericHandler):
         Base directory path relative to which file paths are given.
     """
 
-    fmt_string = '{rule}: {location} - {msg}'
+    fmt_string = "{rule}: {location} - {msg}"
 
     def __init__(self, target=logger.warning, immediate_output=True, basedir=None):
         super().__init__(basedir)
@@ -347,12 +365,14 @@ class DefaultHandler(GenericHandler):
         reports_list = []
         for rule_report in file_report.reports:
             rule = rule_report.rule.__name__
-            if hasattr(rule_report.rule, 'docs') and rule_report.rule.docs:
-                if 'id' in rule_report.rule.docs:
+            if hasattr(rule_report.rule, "docs") and rule_report.rule.docs:
+                if "id" in rule_report.rule.docs:
                     rule = f'[{rule_report.rule.docs["id"]}] {rule}'
             for problem in rule_report.problem_reports:
                 location = self.format_location(filename, problem.location)
-                msg = self.fmt_string.format(rule=rule, location=location, msg=problem.msg)
+                msg = self.fmt_string.format(
+                    rule=rule, location=location, msg=problem.msg
+                )
                 if self.immediate_output:
                     self.target(msg)
                 reports_list.append(msg)
@@ -416,9 +436,10 @@ class ViolationFileHandler(GenericHandler):
     use_line_hashes : bool, optional
         Disable rule violations per line
     """
+
     def __init__(self, target=logger.warning, basedir=None, use_line_hashes=False):
         if not HAVE_YAML:
-            error('Pyyaml is not available')
+            error("Pyyaml is not available")
             raise RuntimeError
 
         super().__init__(basedir)
@@ -443,7 +464,8 @@ class ViolationFileHandler(GenericHandler):
             violated_rules = [
                 {
                     rule_report.rule.__name__: [
-                        line_hash for problem_report in rule_report.problem_reports
+                        line_hash
+                        for problem_report in rule_report.problem_reports
                         if (line_hash := get_location_hash(problem_report.location))
                     ]
                 }
@@ -452,25 +474,30 @@ class ViolationFileHandler(GenericHandler):
             ]
         else:
             violated_rules = [
-                rule_report.rule.__name__ for rule_report in file_report.reports
+                rule_report.rule.__name__
+                for rule_report in file_report.reports
                 if rule_report.problem_reports
             ]
 
         if violated_rules:
             violations_report = {}
-            violations_report['rules'] = violated_rules
+            violations_report["rules"] = violated_rules
             if not self.use_line_hashes:
-                violations_report['filehash'] = file_report.hash
-            return yaml.dump({
-                str(self.get_relative_filename(file_report.filename)): violations_report
-            })
-        return ''
+                violations_report["filehash"] = file_report.hash
+            return yaml.dump(
+                {
+                    str(
+                        self.get_relative_filename(file_report.filename)
+                    ): violations_report
+                }
+            )
+        return ""
 
     def output(self, handler_reports):
         """
         Generate the YAML output from the list of reports.
         """
-        self.target('\n'.join(handler_reports))
+        self.target("\n".join(handler_reports))
 
 
 class JunitXmlHandler(GenericHandler):
@@ -486,11 +513,11 @@ class JunitXmlHandler(GenericHandler):
         Base directory path relative to which file paths are given.
     """
 
-    fmt_string = '{location} - {msg}'
+    fmt_string = "{location} - {msg}"
 
     def __init__(self, target=logger.warning, basedir=None):
         if not HAVE_JUNIT_XML:
-            error('junit_xml is not available')
+            error("junit_xml is not available")
             raise RuntimeError
 
         super().__init__(basedir)
@@ -513,11 +540,15 @@ class JunitXmlHandler(GenericHandler):
             :attr:`messages` a list of strings.
         """
         filename = file_report.filename
-        classname = str(Path(filename).with_suffix(''))
+        classname = str(Path(filename).with_suffix(""))
         test_cases = []
         for rule_report in file_report.reports:
-            kwargs = {'name': rule_report.rule.__name__, 'classname': classname,
-                      'allow_multiple_subelements': True, 'elapsed_sec': rule_report.elapsed_sec}
+            kwargs = {
+                "name": rule_report.rule.__name__,
+                "classname": classname,
+                "allow_multiple_subelements": True,
+                "elapsed_sec": rule_report.elapsed_sec,
+            }
             messages = []
             for problem in rule_report.problem_reports:
                 location = self.format_location(filename, problem.location)
@@ -573,7 +604,9 @@ class LazyTextfile:
         Check if the file is open already, otherwise open it
         """
         if not self.file_handle:
-            self.file_handle = self.file_name.open(mode='w')  # pylint: disable=consider-using-with
+            self.file_handle = self.file_name.open(
+                mode="w"
+            )  # pylint: disable=consider-using-with
 
     def __del__(self):
         if self.file_handle:

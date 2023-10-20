@@ -13,7 +13,14 @@ from itertools import groupby
 from loki.visitors.visitor import Visitor
 from loki.tools import flatten
 
-__all__ = ['FindNodes', 'SequenceFinder', 'PatternFinder', 'is_parent_of', 'is_child_of', 'FindScopes']
+__all__ = [
+    "FindNodes",
+    "SequenceFinder",
+    "PatternFinder",
+    "is_parent_of",
+    "is_child_of",
+    "FindScopes",
+]
 
 
 class FindNodes(Visitor):
@@ -51,28 +58,28 @@ class FindNodes(Visitor):
         return []
 
     rules = {
-        'type': lambda match, o: isinstance(o, match),
-        'scope': lambda match, o: match in flatten(o.children)
+        "type": lambda match, o: isinstance(o, match),
+        "scope": lambda match, o: match in flatten(o.children),
     }
     """
     Mapping of available :data:`mode` selectors to match rules.
     """
 
-    def __init__(self, match, mode='type', greedy=False):
+    def __init__(self, match, mode="type", greedy=False):
         super().__init__()
         self.match = match
         self.rule = self.rules[mode]
         self.greedy = greedy
 
     def visit_object(self, o, **kwargs):
-        ret = kwargs.get('ret')
+        ret = kwargs.get("ret")
         return ret or self.default_retval()
 
     def visit_tuple(self, o, **kwargs):
         """
         Visit all elements in the iterable and return the combined result.
         """
-        ret = kwargs.pop('ret', self.default_retval())
+        ret = kwargs.pop("ret", self.default_retval())
         for i in o:
             ret = self.visit(i, ret=ret, **kwargs)
         return ret or self.default_retval()
@@ -84,7 +91,7 @@ class FindNodes(Visitor):
         Add the node to the returned list if it matches the criteria and visit
         all children.
         """
-        ret = kwargs.pop('ret', self.default_retval())
+        ret = kwargs.pop("ret", self.default_retval())
         if self.rule(self.match, o):
             ret.append(o)
             if self.greedy:
@@ -100,7 +107,7 @@ class FindNodes(Visitor):
         inside the type definition would be unexpected if called on a
         containing :any:`Subroutine` or :any:`Module`)
         """
-        ret = kwargs.pop('ret', self.default_retval())
+        ret = kwargs.pop("ret", self.default_retval())
         if self.rule(self.match, o):
             ret.append(o)
             if self.greedy:
@@ -121,7 +128,7 @@ def is_child_of(node, other):
         Return `True` if :data:`node` is contained in the IR below
         :data:`other`, otherwise return `False`.
     """
-    return len(FindNodes(node, mode='scope', greedy=True).visit(other)) > 0
+    return len(FindNodes(node, mode="scope", greedy=True).visit(other)) > 0
 
 
 def is_parent_of(node, other):
@@ -136,7 +143,7 @@ def is_parent_of(node, other):
         Return `True` if :data:`other` is contained in the IR below
         :data:`node`, otherwise return `False`.
     """
-    return len(FindNodes(other, mode='scope', greedy=True).visit(node)) > 0
+    return len(FindNodes(other, mode="scope", greedy=True).visit(node)) > 0
 
 
 class FindScopes(FindNodes):
@@ -150,6 +157,7 @@ class FindScopes(FindNodes):
     greedy : bool, optional
         Stop traversal when :data:`match` was found.
     """
+
     def __init__(self, match, greedy=True):
         super().__init__(match=match, greedy=greedy)
         self.rule = lambda match, o: match is o
@@ -160,8 +168,8 @@ class FindScopes(FindNodes):
         children and, if :data:`o` is :data:`match`, return the list of
         ancestors.
         """
-        ret = kwargs.pop('ret', self.default_retval())
-        ancestors = kwargs.pop('ancestors', []) + [o]
+        ret = kwargs.pop("ret", self.default_retval())
+        ancestors = kwargs.pop("ancestors", []) + [o]
 
         if self.rule(self.match, o):
             ret.append(ancestors)
@@ -245,11 +253,11 @@ class PatternFinder(Visitor):
 
     @staticmethod
     def match_indices(pattern, sequence):
-        """ Return indices of matched patterns in sequence. """
+        """Return indices of matched patterns in sequence."""
         matches = []
         for i, elem in enumerate(sequence):
             if elem == pattern[0]:
-                if tuple(sequence[i:i+len(pattern)]) == tuple(pattern):
+                if tuple(sequence[i : i + len(pattern)]) == tuple(pattern):
                     matches.append(i)
         return matches
 
@@ -267,7 +275,7 @@ class PatternFinder(Visitor):
         types = list(map(type, o))
         idx = self.match_indices(self.pattern, types)
         for i in idx:
-            matches.append(o[i:i+len(self.pattern)])
+            matches.append(o[i : i + len(self.pattern)])
         return matches
 
     visit_list = visit_tuple

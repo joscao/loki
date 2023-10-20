@@ -19,6 +19,7 @@ from pathlib import Path
 
 try:
     import yaml
+
     HAVE_YAML = True
 except ImportError:
     HAVE_YAML = False
@@ -27,11 +28,23 @@ from loki.logging import debug, error
 
 
 __all__ = [
-    'as_tuple', 'is_iterable', 'is_subset', 'flatten', 'chunks',
-    'execute', 'CaseInsensitiveDict', 'strip_inline_comments',
-    'binary_insertion_sort', 'cached_func', 'optional', 'LazyNodeLookup',
-    'yaml_include_constructor', 'auto_post_mortem_debugger', 'set_excepthook',
-    'timeout', 'WeakrefProperty'
+    "as_tuple",
+    "is_iterable",
+    "is_subset",
+    "flatten",
+    "chunks",
+    "execute",
+    "CaseInsensitiveDict",
+    "strip_inline_comments",
+    "binary_insertion_sort",
+    "cached_func",
+    "optional",
+    "LazyNodeLookup",
+    "yaml_include_constructor",
+    "auto_post_mortem_debugger",
+    "set_excepthook",
+    "timeout",
+    "WeakrefProperty",
 ]
 
 
@@ -55,9 +68,9 @@ def as_tuple(item, type=None, length=None):
         except (TypeError, NotImplementedError):
             t = (item,) * (length or 1)
     if length and not len(t) == length:
-        raise ValueError(f'Tuple needs to be of length {length: d}')
+        raise ValueError(f"Tuple needs to be of length {length: d}")
     if type and not all(isinstance(i, type) for i in t):
-        raise TypeError(f'Items need to be of type {type}')
+        raise TypeError(f"Items need to be of type {type}")
     return t
 
 
@@ -104,9 +117,9 @@ def is_subset(a, b, ordered=True, subsequent=False):
         return set(a) <= set(b)
 
     if not isinstance(a, Sequence):
-        raise ValueError('a is not a Sequence')
+        raise ValueError("a is not a Sequence")
     if not isinstance(b, Sequence):
-        raise ValueError('b is not a Sequence')
+        raise ValueError("b is not a Sequence")
     if not a:
         return False
 
@@ -130,7 +143,7 @@ def is_subset(a, b, ordered=True, subsequent=False):
     # in the remainder of b after the previous element
     for i in a[1:]:
         try:
-            idx = b.index(i, idx+1)
+            idx = b.index(i, idx + 1)
         except ValueError:
             return False
     return True
@@ -171,7 +184,7 @@ def filter_ordered(elements, key=None):
 def chunks(l, n):
     """Yield successive n-sized chunks from l."""
     for i in range(0, len(l), n):
-        yield l[i:i + n]
+        yield l[i : i + n]
 
 
 def execute(command, silent=True, **kwargs):
@@ -192,34 +205,34 @@ def execute(command, silent=True, **kwargs):
         Directory in which to execute :data:`command` (will be stringified)
     """
 
-    cwd = kwargs.pop('cwd', None)
+    cwd = kwargs.pop("cwd", None)
     cwd = cwd if cwd is None else str(cwd)
 
     if silent:
-        kwargs['stdout'] = kwargs.pop('stdout', PIPE)
-        kwargs['stderr'] = kwargs.pop('stderr', STDOUT)
+        kwargs["stdout"] = kwargs.pop("stdout", PIPE)
+        kwargs["stderr"] = kwargs.pop("stderr", STDOUT)
 
     # Some string mangling to support lists and strings
     if isinstance(command, list):
-        command = ' '.join(command)
+        command = " ".join(command)
     if isinstance(command, str):
         command = split(command, posix=False)
 
-    debug('[Loki] Executing: %s', ' '.join(command))
+    debug("[Loki] Executing: %s", " ".join(command))
     try:
         return run(command, check=True, cwd=cwd, **kwargs)
     except CalledProcessError as e:
-        command_str = ' '.join(command)
-        error(f'Error: Execution of {command[0]} failed:')
-        error(f'  Full command: {command_str}')
-        output_str = ''
+        command_str = " ".join(command)
+        error(f"Error: Execution of {command[0]} failed:")
+        error(f"  Full command: {command_str}")
+        output_str = ""
         if e.stdout:
             output_str += e.stdout.decode() if isinstance(e.stdout, bytes) else e.stdout
         if e.stderr:
-            output_str += '\n'
+            output_str += "\n"
             output_str += e.stderr.decode() if isinstance(e.stderr, bytes) else e.stderr
         if output_str:
-            error(f'  Output of the command:\n\n{output_str}')
+            error(f"  Output of the command:\n\n{output_str}")
         raise e
 
 
@@ -230,6 +243,7 @@ class CaseInsensitiveDict(OrderedDict):
     Basic idea from:
     https://stackoverflow.com/questions/2082152/case-insensitive-dictionary
     """
+
     def __setitem__(self, key, value):
         super().__setitem__(key.lower(), value)
 
@@ -243,7 +257,7 @@ class CaseInsensitiveDict(OrderedDict):
         return super().__contains__(key.lower())
 
 
-def strip_inline_comments(source, comment_char='!', str_delim='"\''):
+def strip_inline_comments(source, comment_char="!", str_delim="\"'"):
     """
     Strip inline comments from a source string and return the modified string.
 
@@ -265,13 +279,13 @@ def strip_inline_comments(source, comment_char='!', str_delim='"\''):
         """Run through the string and update the string status."""
         for ch in string:
             if ch in str_delim:
-                if open_str_delim == '':
+                if open_str_delim == "":
                     # This opens a string
                     open_str_delim = ch
                 elif open_str_delim == ch:
                     # TODO: Handle escaping of quotes in general. Fortran just works (TM)
                     # This closes a string
-                    open_str_delim = ''
+                    open_str_delim = ""
                 # else: character is string delimiter but we are inside an open string
                 # with a different character used => ignored
         return open_str_delim
@@ -280,7 +294,7 @@ def strip_inline_comments(source, comment_char='!', str_delim='"\''):
     # to open the current string environment:
     #  '': if not inside a string
     #  'x':  inside a string with x being the opening string delimiter
-    open_str_delim = ''
+    open_str_delim = ""
 
     # Run through lines to strip inline comments
     clean_lines = []
@@ -301,7 +315,7 @@ def strip_inline_comments(source, comment_char='!', str_delim='"\''):
             clean_lines += [line]
             open_str_delim = update_str_delim(open_str_delim, line[end:])
 
-    return '\n'.join(clean_lines)
+    return "\n".join(clean_lines)
 
 
 def binary_search(items, val, start, end, lt=op.lt):
@@ -336,9 +350,9 @@ def binary_search(items, val, start, end, lt=op.lt):
 
     pos = (start + end) // 2
     if lt(items[pos], val):
-        return binary_search(items, val, pos+1, end, lt=lt)
+        return binary_search(items, val, pos + 1, end, lt=lt)
     if lt(val, items[pos]):
-        return binary_search(items, val, start, pos-1, lt=lt)
+        return binary_search(items, val, start, pos - 1, lt=lt)
     return pos
 
 
@@ -365,8 +379,8 @@ def binary_insertion_sort(items, lt=op.lt):
     """
     for i in range(1, len(items)):
         val = items[i]
-        pos = binary_search(items, val, 0, i-1, lt=lt)
-        items = items[:pos] + [val] + items[pos:i] + items[i+1:]
+        pos = binary_search(items, val, 0, i - 1, lt=lt)
+        items = items[:pos] + [val] + items[pos:i] + items[i + 1 :]
     return items
 
 
@@ -488,7 +502,7 @@ def yaml_include_constructor(loader, node):
           baz: bar
     """
     if not HAVE_YAML:
-        error('Pyyaml is not installed')
+        error("Pyyaml is not installed")
         raise RuntimeError
 
     # Load the content of the included file
@@ -498,23 +512,23 @@ def yaml_include_constructor(loader, node):
         with file.open() as inputfile:
             content = yaml.load(inputfile.read(), type(loader))
     except OSError:
-        error(f'Cannot open include file {file}')
-        return f'!include {node.value}'
+        error(f"Cannot open include file {file}")
+        return f"!include {node.value}"
 
     # Filter included content if subscripts given
     if len(yaml_node_data) > 1:
         try:
-            subscripts = yaml_node_data[1].strip().lstrip('[').rstrip(']').split('][')
+            subscripts = yaml_node_data[1].strip().lstrip("[").rstrip("]").split("][")
 
             for subscript in subscripts:
                 if subscript.isnumeric():
                     content = content[int(subscript)]
-                elif subscript[0] == subscript[-1] and subscript[0] in '"\'':
-                    content = content[subscript.strip('"\'')]
+                elif subscript[0] == subscript[-1] and subscript[0] in "\"'":
+                    content = content[subscript.strip("\"'")]
                 else:
                     content = content[subscript]
         except KeyError as e:
-            error(f'Cannot extract {yaml_node_data[1]} from {file}')
+            error(f"Cannot extract {yaml_node_data[1]} from {file}")
             raise e
 
     return content
@@ -528,19 +542,22 @@ def auto_post_mortem_debugger(type, value, tb):  # pylint: disable=redefined-bui
 
     Adapted from https://code.activestate.com/recipes/65287/
     """
-    is_interactive = hasattr(sys, 'ps1')
-    no_tty = not sys.stderr.isatty() or not sys.stdin.isatty() or not sys.stdout.isatty()
+    is_interactive = hasattr(sys, "ps1")
+    no_tty = (
+        not sys.stderr.isatty() or not sys.stdin.isatty() or not sys.stdout.isatty()
+    )
     if is_interactive or no_tty or type == SyntaxError:
         # we are in interactive mode or we don't have a tty-like
         # device, so we call the default hook
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback # pylint: disable=import-outside-toplevel
-        import pdb # pylint: disable=import-outside-toplevel
+        import traceback  # pylint: disable=import-outside-toplevel
+        import pdb  # pylint: disable=import-outside-toplevel
+
         # we are NOT in interactive mode, print the exception...
         traceback.print_exception(type, value, tb)
         # ...then start the debugger in post-mortem mode.
-        pdb.post_mortem(tb)   # pylint: disable=no-member
+        pdb.post_mortem(tb)  # pylint: disable=no-member
 
 
 def set_excepthook(hook=None):
@@ -588,7 +605,7 @@ def timeout(time_in_s, message=None):
     if message is None:
         message = f"Timeout reached after {time_in_s} second(s)"
 
-    def timeout_handler(signum, frame): # pylint: disable=unused-argument
+    def timeout_handler(signum, frame):  # pylint: disable=unused-argument
         raise RuntimeError(message)
 
     if time_in_s > 0:

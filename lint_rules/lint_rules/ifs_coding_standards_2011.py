@@ -16,8 +16,17 @@ import re
 from pymbolic.primitives import Expression
 
 from loki import (
-    Visitor, FindNodes, ExpressionFinder, ExpressionRetriever,
-    flatten, as_tuple, strip_inline_comments, Module, Subroutine, BasicType, ir
+    Visitor,
+    FindNodes,
+    ExpressionFinder,
+    ExpressionRetriever,
+    flatten,
+    as_tuple,
+    strip_inline_comments,
+    Module,
+    Subroutine,
+    BasicType,
+    ir,
 )
 from loki.lint import GenericRule, RuleType
 from loki.expression import symbols as sym
@@ -28,18 +37,19 @@ class CodeBodyRule(GenericRule):  # Coding standards 1.3
     type = RuleType.WARN
 
     docs = {
-        'id': '1.3',
-        'title': ('Rules for Code Body: '
-                  'Nesting of conditional blocks should not be more than {max_nesting_depth} '
-                  'levels deep;'),
+        "id": "1.3",
+        "title": (
+            "Rules for Code Body: "
+            "Nesting of conditional blocks should not be more than {max_nesting_depth} "
+            "levels deep;"
+        ),
     }
 
     config = {
-        'max_nesting_depth': 3,
+        "max_nesting_depth": 3,
     }
 
     class NestingDepthVisitor(Visitor):
-
         @classmethod
         def default_retval(cls):
             return []
@@ -52,9 +62,9 @@ class CodeBodyRule(GenericRule):  # Coding standards 1.3
             return flatten(super().visit(o, *args, **kwargs))
 
         def visit_Conditional(self, o, **kwargs):
-            level = kwargs.pop('level', 0)
+            level = kwargs.pop("level", 0)
             too_deep = []
-            if level >= self.max_nesting_depth and not getattr(o, 'inline', False):
+            if level >= self.max_nesting_depth and not getattr(o, "inline", False):
                 too_deep = [o]
             too_deep += self.visit(o.body, level=level + 1, **kwargs)
             if o.has_elseif:
@@ -64,9 +74,9 @@ class CodeBodyRule(GenericRule):  # Coding standards 1.3
             return too_deep
 
         def visit_MultiConditional(self, o, **kwargs):
-            level = kwargs.pop('level', 0)
+            level = kwargs.pop("level", 0)
             too_deep = []
-            if level >= self.max_nesting_depth and not getattr(o, 'inline', False):
+            if level >= self.max_nesting_depth and not getattr(o, "inline", False):
                 too_deep = [o]
             too_deep += self.visit(o.bodies, level=level + 1, **kwargs)
             too_deep += self.visit(o.else_body, level=level + 1, **kwargs)
@@ -74,8 +84,10 @@ class CodeBodyRule(GenericRule):  # Coding standards 1.3
 
     @classmethod
     def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
-        '''Check the code body: Nesting of conditional blocks.'''
-        too_deep = cls.NestingDepthVisitor(config['max_nesting_depth']).visit(subroutine.body)
+        """Check the code body: Nesting of conditional blocks."""
+        too_deep = cls.NestingDepthVisitor(config["max_nesting_depth"]).visit(
+            subroutine.body
+        )
         msg = f'Nesting of conditionals exceeds limit of {config["max_nesting_depth"]}'
         for node in too_deep:
             rule_report.add(msg, node)
@@ -86,15 +98,17 @@ class ModuleNamingRule(GenericRule):  # Coding standards 1.5
     type = RuleType.WARN
 
     docs = {
-        'id': '1.5',
-        'title': ('Naming Schemes for Modules: All modules should end with "_mod". '
-                  'Module filename should match the name of the module it contains.'),
+        "id": "1.5",
+        "title": (
+            'Naming Schemes for Modules: All modules should end with "_mod". '
+            "Module filename should match the name of the module it contains."
+        ),
     }
 
     @classmethod
     def check_module(cls, module, rule_report, config):
-        '''Check the module name and the name of the source file.'''
-        if not module.name.lower().endswith('_mod'):
+        """Check the module name and the name of the source file."""
+        if not module.name.lower().endswith("_mod"):
             msg = f'Name of module "{module.name}" should end with "_mod"'
             rule_report.add(msg, module)
 
@@ -110,8 +124,8 @@ class DrHookRule(GenericRule):  # Coding standards 1.9
     type = RuleType.SERIOUS
 
     docs = {
-        'id': '1.9',
-        'title': 'Rules for DR_HOOK',
+        "id": "1.9",
+        "title": "Rules for DR_HOOK",
     }
 
     non_exec_nodes = (ir.Comment, ir.CommentBlock, ir.Pragma, ir.PreprocessorDirective)
@@ -121,7 +135,7 @@ class DrHookRule(GenericRule):  # Coding standards 1.9
         cond = None
         for node in reversed(ast) if is_reversed else ast:
             if isinstance(node, ir.Conditional):
-                if node.condition == 'LHOOK':
+                if node.condition == "LHOOK":
                     cond = node
                     break
             elif not isinstance(node, cls.non_exec_nodes):
@@ -137,7 +151,7 @@ class DrHookRule(GenericRule):  # Coding standards 1.9
             # iterable but a single node (e.g., CallStatement)
             body = reversed(as_tuple(cond.body)) if is_reversed else as_tuple(cond.body)
             for node in body:
-                if isinstance(node, ir.CallStatement) and node.name == 'DR_HOOK':
+                if isinstance(node, ir.CallStatement) and node.name == "DR_HOOK":
                     call = node
                 elif not isinstance(node, cls.non_exec_nodes):
                     # Break if executable statement encountered
@@ -147,39 +161,44 @@ class DrHookRule(GenericRule):  # Coding standards 1.9
     @staticmethod
     def _get_string_argument(scope):
         string_arg = scope.name.upper()
-        while hasattr(scope, 'parent') and scope.parent:
+        while hasattr(scope, "parent") and scope.parent:
             scope = scope.parent
             if isinstance(scope, Subroutine):
-                string_arg = scope.name.upper() + '%' + string_arg
+                string_arg = scope.name.upper() + "%" + string_arg
             elif isinstance(scope, Module):
-                string_arg = scope.name.upper() + ':' + string_arg
+                string_arg = scope.name.upper() + ":" + string_arg
         return string_arg
 
     @classmethod
-    def _check_lhook_call(cls, call, subroutine, rule_report, pos='First'):
+    def _check_lhook_call(cls, call, subroutine, rule_report, pos="First"):
         if call is None:
-            msg = f'{pos} executable statement must be call to DR_HOOK'
+            msg = f"{pos} executable statement must be call to DR_HOOK"
             rule_report.add(msg, subroutine)
         elif call.arguments:
             string_arg = cls._get_string_argument(subroutine)
-            if not isinstance(call.arguments[0], sym.StringLiteral) or \
-                    call.arguments[0].value.upper() != string_arg:
+            if (
+                not isinstance(call.arguments[0], sym.StringLiteral)
+                or call.arguments[0].value.upper() != string_arg
+            ):
                 msg = f'String argument to DR_HOOK call should be "{string_arg}"'
                 rule_report.add(msg, call)
-            second_arg = {'First': '0', 'Last': '1'}
-            if not (len(call.arguments) > 1 and isinstance(call.arguments[1], sym.IntLiteral) and
-                    str(call.arguments[1].value) == second_arg[pos]):
+            second_arg = {"First": "0", "Last": "1"}
+            if not (
+                len(call.arguments) > 1
+                and isinstance(call.arguments[1], sym.IntLiteral)
+                and str(call.arguments[1].value) == second_arg[pos]
+            ):
                 msg = f'Second argument to DR_HOOK call should be "{second_arg[pos]}"'
                 rule_report.add(msg, call)
-            if not (len(call.arguments) > 2 and call.arguments[2] == 'ZHOOK_HANDLE'):
+            if not (len(call.arguments) > 2 and call.arguments[2] == "ZHOOK_HANDLE"):
                 msg = 'Third argument to DR_HOOK call should be "ZHOOK_HANDLE".'
                 rule_report.add(msg, call)
 
     @classmethod
     def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
-        '''Check that first and last executable statements in the subroutine
+        """Check that first and last executable statements in the subroutine
         are conditionals with calls to DR_HOOK in their body and that the
-        correct arguments are given to the call.'''
+        correct arguments are given to the call."""
         # Extract the AST for the subroutine body
         ast = subroutine.body
         if isinstance(ast, ir.Section):
@@ -195,7 +214,7 @@ class DrHookRule(GenericRule):  # Coding standards 1.9
         last_call = cls._find_lhook_call(last_cond, is_reversed=True)
 
         cls._check_lhook_call(first_call, subroutine, rule_report)
-        cls._check_lhook_call(last_call, subroutine, rule_report, pos='Last')
+        cls._check_lhook_call(last_call, subroutine, rule_report, pos="Last")
 
 
 class LimitSubroutineStatementsRule(GenericRule):  # Coding standards 2.2
@@ -203,39 +222,49 @@ class LimitSubroutineStatementsRule(GenericRule):  # Coding standards 2.2
     type = RuleType.WARN
 
     docs = {
-        'id': '2.2',
-        'title': 'Subroutines should have no more than {max_num_statements} executable statements.',
+        "id": "2.2",
+        "title": "Subroutines should have no more than {max_num_statements} executable statements.",
     }
 
-    config = {
-        'max_num_statements': 300
-    }
+    config = {"max_num_statements": 300}
 
     # List of nodes that are considered executable statements
     exec_nodes = (
-        ir.Assignment, ir.MaskedStatement, ir.Intrinsic, ir.Allocation,
-        ir.Deallocation, ir.Nullify, ir.CallStatement
+        ir.Assignment,
+        ir.MaskedStatement,
+        ir.Intrinsic,
+        ir.Allocation,
+        ir.Deallocation,
+        ir.Nullify,
+        ir.CallStatement,
     )
 
     # Pattern for intrinsic nodes that are allowed as non-executable statements
-    match_non_exec_intrinsic_node = re.compile(r'\s*(?:PRINT|FORMAT)', re.I)
+    match_non_exec_intrinsic_node = re.compile(r"\s*(?:PRINT|FORMAT)", re.I)
 
     @classmethod
     def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
-        '''Count the number of nodes in the subroutine and check if they exceed
+        """Count the number of nodes in the subroutine and check if they exceed
         a given maximum number.
-        '''
+        """
         # Count total number of executable nodes
         nodes = FindNodes(cls.exec_nodes).visit(subroutine.ir)
         num_nodes = len(nodes)
         # Subtract number of non-exec intrinsic nodes
         intrinsic_nodes = filter(lambda node: isinstance(node, ir.Intrinsic), nodes)
-        num_nodes -= sum(1 for _ in filter(
-            lambda node: cls.match_non_exec_intrinsic_node.match(node.text), intrinsic_nodes))
+        num_nodes -= sum(
+            1
+            for _ in filter(
+                lambda node: cls.match_non_exec_intrinsic_node.match(node.text),
+                intrinsic_nodes,
+            )
+        )
 
-        if num_nodes > config['max_num_statements']:
-            msg = (f'Subroutine has {num_nodes} executable statements '
-                   f'(should not have more than {config["max_num_statements"]})')
+        if num_nodes > config["max_num_statements"]:
+            msg = (
+                f"Subroutine has {num_nodes} executable statements "
+                f'(should not have more than {config["max_num_statements"]})'
+            )
             rule_report.add(msg, subroutine)
 
 
@@ -244,13 +273,11 @@ class MaxDummyArgsRule(GenericRule):  # Coding standards 3.6
     type = RuleType.INFO
 
     docs = {
-        'id': '3.6',
-        'title': 'Routines should have no more than {max_num_arguments} dummy arguments.',
+        "id": "3.6",
+        "title": "Routines should have no more than {max_num_arguments} dummy arguments.",
     }
 
-    config = {
-        'max_num_arguments': 50
-    }
+    config = {"max_num_arguments": 50}
 
     @classmethod
     def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
@@ -259,9 +286,11 @@ class MaxDummyArgsRule(GenericRule):  # Coding standards 3.6
         maximum number exceeded.
         """
         num_arguments = len(subroutine.arguments)
-        if num_arguments > config['max_num_arguments']:
-            msg = (f'Subroutine has {num_arguments} dummy arguments '
-                   f'(should not have more than {config["max_num_arguments"]})')
+        if num_arguments > config["max_num_arguments"]:
+            msg = (
+                f"Subroutine has {num_arguments} dummy arguments "
+                f'(should not have more than {config["max_num_arguments"]})'
+            )
             rule_report.add(msg, subroutine)
 
 
@@ -270,17 +299,17 @@ class MplCdstringRule(GenericRule):  # Coding standards 3.12
     type = RuleType.SERIOUS
 
     docs = {
-        'id': '3.12',
-        'title': 'Calls to MPL subroutines should provide a "CDSTRING" identifying the caller.',
+        "id": "3.12",
+        "title": 'Calls to MPL subroutines should provide a "CDSTRING" identifying the caller.',
     }
 
     @classmethod
     def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
-        '''Check all calls to MPL subroutines for a CDSTRING.'''
+        """Check all calls to MPL subroutines for a CDSTRING."""
         for call in FindNodes(ir.CallStatement).visit(subroutine.ir):
-            if str(call.name).upper().startswith('MPL_'):
+            if str(call.name).upper().startswith("MPL_"):
                 for kw, _ in call.kwarguments:
-                    if kw.upper() == 'CDSTRING':
+                    if kw.upper() == "CDSTRING":
                         break
                 else:
                     msg = f'No "CDSTRING" provided in call to {call.name}'
@@ -292,11 +321,11 @@ class ImplicitNoneRule(GenericRule):  # Coding standards 4.4
     type = RuleType.SERIOUS
 
     docs = {
-        'id': '4.4',
-        'title': '"IMPLICIT NONE" is mandatory in all routines.',
+        "id": "4.4",
+        "title": '"IMPLICIT NONE" is mandatory in all routines.',
     }
 
-    _regex = re.compile(r'implicit\s+none\b', re.I)
+    _regex = re.compile(r"implicit\s+none\b", re.I)
 
     @staticmethod
     def check_for_implicit_none(ast):
@@ -321,9 +350,9 @@ class ImplicitNoneRule(GenericRule):  # Coding standards 4.4
         # Check if enclosing scopes contain implicit none
         scope = subroutine.parent
         while scope and not found_implicit_none:
-            if hasattr(scope, 'spec') and scope.spec:
+            if hasattr(scope, "spec") and scope.spec:
                 found_implicit_none = cls.check_for_implicit_none(scope.spec)
-            scope = scope.parent if hasattr(scope, 'parent') else None
+            scope = scope.parent if hasattr(scope, "parent") else None
 
         if not found_implicit_none:
             # No 'IMPLICIT NONE' intrinsic node was found
@@ -335,25 +364,27 @@ class ExplicitKindRule(GenericRule):  # Coding standards 4.7
     type = RuleType.SERIOUS
 
     docs = {
-        'id': '4.7',
-        'title': ('Variables and constants must be declared with explicit kind, using the kinds '
-                  'defined in "PARKIND1" and "PARKIND2".'),
+        "id": "4.7",
+        "title": (
+            "Variables and constants must be declared with explicit kind, using the kinds "
+            'defined in "PARKIND1" and "PARKIND2".'
+        ),
     }
 
     config = {
-        'declaration_types': ['INTEGER', 'REAL'],
-        'constant_types': ['REAL'],  # Coding standards document includes INTEGERS here
-        'allowed_type_kinds': {
-            'INTEGER': ['JPIM', 'JPIT', 'JPIB', 'JPIA', 'JPIS', 'JPIH'],
-            'REAL': ['JPRB', 'JPRM', 'JPRS', 'JPRT', 'JPRH', 'JPRD', 'JPHOOK']
-        }
+        "declaration_types": ["INTEGER", "REAL"],
+        "constant_types": ["REAL"],  # Coding standards document includes INTEGERS here
+        "allowed_type_kinds": {
+            "INTEGER": ["JPIM", "JPIT", "JPIB", "JPIA", "JPIS", "JPIH"],
+            "REAL": ["JPRB", "JPRM", "JPRS", "JPRT", "JPRH", "JPRD", "JPHOOK"],
+        },
     }
 
     @staticmethod
     def check_kind_declarations(subroutine, types, allowed_type_kinds, rule_report):
-        '''Helper function that carries out the check for explicit kind specification
+        """Helper function that carries out the check for explicit kind specification
         on all declarations.
-        '''
+        """
         for decl in FindNodes(ir.VariableDeclaration).visit(subroutine.spec):
             decl_type = decl.symbols[0].type
             if decl_type.dtype in types:
@@ -364,15 +395,17 @@ class ExplicitKindRule(GenericRule):  # Coding standards 4.7
                 elif allowed_type_kinds.get(decl_type.dtype):
                     if decl_type.kind not in allowed_type_kinds[decl_type.dtype]:
                         # We have a KIND but it does not match any of the allowed kinds
-                        msg = (f'{decl_type.kind!s} is not an allowed KIND value for '
-                               f'{", ".join(str(var) for var in decl.symbols)}')
+                        msg = (
+                            f"{decl_type.kind!s} is not an allowed KIND value for "
+                            f'{", ".join(str(var) for var in decl.symbols)}'
+                        )
                         rule_report.add(msg, decl)
 
     @staticmethod
     def check_kind_literals(subroutine, types, allowed_type_kinds, rule_report):
-        '''Helper function that carries out the check for explicit kind specification
+        """Helper function that carries out the check for explicit kind specification
         on all literals.
-        '''
+        """
 
         class FindLiteralsWithKind(ExpressionFinder):
             """
@@ -383,34 +416,43 @@ class ExplicitKindRule(GenericRule):  # Coding standards 4.7
 
             retriever = ExpressionRetriever(
                 query=lambda e: isinstance(e, types),
-                recurse_query=lambda e: not isinstance(e, (sym.Array, sym.Range))
+                recurse_query=lambda e: not isinstance(e, (sym.Array, sym.Range)),
             )
 
-        for node, exprs in FindLiteralsWithKind(unique=False, with_ir_node=True).visit(subroutine.ir):
+        for node, exprs in FindLiteralsWithKind(unique=False, with_ir_node=True).visit(
+            subroutine.ir
+        ):
             for literal in exprs:
                 if not literal.kind:
-                    rule_report.add(f'{literal} used without explicit KIND', node)
+                    rule_report.add(f"{literal} used without explicit KIND", node)
                 elif allowed_type_kinds.get(literal.__class__):
-                    if str(literal.kind).upper() not in allowed_type_kinds[literal.__class__]:
-                        msg = f'{literal.kind} is not an allowed KIND value for {literal}'
+                    if (
+                        str(literal.kind).upper()
+                        not in allowed_type_kinds[literal.__class__]
+                    ):
+                        msg = (
+                            f"{literal.kind} is not an allowed KIND value for {literal}"
+                        )
                         rule_report.add(msg, node)
 
     @classmethod
     def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
-        '''Check for explicit kind information in constants and
+        """Check for explicit kind information in constants and
         variable declarations.
-        '''
+        """
         # 1. Check variable declarations for explicit KIND
         #
         # When we check variable type information, we have BasicType values to identify
         # whether a variable is REAL, INTEGER, ... Therefore, we create a map that uses
         # the corresponding BasicType values as keys to look up allowed kinds for each type.
         # Since the case does not matter, we convert all allowed type kinds to upper case.
-        types = tuple(BasicType.from_str(name) for name in config['declaration_types'])
+        types = tuple(BasicType.from_str(name) for name in config["declaration_types"])
         allowed_type_kinds = {}
-        if config.get('allowed_type_kinds'):
-            allowed_type_kinds = {BasicType.from_str(name): [kind.upper() for kind in kinds]
-                                  for name, kinds in config['allowed_type_kinds'].items()}
+        if config.get("allowed_type_kinds"):
+            allowed_type_kinds = {
+                BasicType.from_str(name): [kind.upper() for kind in kinds]
+                for name, kinds in config["allowed_type_kinds"].items()
+            }
 
         cls.check_kind_declarations(subroutine, types, allowed_type_kinds, rule_report)
 
@@ -420,12 +462,18 @@ class ExplicitKindRule(GenericRule):  # Coding standards 4.7
         # gives us their type. Therefore, we create a map that uses the corresponding
         # Literal types as keys to look up allowed kinds for each type. Again, we
         # convert all allowed type kinds to upper case.
-        type_map = {'INTEGER': sym.IntLiteral, 'REAL': sym.FloatLiteral,
-                    'LOGICAL': sym.LogicLiteral, 'CHARACTER': sym.StringLiteral}
-        types = tuple(type_map[name] for name in config['constant_types'])
-        if config.get('allowed_type_kinds'):
-            allowed_type_kinds = {type_map[name]: [kind.upper() for kind in kinds]
-                                  for name, kinds in config['allowed_type_kinds'].items()}
+        type_map = {
+            "INTEGER": sym.IntLiteral,
+            "REAL": sym.FloatLiteral,
+            "LOGICAL": sym.LogicLiteral,
+            "CHARACTER": sym.StringLiteral,
+        }
+        types = tuple(type_map[name] for name in config["constant_types"])
+        if config.get("allowed_type_kinds"):
+            allowed_type_kinds = {
+                type_map[name]: [kind.upper() for kind in kinds]
+                for name, kinds in config["allowed_type_kinds"].items()
+            }
 
         cls.check_kind_literals(subroutine, types, allowed_type_kinds, rule_report)
 
@@ -435,21 +483,32 @@ class BannedStatementsRule(GenericRule):  # Coding standards 4.11
     type = RuleType.WARN
 
     docs = {
-        'id': '4.11',
-        'title': 'Banned statements.',
+        "id": "4.11",
+        "title": "Banned statements.",
     }
 
     config = {
-        'banned': ['STOP', 'PRINT', 'RETURN', 'ENTRY', 'DIMENSION',
-                   'DOUBLE PRECISION', 'COMPLEX', 'GO TO', 'CONTINUE',
-                   'FORMAT', 'COMMON', 'EQUIVALENCE'],
+        "banned": [
+            "STOP",
+            "PRINT",
+            "RETURN",
+            "ENTRY",
+            "DIMENSION",
+            "DOUBLE PRECISION",
+            "COMPLEX",
+            "GO TO",
+            "CONTINUE",
+            "FORMAT",
+            "COMMON",
+            "EQUIVALENCE",
+        ],
     }
 
     @classmethod
     def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
-        '''Check for banned statements in intrinsic nodes.'''
+        """Check for banned statements in intrinsic nodes."""
         for intr in FindNodes(ir.Intrinsic).visit(subroutine.ir):
-            for keyword in config['banned']:
+            for keyword in config["banned"]:
                 if keyword.lower() in intr.text.lower():
                     rule_report.add(f'Banned keyword "{keyword}"', intr)
 
@@ -458,33 +517,30 @@ class Fortran90OperatorsRule(GenericRule):  # Coding standards 4.15
 
     type = RuleType.WARN
 
-    docs = {
-        'id': '4.15',
-        'title': 'Use Fortran 90 comparison operators.'
-    }
+    docs = {"id": "4.15", "title": "Use Fortran 90 comparison operators."}
 
     fixable = True
 
-    '''
+    """
     Regex patterns for each operator that match F77 and F90 operators as
     named groups, thus allowing to easily find out which operator was used.
-    '''
+    """
     _op_patterns = {
-        '==': re.compile(r'(?P<f77>\.eq\.)|(?P<f90>==)', re.I),
-        '!=': re.compile(r'(?P<f77>\.ne\.)|(?P<f90>/=)', re.I),
-        '>=': re.compile(r'(?P<f77>\.ge\.)|(?P<f90>>=)', re.I),
-        '<=': re.compile(r'(?P<f77>\.le\.)|(?P<f90><=)', re.I),
-        '>': re.compile(r'(?P<f77>\.gt\.)|(?P<f90>>(?!=))', re.I),
-        '<': re.compile(r'(?P<f77>\.lt\.)|(?P<f90><(?!=))', re.I),
+        "==": re.compile(r"(?P<f77>\.eq\.)|(?P<f90>==)", re.I),
+        "!=": re.compile(r"(?P<f77>\.ne\.)|(?P<f90>/=)", re.I),
+        ">=": re.compile(r"(?P<f77>\.ge\.)|(?P<f90>>=)", re.I),
+        "<=": re.compile(r"(?P<f77>\.le\.)|(?P<f90><=)", re.I),
+        ">": re.compile(r"(?P<f77>\.gt\.)|(?P<f90>>(?!=))", re.I),
+        "<": re.compile(r"(?P<f77>\.lt\.)|(?P<f90><(?!=))", re.I),
     }
 
     _op_map = {
-        '==': '.eq.',
-        '/=': '.ne.',
-        '>=': '.ge.',
-        '<=': '.le.',
-        '>': '.gt.',
-        '<': '.lt.'
+        "==": ".eq.",
+        "/=": ".ne.",
+        ">=": ".ge.",
+        "<=": ".le.",
+        ">": ".gt.",
+        "<": ".lt.",
     }
 
     class ComparisonRetriever(Visitor):
@@ -526,10 +582,12 @@ class Fortran90OperatorsRule(GenericRule):  # Coding standards 4.15
 
     @classmethod
     def check_subroutine(cls, subroutine, rule_report, config, **kwargs):
-        '''Check for the use of Fortran 90 comparison operators.'''
+        """Check for the use of Fortran 90 comparison operators."""
         # Use the bespoke visitor to retrieve all comparison nodes alongside with their expression root
         # and the IR node they belong to
-        for node, expr_root, expr_list in cls.ComparisonRetriever().visit(subroutine.ir):
+        for node, expr_root, expr_list in cls.ComparisonRetriever().visit(
+            subroutine.ir
+        ):
             # Use the string representation of the expression to find the source line
             lstart, lend = node.source.find(str(expr_root))
             lines = node.source.clone_lines((lstart, lend))
@@ -538,11 +596,21 @@ class Fortran90OperatorsRule(GenericRule):  # Coding standards 4.15
             # translate them to F90 operators) to check if F90 or F77 operators were used
             for op in sorted({op.operator for op in expr_list}):
                 # find source line for operator
-                op_str = op if op != '!=' else '/='
-                line = [line for line in lines if op_str in strip_inline_comments(line.string)]
+                op_str = op if op != "!=" else "/="
+                line = [
+                    line
+                    for line in lines
+                    if op_str in strip_inline_comments(line.string)
+                ]
                 if not line:
-                    line = [line for line in lines
-                            if op_str in strip_inline_comments(line.string.replace(cls._op_map[op_str], op_str))]
+                    line = [
+                        line
+                        for line in lines
+                        if op_str
+                        in strip_inline_comments(
+                            line.string.replace(cls._op_map[op_str], op_str)
+                        )
+                    ]
 
                 source_string = strip_inline_comments(line[0].string)
                 matches = cls._op_patterns[op].findall(source_string)
@@ -553,17 +621,19 @@ class Fortran90OperatorsRule(GenericRule):  # Coding standards 4.15
 
     @classmethod
     def fix_subroutine(cls, subroutine, rule_report, config):
-        '''Replace by Fortran 90 comparison operators.'''
+        """Replace by Fortran 90 comparison operators."""
         # We only have to invalidate the source string for the expression. This will cause the
         # backend to regenerate the source string for that node and use Fortran 90 operators
         # automatically
         mapper = {}
         for report in rule_report.problem_reports:
             new_expr = report.location
-            new_expr.update_metadata({'source': None})
+            new_expr.update_metadata({"source": None})
             mapper[report.location] = new_expr
         return mapper
 
 
 # Create the __all__ property of the module to contain only the rule names
-__all__ = tuple(name for name in dir() if name.endswith('Rule') and name != 'GenericRule')
+__all__ = tuple(
+    name for name in dir() if name.endswith("Rule") and name != "GenericRule"
+)

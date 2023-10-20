@@ -17,7 +17,7 @@ from loki.types import SymbolAttributes, BasicType
 from loki.tools import WeakrefProperty
 
 
-__all__ = ['SymbolTable', 'Scope']
+__all__ = ["SymbolTable", "Scope"]
 
 
 class SymbolTable(dict):
@@ -100,13 +100,13 @@ class SymbolTable(dict):
 
     @staticmethod
     def _case_sensitive_format_lookup_name(name):
-        name = name.partition('(')[0]  # Remove any dimension parameters
+        name = name.partition("(")[0]  # Remove any dimension parameters
         return name
 
     @staticmethod
     def _not_case_sensitive_format_lookup_name(name):
         name = name.lower()
-        name = name.partition('(')[0]  # Remove any dimension parameters
+        name = name.partition("(")[0]  # Remove any dimension parameters
         return name
 
     def _lookup_formatted_name(self, name, recursive):
@@ -143,7 +143,9 @@ class SymbolTable(dict):
         -------
         :any:`SymbolAttributes` or `None`
         """
-        formatted_name = self.format_lookup_name(name)  # pylint: disable=assignment-from-no-return
+        formatted_name = self.format_lookup_name(
+            name
+        )  # pylint: disable=assignment-from-no-return
         value = self._lookup_formatted_name(formatted_name, recursive)
         return value
 
@@ -172,17 +174,19 @@ class SymbolTable(dict):
 
     def __setitem__(self, key, value):
         assert isinstance(value, SymbolAttributes)
-        name_parts = self.format_lookup_name(key)  # pylint: disable=assignment-from-no-return
+        name_parts = self.format_lookup_name(
+            key
+        )  # pylint: disable=assignment-from-no-return
         super().__setitem__(name_parts, value.clone())
 
     def __hash__(self):
         return hash(tuple(self.keys()))
 
     def __repr__(self):
-        return f'<loki.types.SymbolTable object at {hex(id(self))}>'
+        return f"<loki.types.SymbolTable object at {hex(id(self))}>"
 
     def __getstate__(self):
-        _ignored = ('_parent', )
+        _ignored = ("_parent",)
         return {k: v for k, v in self.__dict__.items() if k not in _ignored}
 
     def __setstate__(self, s):
@@ -232,10 +236,10 @@ class SymbolTable(dict):
         :any:`SymbolTable`
             The clone symbol table with copies of all :any:`SymbolAttributes`
         """
-        if self.case_sensitive and 'case_sensitive' not in kwargs:
-            kwargs['case_sensitive'] = self.case_sensitive
-        if self.parent and 'parent' not in kwargs:
-            kwargs['parent'] = self.parent
+        if self.case_sensitive and "case_sensitive" not in kwargs:
+            kwargs["case_sensitive"] = self.case_sensitive
+        if self.parent and "parent" not in kwargs:
+            kwargs["parent"] = self.parent
         obj = type(self)(**kwargs)
         obj.update(self)
         return obj
@@ -267,20 +271,25 @@ class Scope:
         self._reset_parent(parent)
 
         assert isinstance(self.symbol_attrs, SymbolTable)
-        self.symbol_attrs.parent = None if self.parent is None else self.parent.symbol_attrs
+        self.symbol_attrs.parent = (
+            None if self.parent is None else self.parent.symbol_attrs
+        )
 
     def __repr__(self):
         """
         String representation.
         """
-        return f'Scope<{id(self)}>'
+        return f"Scope<{id(self)}>"
 
     def rescope_symbols(self):
         """
         Make sure all symbols declared and used inside this node belong
         to a scope in the scope hierarchy
         """
-        from loki.expression import AttachScopes  # pylint: disable=import-outside-toplevel,cyclic-import
+        from loki.expression import (
+            AttachScopes,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
         AttachScopes().visit(self)
 
     def clone(self, **kwargs):
@@ -302,13 +311,15 @@ class Scope:
         `type(self)`
             The cloned scope object
         """
-        if self.parent and 'parent' not in kwargs:
-            kwargs['parent'] = self.parent
-        if 'symbol_attrs' not in kwargs:
-            kwargs['symbol_attrs'] = self.symbol_attrs.clone(parent=kwargs.get('parent'))
-            kwargs['rescope_symbols'] = True
+        if self.parent and "parent" not in kwargs:
+            kwargs["parent"] = self.parent
+        if "symbol_attrs" not in kwargs:
+            kwargs["symbol_attrs"] = self.symbol_attrs.clone(
+                parent=kwargs.get("parent")
+            )
+            kwargs["rescope_symbols"] = True
 
-        if hasattr(self, '_rebuild'):
+        if hasattr(self, "_rebuild"):
             # When cloning IR nodes with a Scope mix-in we need to use the
             # rebuild mechanism
             return self._rebuild(**kwargs)  # pylint: disable=no-member
@@ -351,7 +362,7 @@ class Scope:
         parent : :any:`Scope`, optional
             The enclosing scope, thus allowing recursive look-ups
         """
-        self.__dict__['_parent'] = weakref.ref(parent) if parent is not None else None
+        self.__dict__["_parent"] = weakref.ref(parent) if parent is not None else None
 
         if self.parent is not None:
             self.symbol_attrs.parent = self.parent.symbol_attrs

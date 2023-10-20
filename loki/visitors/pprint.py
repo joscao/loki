@@ -14,7 +14,7 @@ from loki.tools import JoinableStringList, is_iterable, as_tuple
 from loki.visitors.visitor import Visitor
 
 
-__all__ = ['Stringifier', 'pprint']
+__all__ = ["Stringifier", "pprint"]
 
 
 class Stringifier(Visitor):
@@ -47,8 +47,14 @@ class Stringifier(Visitor):
 
     # pylint: disable=arguments-differ
 
-    def __init__(self, depth=0, indent='  ', linewidth=90,
-                 line_cont=lambda indent: '\n' + indent, symgen=str):
+    def __init__(
+        self,
+        depth=0,
+        indent="  ",
+        linewidth=90,
+        line_cont=lambda indent: "\n" + indent,
+        symgen=str,
+    ):
         super().__init__()
 
         self.depth = depth
@@ -94,9 +100,9 @@ class Stringifier(Visitor):
         """
         if not lines:
             return None
-        return '\n'.join(line for line in lines if line is not None)
+        return "\n".join(line for line in lines if line is not None)
 
-    def join_items(self, items, sep=', ', separable=True):
+    def join_items(self, items, sep=", ", separable=True):
         """
         Concatenate a list of items into :any:`JoinableStringList`.
 
@@ -119,8 +125,13 @@ class Stringifier(Visitor):
         -------
         :any:`JoinableStringList`
         """
-        return JoinableStringList(items, sep=sep, width=self.linewidth,
-                                  cont=self.line_cont(self.indent), separable=separable)
+        return JoinableStringList(
+            items,
+            sep=sep,
+            width=self.linewidth,
+            cont=self.line_cont(self.indent),
+            separable=separable,
+        )
 
     def format_node(self, name, *items):
         """
@@ -129,8 +140,8 @@ class Stringifier(Visitor):
         Creates a string of the form ``<name[, attribute, attribute, ...]>``.
         """
         if items:
-            return self.format_line('<', name, ' ', self.join_items(items), '>')
-        return self.format_line('<', name, '>')
+            return self.format_line("<", name, " ", self.join_items(items), ">")
+        return self.format_line("<", name, ">")
 
     def format_line(self, *items, comment=None, no_wrap=False, no_indent=False):
         """
@@ -153,10 +164,10 @@ class Stringifier(Visitor):
             items = [self.indent, *items]
         if no_wrap:
             # Simply concatenate items and append the comment
-            line = ''.join(str(item) for item in items)
+            line = "".join(str(item) for item in items)
         else:
             # Use join_items to concatenate items
-            line = str(self.join_items(items, sep=''))
+            line = str(self.join_items(items, sep=""))
         if comment:
             return line + comment
         return line
@@ -257,7 +268,6 @@ class Stringifier(Visitor):
         self.depth -= 1
         return self.join_lines(header, body)
 
-
     def visit_Conditional(self, o, **kwargs):
         """
         Format :any:`Conditional` as
@@ -272,9 +282,9 @@ class Stringifier(Visitor):
         """
         header = self.format_node(repr(o))
         self.depth += 1
-        conditions = [self.format_node('If', self.visit(o.condition, **kwargs))]
+        conditions = [self.format_node("If", self.visit(o.condition, **kwargs))]
         if o.else_body:
-            conditions.append(self.format_node('Else'))
+            conditions.append(self.format_node("Else"))
         self.depth += 1
         bodies = self.visit_all(o.body, o.else_body, **kwargs)
         self.depth -= 1
@@ -301,9 +311,9 @@ class Stringifier(Visitor):
         values = []
         for expr in o.values:
             value = f'({", ".join(self.visit_all(expr, **kwargs))})'
-            values += [self.format_node('Case', value)]
+            values += [self.format_node("Case", value)]
         if o.else_body:
-            values += [self.format_node('Default')]
+            values += [self.format_node("Default")]
         self.depth += 1
         bodies = self.visit_all(*o.bodies, o.else_body, **kwargs)
         self.depth -= 1

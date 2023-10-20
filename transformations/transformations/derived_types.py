@@ -16,14 +16,34 @@ derived-type arguments in complex calling structures.
 
 from collections import defaultdict
 from loki import (
-    Transformation, FindVariables, FindNodes, FindInlineCalls, Transformer,
-    SubstituteExpressions, SubstituteExpressionsMapper, ExpressionRetriever, recursive_expression_map_update,
-    Module, Import, CallStatement, ProcedureDeclaration, InlineCall, Variable, RangeIndex,
-    BasicType, DerivedType, as_tuple, flatten, warning, debug, CaseInsensitiveDict, ProcedureType
+    Transformation,
+    FindVariables,
+    FindNodes,
+    FindInlineCalls,
+    Transformer,
+    SubstituteExpressions,
+    SubstituteExpressionsMapper,
+    ExpressionRetriever,
+    recursive_expression_map_update,
+    Module,
+    Import,
+    CallStatement,
+    ProcedureDeclaration,
+    InlineCall,
+    Variable,
+    RangeIndex,
+    BasicType,
+    DerivedType,
+    as_tuple,
+    flatten,
+    warning,
+    debug,
+    CaseInsensitiveDict,
+    ProcedureType,
 )
 
 
-__all__ = ['DerivedTypeArgumentsTransformation', 'TypeboundProcedureCallTransformation']
+__all__ = ["DerivedTypeArgumentsTransformation", "TypeboundProcedureCallTransformation"]
 
 
 class DerivedTypeArgumentsTransformation(Transformation):
@@ -49,7 +69,7 @@ class DerivedTypeArgumentsTransformation(Transformation):
     See :meth:`expand_derived_args_kernel` for more information.
     """
 
-    _key = 'DerivedTypeArgumentsTransformation'
+    _key = "DerivedTypeArgumentsTransformation"
 
     def __init__(self, key=None, **kwargs):
         if key is not None:
@@ -57,15 +77,19 @@ class DerivedTypeArgumentsTransformation(Transformation):
         super().__init__(**kwargs)
 
     def transform_subroutine(self, routine, **kwargs):
-        role = kwargs.get('role')
-        item = kwargs.get('item')
+        role = kwargs.get("role")
+        item = kwargs.get("item")
 
         # Initialize the transformation data dictionary
         if item:
             item.trafo_data[self._key] = {}
 
         # Extract expansion maps and argument re-mapping for successors
-        successors = [child for child in kwargs.get('successors', []) if self._key in child.trafo_data]
+        successors = [
+            child
+            for child in kwargs.get("successors", [])
+            if self._key in child.trafo_data
+        ]
 
         # Create a map that accounts for potential renaming of successors upon import,
         # which can lead to calls having a different name than the successor item they
@@ -73,14 +97,17 @@ class DerivedTypeArgumentsTransformation(Transformation):
         renamed_import_map = {
             import_.module.lower(): {
                 s.type.use_name.lower(): s.name.lower()
-                for s in import_.symbols if s.type.use_name
+                for s in import_.symbols
+                if s.type.use_name
             }
-            for import_ in routine.imports + getattr(routine.parent, 'imports', ())
+            for import_ in routine.imports + getattr(routine.parent, "imports", ())
         }
         successors_data = CaseInsensitiveDict(
             (
-                renamed_import_map.get(child.scope_name, {}).get(child.local_name, child.local_name),
-                child.trafo_data[self._key]
+                renamed_import_map.get(child.scope_name, {}).get(
+                    child.local_name, child.local_name
+                ),
+                child.trafo_data[self._key],
             )
             for child in successors
         )
@@ -90,7 +117,7 @@ class DerivedTypeArgumentsTransformation(Transformation):
 
         # ...before updating the routine's signature and replacing
         # use of members in the body
-        if role == 'kernel':
+        if role == "kernel":
             # Expand derived type arguments in kernel...
             trafo_data = self.expand_derived_args_kernel(routine)
             if item:
@@ -101,12 +128,11 @@ class DerivedTypeArgumentsTransformation(Transformation):
 
             # ...before invalidating cached properties if dependencies have changed
             if dependencies_updated and item:
-                item.clear_cached_property('imports')
+                item.clear_cached_property("imports")
 
             # For recursive routines, we have to update calls to itself
-            if any('recursive' in prefix.lower() for prefix in routine.prefix or ()):
+            if any("recursive" in prefix.lower() for prefix in routine.prefix or ()):
                 self.expand_derived_args_recursion(routine, trafo_data)
-
 
     def expand_derived_args_caller(self, routine, successors_data):
         """
@@ -135,8 +161,12 @@ class DerivedTypeArgumentsTransformation(Transformation):
             call_name = str(call.name)
             if call_name in successors_data:
                 # Set the new call signature on the IR node
-                arguments, kwarguments  = self.expand_call_arguments(call, successors_data[call_name])
-                call_mapper[call] = call.clone(arguments=arguments, kwarguments=kwarguments)
+                arguments, kwarguments = self.expand_call_arguments(
+                    call, successors_data[call_name]
+                )
+                call_mapper[call] = call.clone(
+                    arguments=arguments, kwarguments=kwarguments
+                )
 
         # Rebuild the routine's IR tree
         if call_mapper:
@@ -146,8 +176,12 @@ class DerivedTypeArgumentsTransformation(Transformation):
         for call in FindInlineCalls().visit(routine.body):
             if (call_name := str(call.name)) in successors_data:
                 # Set the new call signature on the expression node
-                arguments, kwarguments = self.expand_call_arguments(call, successors_data[call_name])
-                call_mapper[call] = call.clone(parameters=arguments, kw_parameters=kwarguments)
+                arguments, kwarguments = self.expand_call_arguments(
+                    call, successors_data[call_name]
+                )
+                call_mapper[call] = call.clone(
+                    parameters=arguments, kw_parameters=kwarguments
+                )
 
         if call_mapper:
             routine.body = SubstituteExpressions(call_mapper).visit(routine.body)
@@ -171,9 +205,9 @@ class DerivedTypeArgumentsTransformation(Transformation):
         # relative to the local derived type variable
         for child in expansion_components:
             local_var = child.clone(
-                name=f'{local_var.name}%{child.name}',
+                name=f"{local_var.name}%{child.name}",
                 parent=local_var,
-                scope=local_var.scope
+                scope=local_var.scope,
             )
         return local_var
 
@@ -210,23 +244,29 @@ class DerivedTypeArgumentsTransformation(Transformation):
         (tuple, tuple) :
             The argument and keyword argument list with derived type arguments expanded
         """
-        expansion_map = successor_data['expansion_map']
-        orig_argnames = successor_data['orig_argnames']
+        expansion_map = successor_data["expansion_map"]
+        orig_argnames = successor_data["orig_argnames"]
 
         arguments = []
         for kernel_argname, caller_arg in zip(orig_argnames, call.arguments):
             if kernel_argname in expansion_map:
-                arguments += cls._expand_call_argument(caller_arg, expansion_map[kernel_argname])
+                arguments += cls._expand_call_argument(
+                    caller_arg, expansion_map[kernel_argname]
+                )
             else:
                 arguments += [caller_arg]
 
         kwarguments = []
         for kernel_argname, caller_arg in call.kwarguments:
             if kernel_argname in expansion_map:
-                expanded_arguments = cls._expand_call_argument(caller_arg, expansion_map[kernel_argname])
+                expanded_arguments = cls._expand_call_argument(
+                    caller_arg, expansion_map[kernel_argname]
+                )
                 kwarguments += [
                     (cls._expand_kernel_variable(kernel_arg).name, caller_arg)
-                    for kernel_arg, caller_arg in zip(expansion_map[kernel_argname], expanded_arguments)
+                    for kernel_arg, caller_arg in zip(
+                        expansion_map[kernel_argname], expanded_arguments
+                    )
                 ]
             else:
                 kwarguments += [(kernel_argname, caller_arg)]
@@ -239,7 +279,7 @@ class DerivedTypeArgumentsTransformation(Transformation):
         Utility routine that yields the expanded variable in the
         kernel for a given derived type variable member use :data:`var`
         """
-        new_name = var.name.replace('%', '_')
+        new_name = var.name.replace("%", "_")
         return var.clone(name=new_name, parent=None, **kwargs)
 
     @staticmethod
@@ -248,8 +288,10 @@ class DerivedTypeArgumentsTransformation(Transformation):
         Utility routine that yields the variable type for an expanded kernel variable
         """
         return var.type.clone(
-            intent=arg.type.intent, initial=None, allocatable=None,
-            target=arg.type.target if not var.type.pointer else None
+            intent=arg.type.intent,
+            initial=None,
+            allocatable=None,
+            target=arg.type.target if not var.type.pointer else None,
         )
 
     def expand_derived_args_kernel(self, routine):
@@ -264,20 +306,28 @@ class DerivedTypeArgumentsTransformation(Transformation):
         See :meth:`expand_derived_type_member` for more details on how
         the expansion is performed.
         """
-        trafo_data = {'orig_argnames': tuple(arg.lower() for arg in routine.argnames)}
+        trafo_data = {"orig_argnames": tuple(arg.lower() for arg in routine.argnames)}
 
         # All derived type arguments are candidates for expansion
         candidates = []
         for arg in routine.arguments:
             if isinstance(arg.type.dtype, DerivedType):
-                if any(v.type.pointer or v.type.allocatable or
-                       isinstance(v.type.dtype, DerivedType) for v in as_tuple(arg.variables)):
+                if any(
+                    v.type.pointer
+                    or v.type.allocatable
+                    or isinstance(v.type.dtype, DerivedType)
+                    for v in as_tuple(arg.variables)
+                ):
                     # Only include derived types with array members or nested derived types
                     candidates += [arg]
 
         # Inspect all derived type member use and determine their expansion
-        vars_to_expand = [var for var in FindVariables(unique=False).visit(routine.ir) if var.parent]
-        nested_parents = [var.parent for var in vars_to_expand if var.parent in vars_to_expand]
+        vars_to_expand = [
+            var for var in FindVariables(unique=False).visit(routine.ir) if var.parent
+        ]
+        nested_parents = [
+            var.parent for var in vars_to_expand if var.parent in vars_to_expand
+        ]
         vars_to_expand = [var for var in vars_to_expand if var not in nested_parents]
 
         expansion_map = defaultdict(set)
@@ -298,7 +348,9 @@ class DerivedTypeArgumentsTransformation(Transformation):
         expansion_map = dict(expansion_map)
         for arg in candidates:
             if arg in expansion_map:
-                sorted_expansion = sorted(expansion_map[arg], key=lambda v: str(v).lower())
+                sorted_expansion = sorted(
+                    expansion_map[arg], key=lambda v: str(v).lower()
+                )
                 if arg in non_expansion_map:
                     expansion_map[arg] = (arg, *sorted_expansion)
                 else:
@@ -315,17 +367,23 @@ class DerivedTypeArgumentsTransformation(Transformation):
             if arg in expansion_map:
                 arguments_map[arg] = [
                     self._expand_kernel_variable(
-                        var, type=self._get_expanded_kernel_var_type(arg, var),
-                        dimensions=assumed_dim_or_none(var.type.shape), scope=routine
+                        var,
+                        type=self._get_expanded_kernel_var_type(arg, var),
+                        dimensions=assumed_dim_or_none(var.type.shape),
+                        scope=routine,
                     )
                     for var in expansion_map[arg]
                 ]
 
         # Update arguments list
-        routine.arguments = [a for arg in routine.arguments for a in arguments_map.get(arg, [arg])]
+        routine.arguments = [
+            a for arg in routine.arguments for a in arguments_map.get(arg, [arg])
+        ]
 
         # Update variable list, too, as this triggers declaration generation
-        routine.variables = [v for var in routine.variables for v in arguments_map.get(var, [var])]
+        routine.variables = [
+            v for var in routine.variables for v in arguments_map.get(var, [var])
+        ]
 
         # Substitue derived type member use in the spec and body
         vmap = recursive_expression_map_update(vmap)
@@ -337,10 +395,12 @@ class DerivedTypeArgumentsTransformation(Transformation):
             for decl in arg.type.dtype.typedef.declarations:
                 if isinstance(decl, ProcedureDeclaration) and not decl.generic:
                     for proc in decl.symbols:
-                        if routine.name == proc or routine.name in as_tuple(proc.type.bind_names):
+                        if routine.name == proc or routine.name in as_tuple(
+                            proc.type.bind_names
+                        ):
                             proc.type = proc.type.clone(pass_attr=False)
 
-        trafo_data['expansion_map'] = expansion_map
+        trafo_data["expansion_map"] = expansion_map
         return trafo_data
 
     @classmethod
@@ -384,16 +444,20 @@ class DerivedTypeArgumentsTransformation(Transformation):
         # them available later on without risking losing this information due to
         # intermediate rescoping operations
         for idx, parent in enumerate(parents):
-            if hasattr(parent, 'dimensions'):
+            if hasattr(parent, "dimensions"):
                 expansion = parent.clone(scope=None, dimensions=None)
                 if parent is parents[0]:
-                    debug(f'Array of derived types {var!s}. Cannot expand argument.')
+                    debug(f"Array of derived types {var!s}. Cannot expand argument.")
                     local_use = var
                 else:
-                    debug(f'Array of derived types {var!s}. '
-                        f'Can only partially expand argument as {expansion!s}.')
+                    debug(
+                        f"Array of derived types {var!s}. "
+                        f"Can only partially expand argument as {expansion!s}."
+                    )
                     local_use = cls._expand_kernel_variable(parent)
-                    local_use = cls._expand_relative_to_local_var(local_use, [*parents[idx+1:], var])
+                    local_use = cls._expand_relative_to_local_var(
+                        local_use, [*parents[idx + 1 :], var]
+                    )
                 return parents[0], expansion, local_use
 
         # None of the parents had a dimensions attribute, which means we can
@@ -409,11 +473,14 @@ class DerivedTypeArgumentsTransformation(Transformation):
         Helper utility to build the list of symbols per module in an expression :data:`expr` that do
         not exist in the current :data:`scope`
         """
+
         def _warn(symbol):
-            warning((
-                '[Loki::DerivedTypeArgumentsTransformation] '
-                f'Cannot insert import for symbol "{symbol.name}" in {scope.name}. No type information available.'
-            ))
+            warning(
+                (
+                    "[Loki::DerivedTypeArgumentsTransformation] "
+                    f'Cannot insert import for symbol "{symbol.name}" in {scope.name}. No type information available.'
+                )
+            )
 
         new_imports = defaultdict(set)
         for symbol in FindVariables().visit(expr):
@@ -425,9 +492,11 @@ class DerivedTypeArgumentsTransformation(Transformation):
                 if not symbol.type.module:
                     _warn(symbol)
                 else:
-                    new_imports[symbol.type.module.name.lower()].add(symbol.clone(scope=scope))
+                    new_imports[symbol.type.module.name.lower()].add(
+                        symbol.clone(scope=scope)
+                    )
 
-            elif (symbol_scope := symbol.scope):
+            elif symbol_scope := symbol.scope:
                 # This new symbol has been declared in the symbol_scope we inherited it from
                 while symbol_scope.parent:
                     symbol_scope = symbol_scope.parent
@@ -446,7 +515,7 @@ class DerivedTypeArgumentsTransformation(Transformation):
         Inspect the expansion map in :data:`trafo_data` for new symbols that need to be imported
         as a result of flattening a derived type and add the corresponding imports
         """
-        new_arguments = flatten(trafo_data['expansion_map'].values())
+        new_arguments = flatten(trafo_data["expansion_map"].values())
         symbol_map = routine.parent.symbol_map if routine.parent else {}
         symbol_map.update(routine.symbol_map)
 
@@ -454,26 +523,39 @@ class DerivedTypeArgumentsTransformation(Transformation):
         new_imports = defaultdict(set)
         for arg in new_arguments:
             type_ = arg.type
-            if isinstance(type_.dtype, DerivedType) and type_.dtype.name not in symbol_map:
+            if (
+                isinstance(type_.dtype, DerivedType)
+                and type_.dtype.name not in symbol_map
+            ):
                 typedef = type_.dtype.typedef
                 if typedef is BasicType.DEFERRED:
-                    warning((
-                        '[Loki::DerivedTypeArgumentsTransformation] '
-                        f'Cannot insert import for derived type "{type_.dtype.name}" in {routine.name}. '
-                        'No type information available.'
-                    ))
+                    warning(
+                        (
+                            "[Loki::DerivedTypeArgumentsTransformation] "
+                            f'Cannot insert import for derived type "{type_.dtype.name}" in {routine.name}. '
+                            "No type information available."
+                        )
+                    )
                 elif typedef.parent is not routine.parent:
                     # Derived type needs to be imported
                     new_imports[typedef.parent.name.lower()].add(
-                        Variable(name=type_.dtype.name, scope=routine, type=type_.clone(imported=True))
+                        Variable(
+                            name=type_.dtype.name,
+                            scope=routine,
+                            type=type_.clone(imported=True),
+                        )
                     )
 
             if type_.kind:
-                for module, symbols in cls._get_imports_for_expr(type_.kind, routine, symbol_map).items():
+                for module, symbols in cls._get_imports_for_expr(
+                    type_.kind, routine, symbol_map
+                ).items():
                     new_imports[module] |= symbols
 
-            if getattr(arg, 'dimensions', None):
-                for module, symbols in cls._get_imports_for_expr(arg.dimensions, routine, symbol_map).items():
+            if getattr(arg, "dimensions", None):
+                for module, symbols in cls._get_imports_for_expr(
+                    arg.dimensions, routine, symbol_map
+                ).items():
                     new_imports[module] |= symbols
 
         if new_imports:
@@ -491,21 +573,33 @@ class DerivedTypeArgumentsTransformation(Transformation):
         Find recursive calls to itcls and apply the derived args flattening
         to these calls
         """
+
         def _update_call(call):
             # Expand the call signature first
             arguments, kwarguments = cls.expand_call_arguments(call, trafo_data)
             # And expand the derived type members in the new call signature next
             expansion_map = {}
-            vars_to_expand = {var for var in FindVariables().visit((arguments, kwarguments)) if var.parent}
-            nested_parents = {var.parent for var in vars_to_expand if var.parent in vars_to_expand}
+            vars_to_expand = {
+                var
+                for var in FindVariables().visit((arguments, kwarguments))
+                if var.parent
+            }
+            nested_parents = {
+                var.parent for var in vars_to_expand if var.parent in vars_to_expand
+            }
             vars_to_expand -= nested_parents
             for var in vars_to_expand:
                 orig_arg = var.parents[0]
                 expanded_var = cls._expand_kernel_variable(
-                    var, type=cls._get_expanded_kernel_var_type(orig_arg, var), scope=routine, dimensions=None
+                    var,
+                    type=cls._get_expanded_kernel_var_type(orig_arg, var),
+                    scope=routine,
+                    dimensions=None,
                 )
                 expansion_map[var] = expanded_var
-            expansion_mapper = SubstituteExpressionsMapper(recursive_expression_map_update(expansion_map))
+            expansion_mapper = SubstituteExpressionsMapper(
+                recursive_expression_map_update(expansion_map)
+            )
             arguments = tuple(expansion_mapper(arg) for arg in arguments)
             kwarguments = tuple((k, expansion_mapper(v)) for k, v in kwarguments)
             return arguments, kwarguments
@@ -515,7 +609,9 @@ class DerivedTypeArgumentsTransformation(Transformation):
         for call in FindNodes(CallStatement).visit(routine.body):
             if str(call.name).lower() == routine.name.lower():
                 arguments, kwarguments = _update_call(call)
-                call_mapper[call] = call.clone(arguments=arguments, kwarguments=kwarguments)
+                call_mapper[call] = call.clone(
+                    arguments=arguments, kwarguments=kwarguments
+                )
 
         # Rebuild the routine's IR tree
         if call_mapper:
@@ -526,7 +622,9 @@ class DerivedTypeArgumentsTransformation(Transformation):
         for call in FindInlineCalls().visit(routine.body):
             if str(call.name).lower() == routine.name.lower():
                 arguments, kwarguments = _update_call(call)
-                call_mapper[call] = call.clone(parameters=arguments, kw_parameters=kwarguments)
+                call_mapper[call] = call.clone(
+                    parameters=arguments, kw_parameters=kwarguments
+                )
 
         # Rebuild the routine's IR tree with expression substitution
         if call_mapper:
@@ -572,11 +670,17 @@ def get_procedure_symbol_from_typebound_procedure_symbol(proc_symbol, routine_na
                 local_parent = local_var
                 local_var = local_var.type.dtype.typedef.variable_map[local_name]
         except AttributeError:
-            warning('Type definitions incomplete for %s in %s', proc_symbol, routine_name)
+            warning(
+                "Type definitions incomplete for %s in %s", proc_symbol, routine_name
+            )
             return None
 
         if local_var.type.dtype.is_generic:
-            warning('Cannot resolve generic binding %s (not implemented) in %s', proc_symbol, routine_name)
+            warning(
+                "Cannot resolve generic binding %s (not implemented) in %s",
+                proc_symbol,
+                routine_name,
+            )
             return None
 
         if local_var.type.bind_names is not None:
@@ -588,7 +692,9 @@ def get_procedure_symbol_from_typebound_procedure_symbol(proc_symbol, routine_na
             # If the binding doesn't have any specific bind_names, this means the
             # corresponding subroutine has the same name and should be declared
             # in the same module as the typedef
-            new_name = Variable(name=local_var.name, scope=local_parent.type.dtype.typedef.parent)
+            new_name = Variable(
+                name=local_var.name, scope=local_parent.type.dtype.typedef.parent
+            )
         return new_name
 
     # We don't have any binding information available
@@ -630,7 +736,9 @@ class TypeboundProcedureCallTransformer(Transformer):
         self.current_module = current_module
         self.new_procedure_imports = defaultdict(set)
         self.new_dependencies = set()
-        self._retriever = ExpressionRetriever(lambda e: isinstance(e, InlineCall) and e.function.parent)
+        self._retriever = ExpressionRetriever(
+            lambda e: isinstance(e, InlineCall) and e.function.parent
+        )
 
     def retrieve(self, o):
         return self._retriever.retrieve(o)
@@ -642,24 +750,32 @@ class TypeboundProcedureCallTransformer(Transformer):
         If this is a call to a typebound procedure, resolve the procedure binding and
         insert the derived type as the first argument in the call statement.
         """
-        rebuilt = {k: self.visit(c, **kwargs) for k, c in zip(o._traversable, o.children)}
-        if rebuilt['name'].parent:
-            new_proc_symbol = get_procedure_symbol_from_typebound_procedure_symbol(rebuilt['name'], self.routine_name)
+        rebuilt = {
+            k: self.visit(c, **kwargs) for k, c in zip(o._traversable, o.children)
+        }
+        if rebuilt["name"].parent:
+            new_proc_symbol = get_procedure_symbol_from_typebound_procedure_symbol(
+                rebuilt["name"], self.routine_name
+            )
 
             if new_proc_symbol:
                 # Add the derived type as first argument to the call
-                rebuilt['arguments'] = (rebuilt['name'].parent, ) + rebuilt['arguments']
+                rebuilt["arguments"] = (rebuilt["name"].parent,) + rebuilt["arguments"]
 
                 # Add the subroutine to the list of symbols that need to be imported
                 if isinstance(new_proc_symbol.scope, Module):
                     module_name = new_proc_symbol.scope.name.lower()
                 else:
-                    module_name = new_proc_symbol.type.dtype.procedure.procedure_symbol.scope.name.lower()
+                    module_name = (
+                        new_proc_symbol.type.dtype.procedure.procedure_symbol.scope.name.lower()
+                    )
 
                 if module_name != self.current_module:
-                    self.new_procedure_imports[module_name].add(new_proc_symbol.name.lower())
+                    self.new_procedure_imports[module_name].add(
+                        new_proc_symbol.name.lower()
+                    )
 
-                rebuilt['name'] = new_proc_symbol
+                rebuilt["name"] = new_proc_symbol
         children = [rebuilt[k] for k in o._traversable]
         return self._rebuild(o, children)
 
@@ -675,22 +791,28 @@ class TypeboundProcedureCallTransformer(Transformer):
 
         expr_map = {}
         for call in inline_calls:
-            new_proc_symbol = get_procedure_symbol_from_typebound_procedure_symbol(call.function, self.routine_name)
+            new_proc_symbol = get_procedure_symbol_from_typebound_procedure_symbol(
+                call.function, self.routine_name
+            )
 
             if new_proc_symbol:
                 new_arguments = (call.function.parent,) + call.parameters
                 expr_map[call] = call.clone(
-                    function=new_proc_symbol.rescope(scope=kwargs['scope']),
-                    parameters=new_arguments
+                    function=new_proc_symbol.rescope(scope=kwargs["scope"]),
+                    parameters=new_arguments,
                 )
                 # Add the function to the list of symbols that need to be imported
                 if isinstance(new_proc_symbol.scope, Module):
                     module_name = new_proc_symbol.scope.name.lower()
                 else:
-                    module_name = new_proc_symbol.type.dtype.procedure.procedure_symbol.scope.name.lower()
+                    module_name = (
+                        new_proc_symbol.type.dtype.procedure.procedure_symbol.scope.name.lower()
+                    )
 
                 if module_name != self.current_module:
-                    self.new_procedure_imports[module_name].add(new_proc_symbol.name.lower())
+                    self.new_procedure_imports[module_name].add(
+                        new_proc_symbol.name.lower()
+                    )
                     self.new_dependencies.add(call.function.type.dtype.procedure)
 
         if not expr_map:
@@ -746,7 +868,7 @@ class TypeboundProcedureCallTransformation(Transformation):
         for arg in routine.arguments:
             type_ = arg.type
             if type_.polymorphic and not type_.intent:
-                arg.type = type_.clone(intent='inout')
+                arg.type = type_.clone(intent="inout")
 
     def add_inline_call_dependency(self, caller, callee):
         """
@@ -754,18 +876,18 @@ class TypeboundProcedureCallTransformation(Transformation):
 
         These dependencies are later on available to query via :attr:`inline_call_dependencies`.
         """
-        caller_module = getattr(caller.parent, 'name', '')
-        callee_module = getattr(callee.parent, 'name', '')
-        self.inline_call_dependencies[f'{caller_module}#{caller.name}'.lower()] |= {
-            f'{callee_module}#{callee.name}'.lower()
+        caller_module = getattr(caller.parent, "name", "")
+        callee_module = getattr(callee.parent, "name", "")
+        self.inline_call_dependencies[f"{caller_module}#{caller.name}".lower()] |= {
+            f"{callee_module}#{callee.name}".lower()
         }
 
     def transform_subroutine(self, routine, **kwargs):
         """
         Apply the transformation of calls to the given :data:`routine`
         """
-        item = kwargs.get('item')
-        role = kwargs.get('role')
+        item = kwargs.get("item")
+        role = kwargs.get("role")
 
         # Fix any wrong intents on polymorphic arguments
         # (sadly, it's not uncommon to omit the intent specification on the CLASS declaration,
@@ -781,7 +903,9 @@ class TypeboundProcedureCallTransformation(Transformation):
         # Check if this routine is a typebound routine and, if it is, create a duplicate of
         # the original routine before applying the transformation
         is_duplicate_kernels = (
-            self.duplicate_typebound_kernels and role == 'kernel' and isinstance(routine.parent, Module)
+            self.duplicate_typebound_kernels
+            and role == "kernel"
+            and isinstance(routine.parent, Module)
         )
         if is_duplicate_kernels:
             typedefs = routine.parent.typedefs
@@ -792,18 +916,22 @@ class TypeboundProcedureCallTransformation(Transformation):
                     if not isinstance(var.type.dtype, ProcedureType):
                         continue
                     if (
-                        (var.type.bind_names and routine.name in var.type.bind_names) or
-                        (not var.type.bind_names and var == routine.name)
-                    ):
+                        var.type.bind_names and routine.name in var.type.bind_names
+                    ) or (not var.type.bind_names and var == routine.name):
                         # Create a duplicate routine
                         new_routine = routine.clone(
-                            name=f'{routine.name}_', rescope_symbols=True,
-                            result_name=routine.name if routine.is_function and not routine.result_name else None
+                            name=f"{routine.name}_",
+                            rescope_symbols=True,
+                            result_name=routine.name
+                            if routine.is_function and not routine.result_name
+                            else None,
                         )
                         # Update result name if this is a function
                         routine.parent.contains.append(new_routine)
                         # Update the procedure binding
-                        new_type = var.type.clone(bind_names=(new_routine.procedure_symbol,))
+                        new_type = var.type.clone(
+                            bind_names=(new_routine.procedure_symbol,)
+                        )
                         proc_binding_update_maps[tdef.name][var.name] = new_type
 
         # Traverse the routine's body and replace all calls to typebound procedures by
@@ -820,14 +948,18 @@ class TypeboundProcedureCallTransformation(Transformation):
         imported_symbols = routine.imported_symbols
         new_imports = []
         for module_name, proc_symbols in new_procedure_imports.items():
-            new_symbols = tuple(Variable(name=s, scope=routine) for s in proc_symbols if s not in imported_symbols)
+            new_symbols = tuple(
+                Variable(name=s, scope=routine)
+                for s in proc_symbols
+                if s not in imported_symbols
+            )
             if new_symbols:
                 new_imports += [Import(module=module_name, symbols=new_symbols)]
 
         if new_imports:
             routine.spec.prepend(as_tuple(new_imports))
             if item:
-                item.clear_cached_property('imports')
+                item.clear_cached_property("imports")
 
         # Update the procedure bindings in the typedefs
         if is_duplicate_kernels:

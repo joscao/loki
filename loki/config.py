@@ -83,9 +83,10 @@ class Configuration(OrderedDict):
         Print the current configuration state.
         """
         from loki.logging import info  # pylint: disable=import-outside-toplevel
+
         info("[Loki] global config:")
         for k, v in self.items():
-            info(f'  {k}: {v}')
+            info(f"  {k}: {v}")
 
     def _updated(self, key, value):
         # Execute callback function for ``key``
@@ -103,7 +104,7 @@ class Configuration(OrderedDict):
         self._updated(key, value)
 
 
-config = Configuration('Loki configuration')
+config = Configuration("Loki configuration")
 
 
 @contextmanager

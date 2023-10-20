@@ -5,25 +5,32 @@ from conftest import available_frontends
 from loki import Module, Subroutine, FindNodes, flatten, pprint, fgen
 from loki.ir import Pragma, Loop, VariableDeclaration, PragmaRegion
 from loki.pragma_utils import (
-    is_loki_pragma, get_pragma_parameters, attach_pragmas, detach_pragmas,
-    pragmas_attached, pragma_regions_attached
+    is_loki_pragma,
+    get_pragma_parameters,
+    attach_pragmas,
+    detach_pragmas,
+    pragmas_attached,
+    pragma_regions_attached,
 )
 
 
-@pytest.mark.parametrize('keyword, content, starts_with, ref', [
-    ('foo', None, None, False),
-    ('foo', 'bar', None, False),
-    ('foo', 'loki', None, False),
-    ('foo', 'loki', 'loki', False),
-    ('loki', None, None, True),
-    ('loki', None, 'foo', False),
-    ('loki', 'dataflow', None, True),
-    ('loki', 'dataflow', 'dataflow', True),
-    ('loki', 'dataflow', 'foobar', False),
-    ('loki', 'fusion group(1)', None, True),
-    ('loki', 'fusion group(1)', 'fusion', True),
-    ('loki', 'fusion group(1)', 'group', False),
-])
+@pytest.mark.parametrize(
+    "keyword, content, starts_with, ref",
+    [
+        ("foo", None, None, False),
+        ("foo", "bar", None, False),
+        ("foo", "loki", None, False),
+        ("foo", "loki", "loki", False),
+        ("loki", None, None, True),
+        ("loki", None, "foo", False),
+        ("loki", "dataflow", None, True),
+        ("loki", "dataflow", "dataflow", True),
+        ("loki", "dataflow", "foobar", False),
+        ("loki", "fusion group(1)", None, True),
+        ("loki", "fusion group(1)", "fusion", True),
+        ("loki", "fusion group(1)", "group", False),
+    ],
+)
 def test_is_loki_pragma(keyword, content, starts_with, ref):
     """
     Test correct identification of Loki pragmas.
@@ -38,25 +45,35 @@ def test_is_loki_pragma(keyword, content, starts_with, ref):
         assert is_loki_pragma(pragma_list) == ref
 
 
-@pytest.mark.parametrize('content, starts_with, ref', [
-    (None, None, {}),
-    ('', None, {}),
-    ('', 'foo', {}),
-    ('dataflow', None, {'dataflow': None}),
-    ('dataflow', 'dataflow', {}),
-    ('dataflow group(1)', None, {'dataflow': None, 'group': '1'}),
-    ('dataflow group(1)', 'dataflow', {'group': '1'}),
-    ('dataflow group(1)', 'foo', {}),
-    ('dataflow group(1) group(2)', 'dataflow', {'group': ['1', '2']}),
-    ('foo bar(^£!$%*[]:@+-_=~#/?.,<>;) baz foobar(abc_123")', 'foo',
-     {'bar':'^£!$%*[]:@+-_=~#/?.,<>;', 'baz': None, 'foobar': 'abc_123"'}),
-    ('target map(a) map(to: b) map(from: c)', None, {'target': None, 'map': ['a', 'to: b', 'from: c']})
-])
+@pytest.mark.parametrize(
+    "content, starts_with, ref",
+    [
+        (None, None, {}),
+        ("", None, {}),
+        ("", "foo", {}),
+        ("dataflow", None, {"dataflow": None}),
+        ("dataflow", "dataflow", {}),
+        ("dataflow group(1)", None, {"dataflow": None, "group": "1"}),
+        ("dataflow group(1)", "dataflow", {"group": "1"}),
+        ("dataflow group(1)", "foo", {}),
+        ("dataflow group(1) group(2)", "dataflow", {"group": ["1", "2"]}),
+        (
+            'foo bar(^£!$%*[]:@+-_=~#/?.,<>;) baz foobar(abc_123")',
+            "foo",
+            {"bar": "^£!$%*[]:@+-_=~#/?.,<>;", "baz": None, "foobar": 'abc_123"'},
+        ),
+        (
+            "target map(a) map(to: b) map(from: c)",
+            None,
+            {"target": None, "map": ["a", "to: b", "from: c"]},
+        ),
+    ],
+)
 def test_get_pragma_parameters(content, starts_with, ref):
     """
     Test correct extraction of Loki pragma parameters.
     """
-    pragma = Pragma('loki', content)
+    pragma = Pragma("loki", content)
     pragma_list = (pragma,)
     if starts_with is None:
         assert get_pragma_parameters(pragma) == ref
@@ -66,7 +83,7 @@ def test_get_pragma_parameters(content, starts_with, ref):
         assert get_pragma_parameters(pragma_list, starts_with=starts_with) == ref
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragma_inlining(frontend):
     """
     A short test that verifies pragmas that are the first statement
@@ -98,10 +115,13 @@ end subroutine test_tools_pragma_inlining
     assert len(loops) == 1
     assert loops[0].pragma is not None
     assert isinstance(loops[0].pragma, tuple) and len(loops[0].pragma) == 1
-    assert loops[0].pragma[0].keyword == 'loki' and loops[0].pragma[0].content == 'some pragma'
+    assert (
+        loops[0].pragma[0].keyword == "loki"
+        and loops[0].pragma[0].content == "some pragma"
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragma_inlining_multiple(frontend):
     """
     A short test that verifies that multiple pragmas are inlined
@@ -135,24 +155,32 @@ end subroutine test_tools_pragma_inlining_multiple
     assert len(loops) == 1
     assert loops[0].pragma is not None
     assert isinstance(loops[0].pragma, tuple) and len(loops[0].pragma) == 3
-    assert [p.keyword for p in loops[0].pragma] == ['blub', 'loki', 'loki']
-    assert loops[0].pragma[0].content == 'other pragma'
-    assert loops[0].pragma[1].content == 'some pragma(5)'
-    assert loops[0].pragma[2].content == 'more'
+    assert [p.keyword for p in loops[0].pragma] == ["blub", "loki", "loki"]
+    assert loops[0].pragma[0].content == "other pragma"
+    assert loops[0].pragma[1].content == "some pragma(5)"
+    assert loops[0].pragma[2].content == "more"
 
     # A few checks for the pragma utility functions
     assert is_loki_pragma(loops[0].pragma)
-    assert is_loki_pragma(loops[0].pragma, starts_with='some')
-    assert is_loki_pragma(loops[0].pragma, starts_with='more')
-    assert not is_loki_pragma(loops[0].pragma, starts_with='other')
-    assert get_pragma_parameters(loops[0].pragma) == {'some': None, 'pragma': '5', 'more': None}
-    assert get_pragma_parameters(loops[0].pragma, starts_with='some') == {'pragma': '5'}
+    assert is_loki_pragma(loops[0].pragma, starts_with="some")
+    assert is_loki_pragma(loops[0].pragma, starts_with="more")
+    assert not is_loki_pragma(loops[0].pragma, starts_with="other")
+    assert get_pragma_parameters(loops[0].pragma) == {
+        "some": None,
+        "pragma": "5",
+        "more": None,
+    }
+    assert get_pragma_parameters(loops[0].pragma, starts_with="some") == {"pragma": "5"}
     # Note: the following is really unexpected behaviour
-    assert get_pragma_parameters(loops[0].pragma, only_loki_pragmas=False) == \
-            {'some': None, 'pragma': [None, '5'], 'more': None, 'other': None}
+    assert get_pragma_parameters(loops[0].pragma, only_loki_pragmas=False) == {
+        "some": None,
+        "pragma": [None, "5"],
+        "more": None,
+        "other": None,
+    }
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragma_detach(frontend):
     """
     A short test that verifies that multiple pragmas are inlined
@@ -220,12 +248,12 @@ end subroutine test_tools_pragma_detach
     assert not FindNodes(Pragma).visit(ir)
 
     for loop, orig_loop in zip(loops, orig_loops):
-        pragma = [p.keyword + ' ' + p.content for p in loop.pragma]
-        orig_pragma = [p.keyword + ' ' + p.content for p in orig_loop.pragma]
-        assert '\n'.join(pragma) == '\n'.join(orig_pragma)
+        pragma = [p.keyword + " " + p.content for p in loop.pragma]
+        orig_pragma = [p.keyword + " " + p.content for p in orig_loop.pragma]
+        assert "\n".join(pragma) == "\n".join(orig_pragma)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragmas_attached_loop(frontend):
     """
     A short test that verifies that the context manager to attach
@@ -282,7 +310,7 @@ end subroutine test_tools_pragmas_attached_loop
     assert all(loop.pragma is None for loop in attached_loops)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragmas_attached_example(frontend):
     """
     A short test that verifies that the example from the docstring works.
@@ -310,7 +338,7 @@ end subroutine test_tools_pragmas_attached_example
     loop_of_interest = None
     with pragmas_attached(routine, Loop):
         for loop in FindNodes(Loop).visit(routine.body):
-            if is_loki_pragma(loop.pragma, starts_with='foobar'):
+            if is_loki_pragma(loop.pragma, starts_with="foobar"):
                 loop_of_interest = loop
                 break
 
@@ -318,7 +346,7 @@ end subroutine test_tools_pragmas_attached_example
     assert loop_of_interest.pragma is None
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragmas_attached_post(frontend):
     """
     Verify the inlining of pragma_post.
@@ -350,7 +378,7 @@ end subroutine test_tools_pragmas_attached_post
 
     with pragmas_attached(routine, Loop, attach_pragma_post=False):
         assert isinstance(loop.pragma, tuple) and len(loop.pragma) == 1
-        assert loop.pragma[0].keyword.lower() == 'acc'
+        assert loop.pragma[0].keyword.lower() == "acc"
         assert loop.pragma_post is None
         assert len(FindNodes(Pragma).visit(routine.body)) == 1
 
@@ -359,16 +387,16 @@ end subroutine test_tools_pragmas_attached_post
     # default behaviour: attach_pragma_post=True
     with pragmas_attached(routine, Loop):
         assert isinstance(loop.pragma, tuple) and len(loop.pragma) == 1
-        assert loop.pragma[0].keyword.lower() == 'acc'
+        assert loop.pragma[0].keyword.lower() == "acc"
         assert isinstance(loop.pragma_post, tuple) and len(loop.pragma_post) == 1
-        assert loop.pragma_post[0].keyword.lower() == 'acc'
+        assert loop.pragma_post[0].keyword.lower() == "acc"
         assert not FindNodes(Pragma).visit(routine.body)
 
     assert loop.pragma is None and loop.pragma_post is None
     assert len(FindNodes(Pragma).visit(routine.body)) == 2
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragmas_attached_module(frontend):
     """
     Verify pragmas_attached works for Module objects.
@@ -384,18 +412,20 @@ end module test_tools_pragmas_attached_module
 
     assert len(FindNodes(Pragma).visit(module.spec)) == 1
     decl = FindNodes(VariableDeclaration).visit(module.spec)[1]
-    assert len(decl.symbols) == 1 and decl.symbols[0].name.lower() == 'b'
+    assert len(decl.symbols) == 1 and decl.symbols[0].name.lower() == "b"
     assert decl.pragma is None
 
     with pragmas_attached(module, VariableDeclaration):
         assert not FindNodes(Pragma).visit(module.spec)
-        assert isinstance(decl.pragma, tuple) and is_loki_pragma(decl.pragma, starts_with='dimension')
+        assert isinstance(decl.pragma, tuple) and is_loki_pragma(
+            decl.pragma, starts_with="dimension"
+        )
 
     assert decl.pragma is None
     assert len(FindNodes(Pragma).visit(module.spec)) == 1
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragma_regions_attached(frontend):
     """
     Verify ``pragma_regions_attached`` creates and removes `PragmaRegion` objects.
@@ -458,7 +488,7 @@ end subroutine test_tools_pragmas_attached_region
     assert len(FindNodes(Pragma).visit(routine.body)) == 5
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_tools_pragma_regions_attached_nested(frontend):
     """
     Verify ``pragma_regions_attached`` creates and removes `PragmaRegion` objects.
@@ -531,7 +561,7 @@ end subroutine test_tools_pragmas_attached_region
     assert len(FindNodes(Pragma).visit(routine.body)) == 7
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_long_pragmas(frontend):
     """
     Test correct dealing with long pragmas.
@@ -564,7 +594,7 @@ end subroutine test_long_pragmas
         assert len(line) < 135
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_pragmas_map(frontend):
     """
     Test correct handling of pragmas with multiple occurences of same keyword.
@@ -595,12 +625,15 @@ end subroutine test_pragmas_map
     pragmas = FindNodes(Pragma).visit(routine.body)
 
     assert len(pragmas) == 4
-    assert all(p.keyword.lower() == 'omp' for p in pragmas)
-    assert all(v in pragmas[0].content for v in ['target', 'map(to: a)', 'map(b)', 'map(tofrom: c)'])
+    assert all(p.keyword.lower() == "omp" for p in pragmas)
+    assert all(
+        v in pragmas[0].content
+        for v in ["target", "map(to: a)", "map(b)", "map(tofrom: c)"]
+    )
 
     fgen_code = fgen(pragmas[0]).lower()
-    assert '!$omp' in fgen_code
-    assert 'target' in fgen_code
-    assert 'map( to: a )' in fgen_code
-    assert 'map( b )' in fgen_code
-    assert 'map( tofrom: c )' in fgen_code
+    assert "!$omp" in fgen_code
+    assert "target" in fgen_code
+    assert "map( to: a )" in fgen_code
+    assert "map( b )" in fgen_code
+    assert "map( tofrom: c )" in fgen_code

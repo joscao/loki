@@ -7,7 +7,7 @@
 
 from loki.backend.fgen import FortranCodegen
 
-__all__ = ['cufgen', 'CudaFortranCodegen']
+__all__ = ["cufgen", "CudaFortranCodegen"]
 
 
 class CudaFortranCodegen(FortranCodegen):
@@ -31,8 +31,11 @@ class CudaFortranCodegen(FortranCodegen):
         else:
             chevron = ""
         if o.kwarguments:
-            args += tuple(f'{self.visit(arg[0], **kwargs)}={self.visit(arg[1], **kwargs)}' for arg in o.kwarguments)
-        call = self.format_line('CALL ', name, chevron, '(', self.join_items(args), ')')
+            args += tuple(
+                f"{self.visit(arg[0], **kwargs)}={self.visit(arg[1], **kwargs)}"
+                for arg in o.kwarguments
+            )
+        call = self.format_line("CALL ", name, chevron, "(", self.join_items(args), ")")
         return self.join_lines(pragma, call)
 
     def visit_SymbolAttributes(self, o, **kwargs):
@@ -49,8 +52,8 @@ class CudaFortranCodegen(FortranCodegen):
             "constant": "CONSTANT",
             "shared": "SHARED",
             "pinned": "PINNED",
-            "texture": "TEXTURE"
-                    }
+            "texture": "TEXTURE",
+        }
 
         for key, value in attr_dic.items():
             if getattr(o, key):
@@ -78,4 +81,6 @@ def cufgen(ir, depth=0, conservative=False, linewidth=132):
 
     .. _CUDA_FORTRAN_PROGRAMMING_GUIDE: https://docs.nvidia.com/hpc-sdk/compilers/cuda-fortran-prog-guide/index.html
     """
-    return CudaFortranCodegen(depth=depth, linewidth=linewidth, conservative=conservative).visit(ir)
+    return CudaFortranCodegen(
+        depth=depth, linewidth=linewidth, conservative=conservative
+    ).visit(ir)

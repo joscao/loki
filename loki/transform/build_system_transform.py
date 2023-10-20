@@ -14,7 +14,7 @@ from pathlib import Path
 from loki.logging import info
 from loki.transform.transformation import Transformation
 
-__all__ = ['CMakePlanner', 'FileWriteTransformation']
+__all__ = ["CMakePlanner", "FileWriteTransformation"]
 
 
 class CMakePlanner(Transformation):
@@ -74,18 +74,18 @@ class CMakePlanner(Transformation):
         role : str
             The routine's role
         """
-        item = kwargs['item']
-        role = kwargs.get('role')
+        item = kwargs["item"]
+        role = kwargs.get("role")
 
         sourcepath = item.path.resolve()
-        newsource = sourcepath.with_suffix(f'.{self.mode.lower()}.F90')
+        newsource = sourcepath.with_suffix(f".{self.mode.lower()}.F90")
         if self.build is not None:
-            newsource = self.build/newsource.name
+            newsource = self.build / newsource.name
 
         # Make new CMake paths relative to source again
         sourcepath = sourcepath.relative_to(self.rootpath)
 
-        info(f'Planning:: {routine.name} (role={role}, mode={self.mode})')
+        info(f"Planning:: {routine.name} (role={role}, mode={self.mode})")
 
         self.sources_to_transform += [sourcepath]
 
@@ -102,16 +102,16 @@ class CMakePlanner(Transformation):
         """
         Write the CMake plan file at :data:`filepath`
         """
-        info(f'[Loki] CMakePlanner writing plan: {filepath}')
-        with Path(filepath).open('w') as f:
-            s_transform = '\n'.join(f'    {s}' for s in self.sources_to_transform)
-            f.write(f'set( LOKI_SOURCES_TO_TRANSFORM \n{s_transform}\n   )\n')
+        info(f"[Loki] CMakePlanner writing plan: {filepath}")
+        with Path(filepath).open("w") as f:
+            s_transform = "\n".join(f"    {s}" for s in self.sources_to_transform)
+            f.write(f"set( LOKI_SOURCES_TO_TRANSFORM \n{s_transform}\n   )\n")
 
-            s_append = '\n'.join(f'    {s}' for s in self.sources_to_append)
-            f.write(f'set( LOKI_SOURCES_TO_APPEND \n{s_append}\n   )\n')
+            s_append = "\n".join(f"    {s}" for s in self.sources_to_append)
+            f.write(f"set( LOKI_SOURCES_TO_APPEND \n{s_append}\n   )\n")
 
-            s_remove = '\n'.join(f'    {s}' for s in self.sources_to_remove)
-            f.write(f'set( LOKI_SOURCES_TO_REMOVE \n{s_remove}\n   )\n')
+            s_remove = "\n".join(f"    {s}" for s in self.sources_to_remove)
+            f.write(f"set( LOKI_SOURCES_TO_REMOVE \n{s_remove}\n   )\n")
 
 
 class FileWriteTransformation(Transformation):
@@ -130,24 +130,25 @@ class FileWriteTransformation(Transformation):
     cuf : bool, optional
         Use CUF (CUDA Fortran) backend instead of Fortran backend.
     """
-    def __init__(self, builddir=None, mode='loki', suffix=None, cuf=False):
+
+    def __init__(self, builddir=None, mode="loki", suffix=None, cuf=False):
         self.builddir = Path(builddir)
         self.mode = mode
         self.suffix = suffix
         self.cuf = cuf
 
     def transform_file(self, sourcefile, **kwargs):
-        item = kwargs.get('item', None)
-        if not item and 'items' in kwargs:
-            if kwargs['items']:
-                item = kwargs['items'][0]
+        item = kwargs.get("item", None)
+        if not item and "items" in kwargs:
+            if kwargs["items"]:
+                item = kwargs["items"][0]
 
         if not item:
-            raise ValueError('No Item provided; required to determine file write path')
+            raise ValueError("No Item provided; required to determine file write path")
 
         path = Path(item.path)
         suffix = self.suffix if self.suffix else path.suffix
-        sourcepath = Path(item.path).with_suffix(f'.{self.mode}{suffix}')
+        sourcepath = Path(item.path).with_suffix(f".{self.mode}{suffix}")
         if self.builddir is not None:
-            sourcepath = self.builddir/sourcepath.name
+            sourcepath = self.builddir / sourcepath.name
         sourcefile.write(path=sourcepath, cuf=self.cuf)

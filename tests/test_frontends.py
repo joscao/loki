@@ -9,35 +9,55 @@ import pytest
 
 from conftest import jit_compile, clean_test, available_frontends
 from loki import (
-    Module, Subroutine, FindNodes, FindVariables, Allocation,
-    Deallocation, Associate, BasicType, OMNI, OFP, FP, Enumeration,
-    config, REGEX, Sourcefile, Import, RawSource, CallStatement,
-    RegexParserClass, ProcedureType, DerivedType, Comment, Pragma,
-    PreprocessorDirective, config_override
+    Module,
+    Subroutine,
+    FindNodes,
+    FindVariables,
+    Allocation,
+    Deallocation,
+    Associate,
+    BasicType,
+    OMNI,
+    OFP,
+    FP,
+    Enumeration,
+    config,
+    REGEX,
+    Sourcefile,
+    Import,
+    RawSource,
+    CallStatement,
+    RegexParserClass,
+    ProcedureType,
+    DerivedType,
+    Comment,
+    Pragma,
+    PreprocessorDirective,
+    config_override,
 )
 from loki.expression import symbols as sym
 
 
-@pytest.fixture(scope='module', name='here')
+@pytest.fixture(scope="module", name="here")
 def fixture_here():
     return Path(__file__).parent
 
 
-@pytest.fixture(name='reset_frontend_mode')
+@pytest.fixture(name="reset_frontend_mode")
 def fixture_reset_frontend_mode():
-    original_frontend_mode = config['frontend-strict-mode']
+    original_frontend_mode = config["frontend-strict-mode"]
     yield
-    config['frontend-strict-mode'] = original_frontend_mode
+    config["frontend-strict-mode"] = original_frontend_mode
 
 
-@pytest.fixture(name='reset_regex_frontend_timeout')
+@pytest.fixture(name="reset_regex_frontend_timeout")
 def fixture_reset_regex_frontend_timeout():
-    original_timeout = config['regex-frontend-timeout']
+    original_timeout = config["regex-frontend-timeout"]
     yield
-    config['regex-frontend-timeout'] = original_timeout
+    config["regex-frontend-timeout"] = original_timeout
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_check_alloc_opts(here, frontend):
     """
     Test the use of SOURCE and STAT in allocate
@@ -92,47 +112,47 @@ end module alloc_mod
     # Parse the source and validate the IR
     module = Module.from_source(fcode, frontend=frontend)
 
-    allocations = FindNodes(Allocation).visit(module['check_alloc_source'].body)
+    allocations = FindNodes(Allocation).visit(module["check_alloc_source"].body)
     assert len(allocations) == 2
     assert all(alloc.data_source is not None for alloc in allocations)
     assert all(alloc.status_var is None for alloc in allocations)
 
-    allocations = FindNodes(Allocation).visit(module['alloc_deferred'].body)
+    allocations = FindNodes(Allocation).visit(module["alloc_deferred"].body)
     assert len(allocations) == 2
     assert all(alloc.data_source is None for alloc in allocations)
     assert allocations[0].status_var is not None
     assert allocations[1].status_var is None
 
-    deallocs = FindNodes(Deallocation).visit(module['free_deferred'].body)
+    deallocs = FindNodes(Deallocation).visit(module["free_deferred"].body)
     assert len(deallocs) == 2
     assert deallocs[0].status_var is not None
     assert deallocs[1].status_var is None
 
     # Sanity check for the backend
-    assert module.to_fortran().lower().count(', stat=stat') == 2
+    assert module.to_fortran().lower().count(", stat=stat") == 2
 
     # Generate Fortran and test it
-    filepath = here/(f'frontends_check_alloc_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='alloc_mod')
+    filepath = here / (f"frontends_check_alloc_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="alloc_mod")
 
     item = mod.explicit()
-    item.scalar = 1.
-    item.vector[:] = 1.
+    item.scalar = 1.0
+    item.vector[:] = 1.0
 
     item2 = mod.deferred()
     mod.alloc_deferred(item2)
-    item2.scalar = 2.
-    item2.vector[:] = -1.
+    item2.scalar = 2.0
+    item2.vector[:] = -1.0
 
     mod.check_alloc_source(item, item2)
-    assert (item.vector == 2.).all()
-    assert (item2.vector == 2.).all()
+    assert (item.vector == 2.0).all()
+    assert (item2.vector == 2.0).all()
     mod.free_deferred(item2)
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_associates(here, frontend):
     """
     Test the use of associate to access and modify other items
@@ -194,14 +214,16 @@ end module
 """
     # Test the internals
     module = Module.from_source(fcode, frontend=frontend)
-    routine = module['associates']
+    routine = module["associates"]
     variables = FindVariables().visit(routine.body)
     if frontend == OMNI:
-        assert all(v.shape == ('1:3',)
-                   for v in variables if v.name in ['vector', 'vector2'])
+        assert all(
+            v.shape == ("1:3",) for v in variables if v.name in ["vector", "vector2"]
+        )
     else:
-        assert all(v.shape == ('3',)
-                   for v in variables if v.name in ['vector', 'vector2'])
+        assert all(
+            v.shape == ("3",) for v in variables if v.name in ["vector", "vector2"]
+        )
 
     for assoc in FindNodes(Associate).visit(routine.body):
         for var in FindVariables().visit(assoc.body):
@@ -212,20 +234,23 @@ end module
                 assert var.scope is routine
 
     # Test the generated module
-    filepath = here/(f'derived_types_associates_{frontend}.f90')
-    mod = jit_compile(module, filepath=filepath, objname='derived_types_mod')
+    filepath = here / (f"derived_types_associates_{frontend}.f90")
+    mod = jit_compile(module, filepath=filepath, objname="derived_types_mod")
 
     item = mod.explicit()
-    item.scalar = 0.
-    item.vector[0] = 5.
-    item.vector[1:2] = 0.
+    item.scalar = 0.0
+    item.vector[0] = 5.0
+    item.vector[1:2] = 0.0
     mod.associates(item)
-    assert item.scalar == 17.0 and (item.vector == [1., 5., 10.]).all()
+    assert item.scalar == 17.0 and (item.vector == [1.0, 5.0, 10.0]).all()
 
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OMNI, 'OMNI fails to read without full module')]))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OMNI, "OMNI fails to read without full module")]),
+)
 def test_associates_deferred(frontend):
     """
     Verify that reading in subroutines with deferred external type definitions
@@ -246,14 +271,14 @@ END SUBROUTINE
     routine = Subroutine.from_source(fcode, frontend=frontend)
     variables = {v.name: v for v in FindVariables().visit(routine.body)}
     assert len(variables) == 4
-    some_var = variables['SOME_VAR']
+    some_var = variables["SOME_VAR"]
     assert isinstance(some_var, sym.DeferredTypeSymbol)
-    assert some_var.name.upper() == 'SOME_VAR'
+    assert some_var.name.upper() == "SOME_VAR"
     assert some_var.type.dtype == BasicType.DEFERRED
     assert some_var.scope is FindNodes(Associate).visit(routine.body)[0]
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_associates_expr(here, frontend):
     """
     Verify that associates with expressions are supported
@@ -279,22 +304,28 @@ end subroutine associates_expr
 
     variables = {v.name: v for v in FindVariables().visit(routine.body)}
     assert len(variables) == 4
-    assert isinstance(variables['a'], sym.DeferredTypeSymbol)
-    assert variables['a'].type.dtype is BasicType.DEFERRED  # TODO: support type derivation for expressions
-    assert isinstance(variables['b'], sym.Array)  # Note: this is an array because we have a shape
-    assert variables['b'].type.dtype is BasicType.DEFERRED  # TODO: support type derivation for expressions
-    assert variables['b'].type.shape == ('3',)
+    assert isinstance(variables["a"], sym.DeferredTypeSymbol)
+    assert (
+        variables["a"].type.dtype is BasicType.DEFERRED
+    )  # TODO: support type derivation for expressions
+    assert isinstance(
+        variables["b"], sym.Array
+    )  # Note: this is an array because we have a shape
+    assert (
+        variables["b"].type.dtype is BasicType.DEFERRED
+    )  # TODO: support type derivation for expressions
+    assert variables["b"].type.shape == ("3",)
 
-    filepath = here/(f'associates_expr_{frontend}.f90')
+    filepath = here / (f"associates_expr_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
-    a = np.array([1, 2, 3], dtype='i')
-    b = np.zeros(3, dtype='i')
+    a = np.array([1, 2, 3], dtype="i")
+    b = np.zeros(3, dtype="i")
     function(a, b)
     assert np.all(b == [7, 10, 13])
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_enum(here, frontend):
     """
     Verify that enums are represented correctly
@@ -325,32 +356,33 @@ end subroutine test_enum
     assert len(enums) == 1
 
     # Check symbols are available
-    assert enums[0].symbols == ('red', 'blue', 'yellow')
-    assert all(name in routine.symbols for name in ('red', 'blue', 'yellow'))
+    assert enums[0].symbols == ("red", "blue", "yellow")
+    assert all(name in routine.symbols for name in ("red", "blue", "yellow"))
     assert all(s.scope is routine for s in enums[0].symbols)
 
     # Check assigned values
-    assert routine.symbol_map['red'].type.initial == '4'
-    assert routine.symbol_map['blue'].type.initial == '9'
-    assert routine.symbol_map['yellow'].type.initial is None
+    assert routine.symbol_map["red"].type.initial == "4"
+    assert routine.symbol_map["blue"].type.initial == "9"
+    assert routine.symbol_map["yellow"].type.initial is None
 
     # Verify comments are preserved (don't care about the actual place)
     code = routine.to_fortran()
     for i in range(1, 4):
-        assert f'! Comment {i}' in code
+        assert f"! Comment {i}" in code
 
     # Check fgen produces valid code and runs
-    filepath = here/(f'{routine.name}_{frontend}.f90')
+    filepath = here / (f"{routine.name}_{frontend}.f90")
     function = jit_compile(routine, filepath=filepath, objname=routine.name)
     out = function()
     assert out == 23
     clean_test(filepath)
 
 
-@pytest.mark.parametrize('frontend', available_frontends(
-    xfail=[(OFP, 'OFP fails to parse parameterized types')]
-))
-@pytest.mark.usefixtures('reset_frontend_mode')
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(xfail=[(OFP, "OFP fails to parse parameterized types")]),
+)
+@pytest.mark.usefixtures("reset_frontend_mode")
 def test_frontend_strict_mode(frontend):
     """
     Verify that frontends fail on unsupported features if strict mode is enabled
@@ -366,14 +398,14 @@ module frontend_strict_mode
     END TYPE matrix
 end module frontend_strict_mode
     """
-    config['frontend-strict-mode'] = True
+    config["frontend-strict-mode"] = True
     with pytest.raises(NotImplementedError):
         _ = Module.from_source(fcode, frontend=frontend)
 
-    config['frontend-strict-mode'] = False
+    config["frontend-strict-mode"] = False
     module = Module.from_source(fcode, frontend=frontend)
-    assert 'matrix' in module.symbol_attrs
-    assert 'matrix' in module.typedef_map
+    assert "matrix" in module.symbol_attrs
+    assert "matrix" in module.typedef_map
 
 
 def test_regex_subroutine_from_source():
@@ -417,34 +449,38 @@ end subroutine routine_b
     """.strip()
 
     routine = Subroutine.from_source(fcode, frontend=REGEX)
-    assert routine.name == 'routine_b'
+    assert routine.name == "routine_b"
     assert not routine.is_function
     assert routine.arguments == ()
     assert routine.argnames == []
-    assert [r.name for r in routine.subroutines] == ['contained_c', 'contained_e', 'contained_d']
+    assert [r.name for r in routine.subroutines] == [
+        "contained_c",
+        "contained_e",
+        "contained_d",
+    ]
 
-    contained_c = routine['contained_c']
-    assert contained_c.name == 'contained_c'
+    contained_c = routine["contained_c"]
+    assert contained_c.name == "contained_c"
     assert not contained_c.is_function
     assert contained_c.arguments == ()
     assert contained_c.argnames == []
 
-    contained_e = routine['contained_e']
-    assert contained_e.name == 'contained_e'
+    contained_e = routine["contained_e"]
+    assert contained_e.name == "contained_e"
     assert contained_e.is_function
     assert contained_e.arguments == ()
     assert contained_e.argnames == []
 
-    contained_d = routine['contained_d']
-    assert contained_d.name == 'contained_d'
+    contained_d = routine["contained_d"]
+    assert contained_d.name == "contained_d"
     assert not contained_d.is_function
     assert contained_d.arguments == ()
     assert contained_d.argnames == []
 
     code = routine.to_fortran()
-    assert code.count('SUBROUTINE') == 6
-    assert code.count('FUNCTION') == 2
-    assert code.count('CONTAINS') == 1
+    assert code.count("SUBROUTINE") == 6
+    assert code.count("FUNCTION") == 2
+    assert code.count("CONTAINS") == 1
 
 
 def test_regex_module_from_source():
@@ -471,14 +507,14 @@ end module some_module
     """.strip()
 
     module = Module.from_source(fcode, frontend=REGEX)
-    assert module.name == 'some_module'
-    assert [r.name for r in module.subroutines] == ['module_routine', 'module_function']
+    assert module.name == "some_module"
+    assert [r.name for r in module.subroutines] == ["module_routine", "module_function"]
 
     code = module.to_fortran()
-    assert code.count('MODULE') == 2
-    assert code.count('SUBROUTINE') == 2
-    assert code.count('FUNCTION') == 2
-    assert code.count('CONTAINS') == 1
+    assert code.count("MODULE") == 2
+    assert code.count("SUBROUTINE") == 2
+    assert code.count("FUNCTION") == 2
+    assert code.count("CONTAINS") == 1
 
 
 def test_regex_sourcefile_from_source():
@@ -555,19 +591,25 @@ end function function_d
     """.strip()
 
     sourcefile = Sourcefile.from_source(fcode, frontend=REGEX)
-    assert [m.name for m in sourcefile.modules] == ['some_module', 'other_module']
+    assert [m.name for m in sourcefile.modules] == ["some_module", "other_module"]
     assert [r.name for r in sourcefile.routines] == [
-        'routine_a', 'routine_b', 'function_d'
+        "routine_a",
+        "routine_b",
+        "function_d",
     ]
     assert [r.name for r in sourcefile.all_subroutines] == [
-        'routine_a', 'routine_b', 'function_d', 'module_routine', 'module_function'
+        "routine_a",
+        "routine_b",
+        "function_d",
+        "module_routine",
+        "module_function",
     ]
 
     code = sourcefile.to_fortran()
-    assert code.count('SUBROUTINE') == 10
-    assert code.count('FUNCTION') == 6
-    assert code.count('CONTAINS') == 2
-    assert code.count('MODULE') == 4
+    assert code.count("SUBROUTINE") == 10
+    assert code.count("FUNCTION") == 6
+    assert code.count("CONTAINS") == 2
+    assert code.count("MODULE") == 4
 
 
 def test_regex_sourcefile_from_file(here):
@@ -576,124 +618,181 @@ def test_regex_sourcefile_from_file(here):
     multiple modules and subroutines
     """
 
-    sourcefile = Sourcefile.from_file(here/'sources/sourcefile.f90', frontend=REGEX)
-    assert [m.name for m in sourcefile.modules] == ['some_module']
+    sourcefile = Sourcefile.from_file(here / "sources/sourcefile.f90", frontend=REGEX)
+    assert [m.name for m in sourcefile.modules] == ["some_module"]
     assert [r.name for r in sourcefile.routines] == [
-        'routine_a', 'routine_b', 'function_d'
+        "routine_a",
+        "routine_b",
+        "function_d",
     ]
     assert [r.name for r in sourcefile.all_subroutines] == [
-        'routine_a', 'routine_b', 'function_d', 'module_routine', 'module_function'
+        "routine_a",
+        "routine_b",
+        "function_d",
+        "module_routine",
+        "module_function",
     ]
 
-    routine_b = sourcefile['ROUTINE_B']
-    assert routine_b.name == 'routine_b'
+    routine_b = sourcefile["ROUTINE_B"]
+    assert routine_b.name == "routine_b"
     assert not routine_b.is_function
     assert routine_b.arguments == ()
     assert routine_b.argnames == []
-    assert [r.name for r in routine_b.subroutines] == ['contained_c']
+    assert [r.name for r in routine_b.subroutines] == ["contained_c"]
 
-    function_d = sourcefile['function_d']
-    assert function_d.name == 'function_d'
+    function_d = sourcefile["function_d"]
+    assert function_d.name == "function_d"
     assert function_d.is_function
     assert function_d.arguments == ()
     assert function_d.argnames == []
     assert not function_d.contains
 
     code = sourcefile.to_fortran()
-    assert code.count('SUBROUTINE') == 8
-    assert code.count('FUNCTION') == 4
-    assert code.count('CONTAINS') == 2
-    assert code.count('MODULE') == 2
+    assert code.count("SUBROUTINE") == 8
+    assert code.count("FUNCTION") == 4
+    assert code.count("CONTAINS") == 2
+    assert code.count("MODULE") == 2
 
 
 def test_regex_sourcefile_from_file_parser_classes(here):
 
-    filepath = here/'sources/Fortran-extract-interface-source.f90'
-    module_names = {'bar', 'foo'}
+    filepath = here / "sources/Fortran-extract-interface-source.f90"
+    module_names = {"bar", "foo"}
     routine_names = {
-        'func_simple', 'func_simple_1', 'func_simple_2', 'func_simple_pure', 'func_simple_recursive_pure',
-        'func_simple_elemental', 'func_with_use_and_args', 'func_with_parameters', 'func_with_parameters_1',
-        'func_with_contains', 'func_mix_local_and_result', 'sub_simple', 'sub_simple_1', 'sub_simple_2',
-        'sub_simple_3', 'sub_with_contains', 'sub_with_renamed_import', 'sub_with_external', 'sub_with_end'
+        "func_simple",
+        "func_simple_1",
+        "func_simple_2",
+        "func_simple_pure",
+        "func_simple_recursive_pure",
+        "func_simple_elemental",
+        "func_with_use_and_args",
+        "func_with_parameters",
+        "func_with_parameters_1",
+        "func_with_contains",
+        "func_mix_local_and_result",
+        "sub_simple",
+        "sub_simple_1",
+        "sub_simple_2",
+        "sub_simple_3",
+        "sub_with_contains",
+        "sub_with_renamed_import",
+        "sub_with_external",
+        "sub_with_end",
     }
-    module_routine_names = {'foo_sub', 'foo_func'}
+    module_routine_names = {"foo_sub", "foo_func"}
 
     # Empty parse (since we don't match typedef without having the enclosing module first)
-    sourcefile = Sourcefile.from_file(filepath, frontend=REGEX, parser_classes=RegexParserClass.TypeDefClass)
+    sourcefile = Sourcefile.from_file(
+        filepath, frontend=REGEX, parser_classes=RegexParserClass.TypeDefClass
+    )
     assert not sourcefile.subroutines
     assert not sourcefile.modules
     assert FindNodes(RawSource).visit(sourcefile.ir)
     assert sourcefile._incomplete
 
     # Incremental addition of program unit objects
-    sourcefile.make_complete(frontend=REGEX, parser_classes=RegexParserClass.ProgramUnitClass)
+    sourcefile.make_complete(
+        frontend=REGEX, parser_classes=RegexParserClass.ProgramUnitClass
+    )
 
     assert {module.name.lower() for module in sourcefile.modules} == module_names
     assert {routine.name.lower() for routine in sourcefile.routines} == routine_names
-    assert {routine.name.lower() for routine in sourcefile.all_subroutines} == routine_names | module_routine_names
+    assert {
+        routine.name.lower() for routine in sourcefile.all_subroutines
+    } == routine_names | module_routine_names
 
-    assert {routine.name.lower() for routine in sourcefile['func_with_contains'].routines} == {'func_with_contains_1'}
-    assert {routine.name.lower() for routine in sourcefile['sub_with_contains'].routines} == {
-        'sub_with_contains_first', 'sub_with_contains_second', 'sub_with_contains_third'
+    assert {
+        routine.name.lower() for routine in sourcefile["func_with_contains"].routines
+    } == {"func_with_contains_1"}
+    assert {
+        routine.name.lower() for routine in sourcefile["sub_with_contains"].routines
+    } == {
+        "sub_with_contains_first",
+        "sub_with_contains_second",
+        "sub_with_contains_third",
     }
 
     for module in sourcefile.modules:
         assert not module.imports
     for routine in sourcefile.all_subroutines:
         assert not routine.imports
-    assert not sourcefile['bar'].typedefs
+    assert not sourcefile["bar"].typedefs
 
     # Incremental addition of imports
     sourcefile.make_complete(
         frontend=REGEX,
-        parser_classes=RegexParserClass.ProgramUnitClass | RegexParserClass.ImportClass
+        parser_classes=RegexParserClass.ProgramUnitClass | RegexParserClass.ImportClass,
     )
 
     assert {module.name.lower() for module in sourcefile.modules} == module_names
     assert {routine.name.lower() for routine in sourcefile.routines} == routine_names
-    assert {routine.name.lower() for routine in sourcefile.all_subroutines} == routine_names | module_routine_names
+    assert {
+        routine.name.lower() for routine in sourcefile.all_subroutines
+    } == routine_names | module_routine_names
 
-    assert {routine.name.lower() for routine in sourcefile['func_with_contains'].routines} == {'func_with_contains_1'}
-    assert {routine.name.lower() for routine in sourcefile['sub_with_contains'].routines} == {
-        'sub_with_contains_first', 'sub_with_contains_second', 'sub_with_contains_third'
+    assert {
+        routine.name.lower() for routine in sourcefile["func_with_contains"].routines
+    } == {"func_with_contains_1"}
+    assert {
+        routine.name.lower() for routine in sourcefile["sub_with_contains"].routines
+    } == {
+        "sub_with_contains_first",
+        "sub_with_contains_second",
+        "sub_with_contains_third",
     }
 
     program_units_with_imports = {
-        'foo': ['bar'], 'func_with_use_and_args': ['foo', 'bar'], 'sub_with_contains': ['bar'],
-        'sub_with_renamed_import': ['bar']
+        "foo": ["bar"],
+        "func_with_use_and_args": ["foo", "bar"],
+        "sub_with_contains": ["bar"],
+        "sub_with_renamed_import": ["bar"],
     }
 
     for unit in module_names | routine_names | module_routine_names:
         if unit in program_units_with_imports:
-            assert [import_.module.lower() for import_ in sourcefile[unit].imports] == program_units_with_imports[unit]
+            assert [
+                import_.module.lower() for import_ in sourcefile[unit].imports
+            ] == program_units_with_imports[unit]
         else:
             assert not sourcefile[unit].imports
-    assert not sourcefile['bar'].typedefs
+    assert not sourcefile["bar"].typedefs
 
     # Parse the rest
     sourcefile.make_complete(frontend=REGEX, parser_classes=RegexParserClass.AllClasses)
 
     assert {module.name.lower() for module in sourcefile.modules} == module_names
     assert {routine.name.lower() for routine in sourcefile.routines} == routine_names
-    assert {routine.name.lower() for routine in sourcefile.all_subroutines} == routine_names | module_routine_names
+    assert {
+        routine.name.lower() for routine in sourcefile.all_subroutines
+    } == routine_names | module_routine_names
 
-    assert {routine.name.lower() for routine in sourcefile['func_with_contains'].routines} == {'func_with_contains_1'}
-    assert {routine.name.lower() for routine in sourcefile['sub_with_contains'].routines} == {
-        'sub_with_contains_first', 'sub_with_contains_second', 'sub_with_contains_third'
+    assert {
+        routine.name.lower() for routine in sourcefile["func_with_contains"].routines
+    } == {"func_with_contains_1"}
+    assert {
+        routine.name.lower() for routine in sourcefile["sub_with_contains"].routines
+    } == {
+        "sub_with_contains_first",
+        "sub_with_contains_second",
+        "sub_with_contains_third",
     }
 
     program_units_with_imports = {
-        'foo': ['bar'], 'func_with_use_and_args': ['foo', 'bar'], 'sub_with_contains': ['bar'],
-        'sub_with_renamed_import': ['bar']
+        "foo": ["bar"],
+        "func_with_use_and_args": ["foo", "bar"],
+        "sub_with_contains": ["bar"],
+        "sub_with_renamed_import": ["bar"],
     }
 
     for unit in module_names | routine_names | module_routine_names:
         if unit in program_units_with_imports:
-            assert [import_.module.lower() for import_ in sourcefile[unit].imports] == program_units_with_imports[unit]
+            assert [
+                import_.module.lower() for import_ in sourcefile[unit].imports
+            ] == program_units_with_imports[unit]
         else:
             assert not sourcefile[unit].imports
 
-    assert sorted(sourcefile['bar'].typedef_map) == ['food', 'organic']
+    assert sorted(sourcefile["bar"].typedef_map) == ["food", "organic"]
 
 
 def test_regex_raw_source():
@@ -721,26 +820,26 @@ end module some_mod
 
     assert isinstance(source.ir.body[0], RawSource)
     assert source.ir.body[0].source.lines == (1, 2)
-    assert source.ir.body[0].text == '! Some comment before the module\n!'
+    assert source.ir.body[0].text == "! Some comment before the module\n!"
     assert source.ir.body[0].source.string == source.ir.body[0].text
 
     assert isinstance(source.ir.body[1], Module)
     assert source.ir.body[1].source.lines == (3, 11)
-    assert source.ir.body[1].source.string.startswith('module')
+    assert source.ir.body[1].source.string.startswith("module")
 
     assert isinstance(source.ir.body[2], RawSource)
     assert source.ir.body[2].source.lines == (12, 13)
-    assert source.ir.body[2].text == '\n! Other comment at the end'
+    assert source.ir.body[2].text == "\n! Other comment at the end"
     assert source.ir.body[2].source.string == source.ir.body[2].text
 
-    module = source['some_mod']
+    module = source["some_mod"]
     assert len(module.spec.body) == 3
     assert isinstance(module.spec.body[0], RawSource)
     assert isinstance(module.spec.body[1], Import)
     assert isinstance(module.spec.body[2], RawSource)
 
-    assert module.spec.body[0].text.count('docstring') == 3
-    assert module.spec.body[2].text.count('comment') == 3
+    assert module.spec.body[0].text.count("docstring") == 3
+    assert module.spec.body[2].text.count("comment") == 3
 
 
 def test_regex_raw_source_with_cpp():
@@ -765,18 +864,21 @@ END SUBROUTINE SOME_ROUTINE
 
     assert isinstance(source.ir.body[0], RawSource)
     assert source.ir.body[0].source.lines == (1, 4)
-    assert source.ir.body[0].text.startswith('! Some comment before the subroutine\n#')
-    assert source.ir.body[0].text.endswith('#endif')
+    assert source.ir.body[0].text.startswith("! Some comment before the subroutine\n#")
+    assert source.ir.body[0].text.endswith("#endif")
     assert source.ir.body[0].source.string == source.ir.body[0].text
 
     assert isinstance(source.ir.body[1], Subroutine)
     assert source.ir.body[1].source.lines == (5, 9)
-    assert source.ir.body[1].source.string.startswith('SUBROUTINE')
+    assert source.ir.body[1].source.string.startswith("SUBROUTINE")
 
 
-@pytest.mark.parametrize('frontend', available_frontends(
-    xfail=[(OMNI, 'Non-standard notation needs full preprocessing')]
-))
+@pytest.mark.parametrize(
+    "frontend",
+    available_frontends(
+        xfail=[(OMNI, "Non-standard notation needs full preprocessing")]
+    ),
+)
 def test_make_complete_sanitize(frontend):
     """
     Test that attempts to first REGEX-parse and then complete source code
@@ -800,17 +902,17 @@ END SUBROUTINE SOME_ROUTINE
 
     comments = FindNodes(Comment).visit(source.ir)
     assert len(comments) == 2 if frontend == FP else 1
-    assert comments[0].text == '! Some comment before the subroutine'
+    assert comments[0].text == "! Some comment before the subroutine"
     if frontend == FP:
-        assert comments[1].text == '@PROCESS HOT(NOVECTOR) NOSTRICT'
+        assert comments[1].text == "@PROCESS HOT(NOVECTOR) NOSTRICT"
 
     directives = FindNodes(PreprocessorDirective).visit(source.ir)
     assert len(directives) == 2
-    assert directives[0].text == '#ifdef RS6K'
-    assert directives[1].text == '#endif'
+    assert directives[0].text == "#ifdef RS6K"
+    assert directives[1].text == "#endif"
 
 
-@pytest.mark.usefixtures('reset_regex_frontend_timeout')
+@pytest.mark.usefixtures("reset_regex_frontend_timeout")
 def test_regex_timeout():
     """
     This source fails to parse because of missing SUBROUTINE in END
@@ -823,19 +925,19 @@ end
     """.strip()
 
     # Test timeout
-    config['regex-frontend-timeout'] = 1
+    config["regex-frontend-timeout"] = 1
     start = perf_counter()
     with pytest.raises(RuntimeError) as exc:
         _ = Sourcefile.from_source(fcode, frontend=REGEX)
     stop = perf_counter()
-    assert .9 < stop - start < 1.1
-    assert 'REGEX frontend timeout of 1 s exceeded' in str(exc.value)
+    assert 0.9 < stop - start < 1.1
+    assert "REGEX frontend timeout of 1 s exceeded" in str(exc.value)
 
     # Test it works fine with proper Fortran:
-    fcode += ' subroutine'
+    fcode += " subroutine"
     source = Sourcefile.from_source(fcode, frontend=REGEX)
     assert len(source.subroutines) == 1
-    assert source.subroutines[0].name == 'some_routine'
+    assert source.subroutines[0].name == "some_routine"
 
 
 def test_regex_module_imports():
@@ -858,17 +960,25 @@ end module some_mod
     imports = FindNodes(Import).visit(module.spec)
     assert len(imports) == 5
     assert [import_.module for import_ in imports] == [
-        'no_symbols_mod', 'only_mod', 'test_rename_mod', 'test_other_rename_mod',
-        'test_other_rename_mod'
+        "no_symbols_mod",
+        "only_mod",
+        "test_rename_mod",
+        "test_other_rename_mod",
+        "test_other_rename_mod",
     ]
     assert set(module.imported_symbols) == {
-        'my_var', 'first_var1', 'first_var3', 'second_var1', 'other_var2', 'other_var3'
+        "my_var",
+        "first_var1",
+        "first_var3",
+        "second_var1",
+        "other_var2",
+        "other_var3",
     }
-    assert module.imported_symbol_map['first_var1'].type.use_name == 'var1'
-    assert module.imported_symbol_map['first_var3'].type.use_name == 'var3'
-    assert module.imported_symbol_map['second_var1'].type.use_name == 'var1'
-    assert module.imported_symbol_map['other_var2'].type.use_name == 'var2'
-    assert module.imported_symbol_map['other_var3'].type.use_name == 'var3'
+    assert module.imported_symbol_map["first_var1"].type.use_name == "var1"
+    assert module.imported_symbol_map["first_var3"].type.use_name == "var3"
+    assert module.imported_symbol_map["second_var1"].type.use_name == "var1"
+    assert module.imported_symbol_map["other_var2"].type.use_name == "var2"
+    assert module.imported_symbol_map["other_var3"].type.use_name == "var3"
 
 
 def test_regex_subroutine_imports():
@@ -891,17 +1001,25 @@ end subroutine some_routine
     imports = FindNodes(Import).visit(routine.spec)
     assert len(imports) == 5
     assert [import_.module for import_ in imports] == [
-        'no_symbols_mod', 'only_mod', 'test_rename_mod', 'test_other_rename_mod',
-        'test_other_rename_mod'
+        "no_symbols_mod",
+        "only_mod",
+        "test_rename_mod",
+        "test_other_rename_mod",
+        "test_other_rename_mod",
     ]
     assert set(routine.imported_symbols) == {
-        'my_var', 'first_var1', 'first_var3', 'second_var1', 'other_var2', 'other_var3'
+        "my_var",
+        "first_var1",
+        "first_var3",
+        "second_var1",
+        "other_var2",
+        "other_var3",
     }
-    assert routine.imported_symbol_map['first_var1'].type.use_name == 'var1'
-    assert routine.imported_symbol_map['first_var3'].type.use_name == 'var3'
-    assert routine.imported_symbol_map['second_var1'].type.use_name == 'var1'
-    assert routine.imported_symbol_map['other_var2'].type.use_name == 'var2'
-    assert routine.imported_symbol_map['other_var3'].type.use_name == 'var3'
+    assert routine.imported_symbol_map["first_var1"].type.use_name == "var1"
+    assert routine.imported_symbol_map["first_var3"].type.use_name == "var3"
+    assert routine.imported_symbol_map["second_var1"].type.use_name == "var1"
+    assert routine.imported_symbol_map["other_var2"].type.use_name == "var2"
+    assert routine.imported_symbol_map["other_var3"].type.use_name == "var3"
 
 
 def test_regex_import_linebreaks():
@@ -938,12 +1056,30 @@ end module file_io_mod
     module = Module.from_source(fcode, frontend=REGEX)
     imports = FindNodes(Import).visit(module.spec)
     assert len(imports) == 4
-    assert [import_.module for import_ in imports] == ['PARKIND1', 'm_serialize', 'utils_ppser', 'hdf5_file_mod']
+    assert [import_.module for import_ in imports] == [
+        "PARKIND1",
+        "m_serialize",
+        "utils_ppser",
+        "hdf5_file_mod",
+    ]
     assert all(
-        s in module.imported_symbols for s in [
-            'JPIM', 'JPRB', 'JPRD', 'fs_create_savepoint', 'fs_add_serializer_metainfo', 'fs_get_serializer_metainfo',
-            'fs_read_field', 'fs_write_field', 'ppser_initialize', 'ppser_finalize', 'ppser_serializer',
-            'ppser_serializer_ref', 'ppser_set_mode', 'ppser_savepoint', 'hdf5_file'
+        s in module.imported_symbols
+        for s in [
+            "JPIM",
+            "JPRB",
+            "JPRD",
+            "fs_create_savepoint",
+            "fs_add_serializer_metainfo",
+            "fs_get_serializer_metainfo",
+            "fs_read_field",
+            "fs_write_field",
+            "ppser_initialize",
+            "ppser_finalize",
+            "ppser_serializer",
+            "ppser_serializer_ref",
+            "ppser_set_mode",
+            "ppser_savepoint",
+            "hdf5_file",
         ]
     )
 
@@ -1002,19 +1138,22 @@ end module typebound_item
 
     module = Module.from_source(fcode, frontend=REGEX)
 
-    assert 'some_type' in module.typedef_map
-    some_type = module.typedef_map['some_type']
+    assert "some_type" in module.typedef_map
+    some_type = module.typedef_map["some_type"]
 
     proc_bindings = {
-        'routine': 'module_routine',
-        'some_routine': None,
-        'other_routine': None,
-        'routine1': None,
-        'routine2': 'routine'
+        "routine": "module_routine",
+        "some_routine": None,
+        "other_routine": None,
+        "routine1": None,
+        "routine2": "routine",
     }
     assert len(proc_bindings) == len(some_type.variables)
     assert all(proc in some_type.variables for proc in proc_bindings)
-    assert all(some_type.variable_map[proc].type.initial == init for proc, init in proc_bindings.items())
+    assert all(
+        some_type.variable_map[proc].type.initial == init
+        for proc, init in proc_bindings.items()
+    )
 
 
 def test_regex_typedef_generic():
@@ -1055,14 +1194,14 @@ end module typebound_header
 
     module = Module.from_source(fcode, frontend=REGEX)
 
-    assert 'header_type' in module.typedef_map
-    header_type = module.typedef_map['header_type']
+    assert "header_type" in module.typedef_map
+    header_type = module.typedef_map["header_type"]
 
     proc_bindings = {
-        'member_routine': 'header_member_routine',
-        'routine_real': 'header_routine_real',
-        'routine_integer': None,
-        'routine': ('routine_real', 'routine_integer')
+        "member_routine": "header_member_routine",
+        "routine_real": "header_routine_real",
+        "routine_integer": None,
+        "routine": ("routine_real", "routine_integer"),
     }
     assert len(proc_bindings) == len(header_type.variables)
     assert all(proc in header_type.variables for proc in proc_bindings)
@@ -1070,7 +1209,9 @@ end module typebound_header
         (
             header_type.variable_map[proc].type.bind_names == bind
             and header_type.variable_map[proc].type.initial is None
-        ) if isinstance(bind, tuple) else (
+        )
+        if isinstance(bind, tuple)
+        else (
             header_type.variable_map[proc].type.bind_names is None
             and header_type.variable_map[proc].type.initial == bind
         )
@@ -1134,43 +1275,55 @@ end subroutine test
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=REGEX)
-    assert [r.name for r in source.all_subroutines] == ['random_call_0', 'random_call_2', 'test']
+    assert [r.name for r in source.all_subroutines] == [
+        "random_call_0",
+        "random_call_2",
+        "test",
+    ]
 
-    calls = FindNodes(CallStatement).visit(source['test'].ir)
-    assert [call.name for call in calls] == ['RANDOM_CALL_0', 'random_call_2']
+    calls = FindNodes(CallStatement).visit(source["test"].ir)
+    assert [call.name for call in calls] == ["RANDOM_CALL_0", "random_call_2"]
 
 
 def test_regex_variable_declaration(here):
     """
     Test correct parsing of derived type variable declarations
     """
-    filepath = here/'sources/projTypeBound/typebound_item.F90'
+    filepath = here / "sources/projTypeBound/typebound_item.F90"
     source = Sourcefile.from_file(filepath, frontend=REGEX)
 
-    driver = source['driver']
-    assert driver.variables == ('obj', 'obj2', 'header', 'other_obj', 'derived', 'x', 'i')
-    assert source['module_routine'].variables == ('m',)
-    assert source['other_routine'].variables == ('self', 'm', 'j')
-    assert source['routine'].variables == ('self',)
-    assert source['routine1'].variables == ('self',)
+    driver = source["driver"]
+    assert driver.variables == (
+        "obj",
+        "obj2",
+        "header",
+        "other_obj",
+        "derived",
+        "x",
+        "i",
+    )
+    assert source["module_routine"].variables == ("m",)
+    assert source["other_routine"].variables == ("self", "m", "j")
+    assert source["routine"].variables == ("self",)
+    assert source["routine1"].variables == ("self",)
 
     # Check this for REGEX and complete parse to make sure their behaviour is aligned
     for _ in range(2):
         var_map = driver.symbol_map
-        assert isinstance(var_map['obj'].type.dtype, DerivedType)
-        assert var_map['obj'].type.dtype.name == 'some_type'
-        assert isinstance(var_map['obj2'].type.dtype, DerivedType)
-        assert var_map['obj2'].type.dtype.name == 'some_type'
-        assert isinstance(var_map['header'].type.dtype, DerivedType)
-        assert var_map['header'].type.dtype.name == 'header_type'
-        assert isinstance(var_map['other_obj'].type.dtype, DerivedType)
-        assert var_map['other_obj'].type.dtype.name == 'other'
-        assert isinstance(var_map['derived'].type.dtype, DerivedType)
-        assert var_map['derived'].type.dtype.name == 'other'
-        assert isinstance(var_map['x'].type.dtype, BasicType)
-        assert var_map['x'].type.dtype is BasicType.REAL
-        assert isinstance(var_map['i'].type.dtype, BasicType)
-        assert var_map['i'].type.dtype is BasicType.INTEGER
+        assert isinstance(var_map["obj"].type.dtype, DerivedType)
+        assert var_map["obj"].type.dtype.name == "some_type"
+        assert isinstance(var_map["obj2"].type.dtype, DerivedType)
+        assert var_map["obj2"].type.dtype.name == "some_type"
+        assert isinstance(var_map["header"].type.dtype, DerivedType)
+        assert var_map["header"].type.dtype.name == "header_type"
+        assert isinstance(var_map["other_obj"].type.dtype, DerivedType)
+        assert var_map["other_obj"].type.dtype.name == "other"
+        assert isinstance(var_map["derived"].type.dtype, DerivedType)
+        assert var_map["derived"].type.dtype.name == "other"
+        assert isinstance(var_map["x"].type.dtype, BasicType)
+        assert var_map["x"].type.dtype is BasicType.REAL
+        assert isinstance(var_map["i"].type.dtype, BasicType)
+        assert var_map["i"].type.dtype is BasicType.INTEGER
 
         # While we're here: let's check the call statements, too
         calls = FindNodes(CallStatement).visit(driver.ir)
@@ -1180,27 +1333,27 @@ def test_regex_variable_declaration(here):
         # Note: we're explicitly accessing the string name here (instead of relying
         # on the StrCompareMixin) as some have dimensions that only show up in the full
         # parse
-        assert calls[0].name.name == 'obj%other_routine'
-        assert calls[0].name.parent.name == 'obj'
-        assert calls[1].name.name == 'obj2%some_routine'
-        assert calls[1].name.parent.name == 'obj2'
-        assert calls[2].name.name == 'header%member_routine'
-        assert calls[2].name.parent.name == 'header'
-        assert calls[3].name.name == 'header%routine'
-        assert calls[3].name.parent.name == 'header'
-        assert calls[4].name.name == 'header%routine'
-        assert calls[4].name.parent.name == 'header'
-        assert calls[5].name.name == 'other_obj%member'
-        assert calls[5].name.parent.name == 'other_obj'
-        assert calls[6].name.name == 'derived%var%member_routine'
-        assert calls[6].name.parent.name == 'derived%var'
-        assert calls[6].name.parent.parent.name == 'derived'
+        assert calls[0].name.name == "obj%other_routine"
+        assert calls[0].name.parent.name == "obj"
+        assert calls[1].name.name == "obj2%some_routine"
+        assert calls[1].name.parent.name == "obj2"
+        assert calls[2].name.name == "header%member_routine"
+        assert calls[2].name.parent.name == "header"
+        assert calls[3].name.name == "header%routine"
+        assert calls[3].name.parent.name == "header"
+        assert calls[4].name.name == "header%routine"
+        assert calls[4].name.parent.name == "header"
+        assert calls[5].name.name == "other_obj%member"
+        assert calls[5].name.parent.name == "other_obj"
+        assert calls[6].name.name == "derived%var%member_routine"
+        assert calls[6].name.parent.name == "derived%var"
+        assert calls[6].name.parent.parent.name == "derived"
 
         # Hack: Split the procedure binding into one-per-line until Fparser
         # supports this...
-        module = source['typebound_item']
+        module = source["typebound_item"]
         module.source.string = module.source.string.replace(
-            'procedure :: routine1,', 'procedure :: routine1\nprocedure ::'
+            "procedure :: routine1,", "procedure :: routine1\nprocedure ::"
         )
 
         source.make_complete()
@@ -1220,13 +1373,20 @@ end subroutine definitely_not_allfpos
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=REGEX)
-    routine = source['definitely_not_allfpos']
+    routine = source["definitely_not_allfpos"]
     assert routine.variables == (
-        'nmaxcloudtypes', 'ydfpdata', 'ylofn', 'not_an_annoying_ecwam_var',
-        'cloud_type_name', 'other_name', 'names', 'more_names', 'naaaames'
+        "nmaxcloudtypes",
+        "ydfpdata",
+        "ylofn",
+        "not_an_annoying_ecwam_var",
+        "cloud_type_name",
+        "other_name",
+        "names",
+        "more_names",
+        "naaaames",
     )
-    assert routine.symbol_map['not_an_annoying_ecwam_var'].type.dtype is BasicType.REAL
-    assert routine.symbol_map['cloud_type_name'].type.dtype is BasicType.CHARACTER
+    assert routine.symbol_map["not_an_annoying_ecwam_var"].type.dtype is BasicType.REAL
+    assert routine.symbol_map["cloud_type_name"].type.dtype is BasicType.CHARACTER
 
 
 def test_regex_preproc_in_contains():
@@ -1254,14 +1414,16 @@ end module preproc_in_contains
     """.strip()
     source = Sourcefile.from_source(fcode, frontend=REGEX)
 
-    expected_names = {'preproc_in_contains', 'routine1', 'mod_routine', 'func'}
-    actual_names = {r.name for r in source.all_subroutines} | {m.name for m in source.modules}
+    expected_names = {"preproc_in_contains", "routine1", "mod_routine", "func"}
+    actual_names = {r.name for r in source.all_subroutines} | {
+        m.name for m in source.modules
+    }
     assert expected_names == actual_names
 
-    assert isinstance(source['mod_routine']['other_routine'], Subroutine)
+    assert isinstance(source["mod_routine"]["other_routine"], Subroutine)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_frontend_pragma_vs_comment(frontend):
     """
     Make sure pragmas and comments are identified correctly
@@ -1287,12 +1449,12 @@ end module frontend_pragma_vs_comment
     comments = FindNodes(Comment).visit(module.ir)
     assert len(pragmas) == 2
     assert len(comments) == 3
-    assert all(pragma.keyword == 'some' for pragma in pragmas)
-    assert all(pragma.content == 'pragma' for pragma in pragmas)
-    assert all('some comment' in comment.text for comment in comments)
+    assert all(pragma.keyword == "some" for pragma in pragmas)
+    assert all(pragma.content == "pragma" for pragma in pragmas)
+    assert all("some comment" in comment.text for comment in comments)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_frontend_main_program(frontend):
     """
     Loki can't handle PROGRAM blocks and the frontends should throw an exception
@@ -1303,7 +1465,7 @@ program hello
 end program
     """.strip()
 
-    with config_override({'frontend-strict-mode': True}):
+    with config_override({"frontend-strict-mode": True}):
         with pytest.raises(NotImplementedError):
             Sourcefile.from_source(fcode, frontend=frontend)
 
@@ -1311,7 +1473,7 @@ end program
     assert source.ir.body == ()
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_frontend_source_lineno(frontend):
     """
     ...
@@ -1325,11 +1487,13 @@ def test_frontend_source_lineno(frontend):
     """
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
-    routine = source['driver']
+    routine = source["driver"]
     calls = FindNodes(CallStatement).visit(routine.body)
     assert calls[0] != calls[1]
     assert calls[1] != calls[2]
-    assert calls[0].source.lines[0] < calls[1].source.lines[0] < calls[2].source.lines[0]
+    assert (
+        calls[0].source.lines[0] < calls[1].source.lines[0] < calls[2].source.lines[0]
+    )
 
 
 def test_regex_interface_subroutine():
@@ -1377,7 +1541,7 @@ end subroutine test
     # Make sure only the host subroutine is captured
     source = Sourcefile.from_source(fcode, frontend=REGEX)
     assert len(source.subroutines) == 1
-    assert source.subroutines[0].name == 'test'
+    assert source.subroutines[0].name == "test"
     assert source.subroutines[0].source.lines == (1, 38)
 
     # Make sure this also works for module procedures
@@ -1391,7 +1555,7 @@ end module my_mod
     source = Sourcefile.from_source(fcode, frontend=REGEX)
     assert not source.subroutines
     assert len(source.all_subroutines) == 1
-    assert source.all_subroutines[0].name == 'test'
+    assert source.all_subroutines[0].name == "test"
     assert source.all_subroutines[0].source.lines == (4, 41)
 
 
@@ -1406,16 +1570,19 @@ SUBROUTINE DOT_PROD_SP_2D()
 END SUBROUTINE DOT_PROD_SP_2D
     """.strip()
     source = Sourcefile.from_source(fcode, frontend=REGEX)
-    assert {
-        routine.name.lower() for routine in source.subroutines
-    } == {'dot_product_ecv', 'dot_prod_sp_2d'}
+    assert {routine.name.lower() for routine in source.subroutines} == {
+        "dot_product_ecv",
+        "dot_prod_sp_2d",
+    }
 
     source.make_complete()
-    routine = source['dot_product_ecv']
-    assert 'dot_product_ecv' in routine.variables
+    routine = source["dot_product_ecv"]
+    assert "dot_product_ecv" in routine.variables
 
 
-@pytest.mark.parametrize('frontend', available_frontends(xfail=[(OFP, 'No support for prefix implemented')]))
+@pytest.mark.parametrize(
+    "frontend", available_frontends(xfail=[(OFP, "No support for prefix implemented")])
+)
 def test_regex_prefix(frontend):
     fcode = """
 module some_mod
@@ -1439,11 +1606,11 @@ contains
 end module some_mod
     """.strip()
     source = Sourcefile.from_source(fcode, frontend=REGEX)
-    assert source['f_elem'].prefix == ('pure elemental real',)
-    assert source['fib'].prefix == ('pure recursive integer',)
+    assert source["f_elem"].prefix == ("pure elemental real",)
+    assert source["fib"].prefix == ("pure recursive integer",)
     source.make_complete(frontend=frontend)
-    assert tuple(p.lower() for p in source['f_elem'].prefix) == ('pure', 'elemental')
-    assert tuple(p.lower() for p in source['fib'].prefix) == ('pure', 'recursive')
+    assert tuple(p.lower() for p in source["f_elem"].prefix) == ("pure", "elemental")
+    assert tuple(p.lower() for p in source["fib"].prefix) == ("pure", "recursive")
 
 
 def test_regex_fypp():
@@ -1483,10 +1650,10 @@ end subroutine last_routine
 end module fypp_mod
 """
     source = Sourcefile.from_source(fcode, frontend=REGEX)
-    module = source['fypp_mod']
+    module = source["fypp_mod"]
     assert isinstance(module, Module)
 
     # Check that only non-templated routines are included
     assert len(module.routines) == 2
-    assert module.routines[0].name == 'first_routine'
-    assert module.routines[1].name == 'last_routine'
+    assert module.routines[0].name == "first_routine"
+    assert module.routines[1].name == "last_routine"

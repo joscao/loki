@@ -12,7 +12,8 @@ import pytest
 from loki import as_tuple, Frontend
 import loki.frontend
 
-__all__ = ['available_frontends', 'local_loki_setup', 'local_loki_cleanup']
+__all__ = ["available_frontends", "local_loki_setup", "local_loki_cleanup"]
+
 
 def available_frontends(xfail=None, skip=None):
     """
@@ -55,8 +56,9 @@ def available_frontends(xfail=None, skip=None):
 
     # Unavailable frontends
     unavailable_frontends = {
-        f: f'{f} is not available' for f in Frontend
-        if not getattr(loki.frontend, f'HAVE_{str(f).upper()}')
+        f: f"{f} is not available"
+        for f in Frontend
+        if not getattr(loki.frontend, f"HAVE_{str(f).upper()}")
     }
     skip.update(unavailable_frontends)
 
@@ -75,14 +77,16 @@ def available_frontends(xfail=None, skip=None):
 
 def write_env_launch_script(here, binary, args):
     # Write a script to source env.sh and launch the binary
-    script = Path(here/f'build/run_{binary}.sh')
-    script.write_text(f"""
+    script = Path(here / f"build/run_{binary}.sh")
+    script.write_text(
+        f"""
 #!/bin/bash
 
 source env.sh >&2
 bin/{binary} {' '.join(args)}
 exit $?
-    """.strip())
+    """.strip()
+    )
     script.chmod(0o750)
 
     return script
@@ -90,8 +94,8 @@ exit $?
 
 def local_loki_setup(here):
     lokidir = Path(__file__).parent.parent.parent
-    target = here/'source/loki'
-    backup = here/'source/loki.bak'
+    target = here / "source/loki"
+    backup = here / "source/loki.bak"
 
     # Do not overwrite any existing Loki copy
     if target.exists():

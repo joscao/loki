@@ -16,7 +16,14 @@ from enum import Enum
 from loki.tools import flatten, as_tuple, LazyNodeLookup
 
 
-__all__ = ['DataType', 'BasicType', 'DerivedType', 'ProcedureType', 'ModuleType', 'SymbolAttributes']
+__all__ = [
+    "DataType",
+    "BasicType",
+    "DerivedType",
+    "ProcedureType",
+    "ModuleType",
+    "SymbolAttributes",
+]
 
 
 class DataType:
@@ -62,7 +69,7 @@ class BasicType(DataType, int, Enum):
                 return meth(value)
             except KeyError:
                 pass
-        raise ValueError(f'Unknown data type: {value}')
+        raise ValueError(f"Unknown data type: {value}")
 
     @classmethod
     def from_name(cls, value):
@@ -76,9 +83,15 @@ class BasicType(DataType, int, Enum):
         """
         Convert the given string representation of a FORTRAN type.
         """
-        type_map = {'logical': cls.LOGICAL, 'integer': cls.INTEGER, 'real': cls.REAL,
-                    'double precision': cls.REAL, 'double complex': cls.COMPLEX,
-                    'character': cls.CHARACTER, 'complex': cls.COMPLEX}
+        type_map = {
+            "logical": cls.LOGICAL,
+            "integer": cls.INTEGER,
+            "real": cls.REAL,
+            "double precision": cls.REAL,
+            "double complex": cls.COMPLEX,
+            "character": cls.CHARACTER,
+            "complex": cls.COMPLEX,
+        }
         return type_map[value.lower()]
 
     @classmethod
@@ -86,12 +99,14 @@ class BasicType(DataType, int, Enum):
         """
         Convert the given string representation of a C99 type.
         """
-        logical_types = ['bool', '_Bool']
-        integer_types = ['short', 'int', 'long', 'long long']
-        integer_types += flatten([(f'signed {t}', f'unsigned {t}') for t in integer_types])
-        real_types = ['float', 'double', 'long double']
-        character_types = ['char']
-        complex_types = ['float _Complex', 'double _Complex', 'long double _Complex']
+        logical_types = ["bool", "_Bool"]
+        integer_types = ["short", "int", "long", "long long"]
+        integer_types += flatten(
+            [(f"signed {t}", f"unsigned {t}") for t in integer_types]
+        )
+        real_types = ["float", "double", "long double"]
+        character_types = ["char"]
+        complex_types = ["float _Complex", "double _Complex", "long double _Complex"]
 
         type_map = {t: cls.LOGICAL for t in logical_types}
         type_map.update({t: cls.INTEGER for t in integer_types})
@@ -131,7 +146,7 @@ class DerivedType(DataType):
         return self.name
 
     def __repr__(self):
-        return f'<DerivedType {self.name}>'
+        return f"<DerivedType {self.name}>"
 
     @property
     def _canonical(self):
@@ -144,7 +159,6 @@ class DerivedType(DataType):
 
     def __hash__(self):
         return hash(self._canonical)
-
 
 
 class ProcedureType(DataType):
@@ -172,8 +186,18 @@ class ProcedureType(DataType):
         The procedure this type represents
     """
 
-    def __init__(self, name=None, is_function=None, is_generic=False, procedure=None, return_type=None):
-        from loki.subroutine import Subroutine  # pylint: disable=import-outside-toplevel,cyclic-import
+    def __init__(
+        self,
+        name=None,
+        is_function=None,
+        is_generic=False,
+        procedure=None,
+        return_type=None,
+    ):
+        from loki.subroutine import (
+            Subroutine,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
         super().__init__()
         assert name or isinstance(procedure, Subroutine)
         assert isinstance(return_type, SymbolAttributes) or procedure or not is_function
@@ -198,7 +222,13 @@ class ProcedureType(DataType):
 
     @property
     def _canonical(self):
-        return (self._name, self._procedure, self.is_function, self.is_generic, self.return_type)
+        return (
+            self._name,
+            self._procedure,
+            self.is_function,
+            self.is_generic,
+            self.return_type,
+        )
 
     def __eq__(self, other):
         if isinstance(other, ProcedureType):
@@ -216,7 +246,9 @@ class ProcedureType(DataType):
         This looks up the name in the linked :attr:`procedure` if available, otherwise
         returns the name stored during instanation of the :any:`ProcedureType` object.
         """
-        return self._name if self.procedure is BasicType.DEFERRED else self.procedure.name
+        return (
+            self._name if self.procedure is BasicType.DEFERRED else self.procedure.name
+        )
 
     @property
     def procedure(self):
@@ -263,10 +295,10 @@ class ProcedureType(DataType):
         return self.name
 
     def __repr__(self):
-        return f'<ProcedureType {self.name}>'
+        return f"<ProcedureType {self.name}>"
 
     def __getstate__(self):
-        _ignore = ('_procedure', )
+        _ignore = ("_procedure",)
         return dict((k, v) for k, v in self.__dict__.items() if k not in _ignore)
 
     def __setstate__(self, s):
@@ -291,7 +323,10 @@ class ModuleType(DataType):
     """
 
     def __init__(self, name=None, module=None):
-        from loki.module import Module  # pylint: disable=import-outside-toplevel,cyclic-import
+        from loki.module import (
+            Module,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
         super().__init__()
         assert name or isinstance(module, Module)
         if module is None or isinstance(module, LazyNodeLookup):
@@ -331,7 +366,7 @@ class ModuleType(DataType):
         return self.name
 
     def __repr__(self):
-        return f'<ModuleType {self.name}>'
+        return f"<ModuleType {self.name}>"
 
 
 class SymbolAttributes:
@@ -394,22 +429,22 @@ class SymbolAttributes:
     def __repr__(self):
         parameters = [str(self.dtype)]
         for k, v in self.__dict__.items():
-            if k in ['dtype', 'source']:
+            if k in ["dtype", "source"]:
                 continue
             if isinstance(v, bool):
                 if v:
                     parameters += [str(k)]
-            elif k == 'parent' and v is not None:
-                typename = 'Type' if isinstance(v, SymbolAttributes) else 'Variable'
-                parameters += [f'parent={typename}({v.name})']
+            elif k == "parent" and v is not None:
+                typename = "Type" if isinstance(v, SymbolAttributes) else "Variable"
+                parameters += [f"parent={typename}({v.name})"]
             else:
-                parameters += [f'{k}={str(v)}']
+                parameters += [f"{k}={str(v)}"]
         return f'<{self.__class__.__name__} {", ".join(parameters)}>'
 
     def __getinitargs__(self):
         args = [self.dtype]
         for k, v in self.__dict__.items():
-            if k in ['dtype', 'source']:
+            if k in ["dtype", "source"]:
                 continue
             args += [(k, v)]
         return tuple(args)
@@ -447,5 +482,8 @@ class SymbolAttributes:
         """
         ignore_attrs = as_tuple(ignore)
         keys = set(as_tuple(self.__dict__.keys()) + as_tuple(other.__dict__.keys()))
-        return all(self.__dict__.get(k) == other.__dict__.get(k)
-                   for k in keys if k not in ignore_attrs)
+        return all(
+            self.__dict__.get(k) == other.__dict__.get(k)
+            for k in keys
+            if k not in ignore_attrs
+        )

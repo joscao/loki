@@ -11,16 +11,40 @@ from pymbolic.primitives import Expression
 from conftest import available_frontends
 from loki import (
     OMNI,
-    Module, Subroutine, Section, Loop, Assignment, Conditional, Sum, Associate,
-    Array, ArraySubscript, LoopRange, IntLiteral, FloatLiteral, LogicLiteral,
-    FindNodes, FindVariables, ExpressionFinder,
-    ExpressionCallbackMapper, ExpressionRetriever, Stringifier, Transformer,
-    NestedTransformer, MaskedTransformer, NestedMaskedTransformer, SubstituteExpressions,
-    is_parent_of, is_child_of, fgen, FindScopes, Intrinsic
+    Module,
+    Subroutine,
+    Section,
+    Loop,
+    Assignment,
+    Conditional,
+    Sum,
+    Associate,
+    Array,
+    ArraySubscript,
+    LoopRange,
+    IntLiteral,
+    FloatLiteral,
+    LogicLiteral,
+    FindNodes,
+    FindVariables,
+    ExpressionFinder,
+    ExpressionCallbackMapper,
+    ExpressionRetriever,
+    Stringifier,
+    Transformer,
+    NestedTransformer,
+    MaskedTransformer,
+    NestedMaskedTransformer,
+    SubstituteExpressions,
+    is_parent_of,
+    is_child_of,
+    fgen,
+    FindScopes,
+    Intrinsic,
 )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_find_nodes_greedy(frontend):
     """
     Test the FindNodes visitor's greedy property.
@@ -47,10 +71,10 @@ end subroutine routine_find_nodes_greedy
     outer_cond = FindNodes(Conditional, greedy=True).visit(routine.body)
     assert len(outer_cond) == 1
     assert outer_cond[0] in conditionals
-    assert str(outer_cond[0].condition) == 'n > m'
+    assert str(outer_cond[0].condition) == "n > m"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_find_scopes(frontend):
     """
     Test the FindScopes visitor.
@@ -71,8 +95,8 @@ end subroutine routine_find_nodes_greedy
 
     intrinsics = FindNodes(Intrinsic).visit(routine.body)
     assert len(intrinsics) == 2
-    inner = [i for i in intrinsics if 'Inner' in i.text][0]
-    outer = [i for i in intrinsics if 'Outer' in i.text][0]
+    inner = [i for i in intrinsics if "Inner" in i.text][0]
+    outer = [i for i in intrinsics if "Outer" in i.text][0]
 
     conditionals = FindNodes(Conditional).visit(routine.body)
     assert len(conditionals) == 2
@@ -82,19 +106,20 @@ end subroutine routine_find_nodes_greedy
     assert len(scopes[0]) == 4  # should have found 3 scopes and the node itself
     assert all(c in scopes[0] for c in conditionals)  # should have found all if
     assert routine.body is scopes[0][0]  # body section should be outermost scope
-    assert str(scopes[0][1].condition) == 'n > m'  # outer if should come first
+    assert str(scopes[0][1].condition) == "n > m"  # outer if should come first
     assert inner is scopes[0][-1]  # node itself should be last in list
 
     scopes = FindScopes(outer).visit(routine.body)
     assert len(scopes) == 1  # returns a list containing a list of nested nodes
     assert len(scopes[0]) == 3  # should have found 2 scopes and the node itself
-    assert all(c in scopes[0] or str(c.condition == 'n == 3')
-               for c in conditionals)  # should have found only the outer if
+    assert all(
+        c in scopes[0] or str(c.condition == "n == 3") for c in conditionals
+    )  # should have found only the outer if
     assert routine.body is scopes[0][0]  # body section should be outermost scope
     assert outer is scopes[0][-1]  # node itself should be last in list
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_expression_finder(frontend):
     """
     Test the expression finder's ability to yield only all variables.
@@ -122,10 +147,11 @@ end subroutine routine_simple
     assert all(isinstance(v, Expression) for v in variables)
 
     assert sorted([str(v) for v in variables]) == (
-        ['i'] * 6 + ['matrix(i, :)', 'scalar'] + ['vector(i)'] * 3 + ['x'])
+        ["i"] * 6 + ["matrix(i, :)", "scalar"] + ["vector(i)"] * 3 + ["x"]
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_expression_finder_unique(frontend):
     """
     Test the expression finder's ability to yield unique variables.
@@ -153,10 +179,16 @@ end subroutine routine_simple
     assert len(variables) == 5
     assert all(isinstance(v, Expression) for v in variables)
 
-    assert sorted([str(v) for v in variables]) == ['i', 'matrix(i, :)', 'scalar', 'vector(i)', 'x']
+    assert sorted([str(v) for v in variables]) == [
+        "i",
+        "matrix(i, :)",
+        "scalar",
+        "vector(i)",
+        "x",
+    ]
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_expression_finder_with_ir_node(frontend):
     """
     Test the expression finder's ability to yield the root node.
@@ -186,17 +218,29 @@ end subroutine routine_simple
     # Verify that the variables in the loop definition are found
     loops = [v for v in variables if isinstance(v[0], Loop)]
     assert len(loops) == 1
-    assert sorted([str(v) for v in loops[0][1]]) == ['i', 'x']
+    assert sorted([str(v) for v in loops[0][1]]) == ["i", "x"]
 
     # Verify that the variables in the statements are found
     stmts = [v for v in variables if isinstance(v[0], Assignment)]
     assert len(stmts) == 2
 
-    assert sorted([str(v) for v in stmts[0][1]]) == ['i', 'i', 'scalar', 'vector(i)', 'vector(i)']
-    assert sorted([str(v) for v in stmts[1][1]]) == ['i', 'i', 'i', 'matrix(i, :)', 'vector(i)']
+    assert sorted([str(v) for v in stmts[0][1]]) == [
+        "i",
+        "i",
+        "scalar",
+        "vector(i)",
+        "vector(i)",
+    ]
+    assert sorted([str(v) for v in stmts[1][1]]) == [
+        "i",
+        "i",
+        "i",
+        "matrix(i, :)",
+        "vector(i)",
+    ]
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_expression_finder_unique_with_ir_node(frontend):
     """
     Test the expression finder's ability to yield the ir node combined with only unique
@@ -227,17 +271,17 @@ end subroutine routine_simple
     # Verify that the variables in the loop definition are found
     loops = [v for v in variables if isinstance(v[0], Loop)]
     assert len(loops) == 1
-    assert sorted([str(v) for v in loops[0][1]]) == ['i', 'x']
+    assert sorted([str(v) for v in loops[0][1]]) == ["i", "x"]
 
     # Verify that the variables in the statements are found
     stmts = [v for v in variables if isinstance(v[0], Assignment)]
     assert len(stmts) == 2
 
-    assert sorted([str(v) for v in stmts[0][1]]) == ['i', 'scalar', 'vector(i)']
-    assert sorted([str(v) for v in stmts[1][1]]) == ['i', 'matrix(i, :)', 'vector(i)']
+    assert sorted([str(v) for v in stmts[0][1]]) == ["i", "scalar", "vector(i)"]
+    assert sorted([str(v) for v in stmts[1][1]]) == ["i", "matrix(i, :)", "vector(i)"]
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_expression_callback_mapper(frontend):
     """
     Test the ExpressionFinder together with ExpressionCallbackMapper. This is just a very basic
@@ -275,8 +319,7 @@ end subroutine routine_simple
 
     class FindMatrix(ExpressionFinder):
         retriever = ExpressionCallbackMapper(
-            callback=is_matrix,
-            combine=lambda v: tuple(e for e in v if e is not None)
+            callback=is_matrix, combine=lambda v: tuple(e for e in v if e is not None)
         )
 
     matrix_count = FindMatrix(unique=False).visit(routine.body)
@@ -284,10 +327,10 @@ end subroutine routine_simple
 
     matrix_count = FindMatrix().visit(routine.body)
     assert len(matrix_count) == 1
-    assert str(matrix_count.pop()) == 'matrix(i, j)'
+    assert str(matrix_count.pop()) == "matrix(i, j)"
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_expression_retriever_recurse_query(frontend):
     """
     Test the ExpressionRetriever with a custom recurse query that allows to terminate recursion
@@ -320,21 +363,26 @@ end subroutine routine_simple
     # Find all literals except when they appear in array subscripts or loop ranges
     class FindLiteralsNotInSubscriptsOrRanges(ExpressionFinder):
         retriever = ExpressionRetriever(
-            query=lambda expr: isinstance(expr, (IntLiteral, FloatLiteral, LogicLiteral)),
-            recurse_query=lambda expr, *args, **kwargs: not isinstance(expr, (ArraySubscript, LoopRange))
+            query=lambda expr: isinstance(
+                expr, (IntLiteral, FloatLiteral, LogicLiteral)
+            ),
+            recurse_query=lambda expr, *args, **kwargs: not isinstance(
+                expr, (ArraySubscript, LoopRange)
+            ),
         )
+
     literals = FindLiteralsNotInSubscriptsOrRanges(unique=False).visit(routine.body)
 
     if frontend == OMNI:
         # OMNI substitutes jprb
         assert len(literals) == 4
-        assert sorted([str(l) for l in literals]) == ['1.', '13', '2', '300']
+        assert sorted([str(l) for l in literals]) == ["1.", "13", "2", "300"]
     else:
         assert len(literals) == 2
-        assert sorted([str(l) for l in literals]) == ['1.', '2']
+        assert sorted([str(l) for l in literals]) == ["1.", "2"]
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_find_variables_associates(frontend):
     """
     Test correct discovery of variables in associates.
@@ -366,11 +414,11 @@ end subroutine find_variables_associates
 
     variables = FindVariables(unique=False).visit(routine.body)
     assert len(variables) == 29
-    assert len([v for v in variables if v.name == 'v']) == 1
-    assert len([v for v in variables if v.name == 'm']) == 2
+    assert len([v for v in variables if v.name == "v"]) == 1
+    assert len([v for v in variables if v.name == "m"]) == 2
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_stringifier(frontend):
     """
     Test basic stringifier capability for most IR nodes.
@@ -466,7 +514,7 @@ END MODULE some_mod
         "####<Assignment:: y = y + x*x>",
         "###<Assignment:: y = my_sqrt(y) + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + ",
         "... 1. + 1.>",
-        "#<Function:: my_sqrt>", # l. 30
+        "#<Function:: my_sqrt>",  # l. 30
         "##<Section::>",
         "###<Intrinsic:: IMPLICIT NONE>",
         "###<VariableDeclaration:: arg>",
@@ -500,44 +548,64 @@ END MODULE some_mod
 
     if frontend == OMNI:
         # Some string inconsistencies
-        ref_lines[15] = ref_lines[15].replace('1E-8', '1e-8')
-        ref_lines[35] = ref_lines[35].replace('SQRT', 'sqrt')
-        ref_lines[48] = ref_lines[48].replace('PRINT', 'print')
-        ref_lines[52] = ref_lines[52].replace('PRINT', 'print')
+        ref_lines[15] = ref_lines[15].replace("1E-8", "1e-8")
+        ref_lines[35] = ref_lines[35].replace("SQRT", "sqrt")
+        ref_lines[48] = ref_lines[48].replace("PRINT", "print")
+        ref_lines[52] = ref_lines[52].replace("PRINT", "print")
 
     cont_index = 27  # line number where line continuation is happening
-    ref = '\n'.join(ref_lines)
+    ref = "\n".join(ref_lines)
     module = Module.from_source(fcode, frontend=frontend)
 
     # Test custom indentation
     def line_cont(indent):
         return f'\n{"...":{max(len(indent), 1)}} '
-    assert Stringifier(indent='#', line_cont=line_cont).visit(module).strip() == ref.strip()
+
+    assert (
+        Stringifier(indent="#", line_cont=line_cont).visit(module).strip()
+        == ref.strip()
+    )
 
     # Test default
-    ref_lines = ref.strip().replace('#', '  ').splitlines()
-    ref_lines[cont_index] = '      <Assignment:: y = my_sqrt(y) + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1.'
-    ref_lines[cont_index + 1] = '       + 1. + 1.>'
-    default_ref = '\n'.join(ref_lines)
+    ref_lines = ref.strip().replace("#", "  ").splitlines()
+    ref_lines[
+        cont_index
+    ] = "      <Assignment:: y = my_sqrt(y) + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1."
+    ref_lines[cont_index + 1] = "       + 1. + 1.>"
+    default_ref = "\n".join(ref_lines)
     assert Stringifier().visit(module).strip() == default_ref
 
     # Test custom initial depth
-    ref_lines = ['#' + line if line else '' for line in ref.splitlines()]
-    ref_lines[cont_index] = '####<Assignment:: y = my_sqrt(y) + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. +'
-    ref_lines[cont_index + 1] = '...   1. + 1.>'
-    depth_ref = '\n'.join(ref_lines)
-    assert Stringifier(indent='#', depth=1, line_cont=line_cont).visit(module).strip() == depth_ref
+    ref_lines = ["#" + line if line else "" for line in ref.splitlines()]
+    ref_lines[
+        cont_index
+    ] = "####<Assignment:: y = my_sqrt(y) + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. +"
+    ref_lines[cont_index + 1] = "...   1. + 1.>"
+    depth_ref = "\n".join(ref_lines)
+    assert (
+        Stringifier(indent="#", depth=1, line_cont=line_cont).visit(module).strip()
+        == depth_ref
+    )
 
     # Test custom linewidth
     ref_lines = ref.strip().splitlines()
-    ref_lines = ref_lines[:cont_index] + ['###<Assignment:: y = my_sqrt(y) + 1. + 1. +',
-                                          '...  1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. ',
-                                          '... + 1. + 1. + 1.>'] + ref_lines[cont_index+2:]
-    w_ref = '\n'.join(ref_lines)
-    assert Stringifier(indent='#', linewidth=44, line_cont=line_cont).visit(module).strip() == w_ref
+    ref_lines = (
+        ref_lines[:cont_index]
+        + [
+            "###<Assignment:: y = my_sqrt(y) + 1. + 1. +",
+            "...  1. + 1. + 1. + 1. + 1. + 1. + 1. + 1. ",
+            "... + 1. + 1. + 1.>",
+        ]
+        + ref_lines[cont_index + 2 :]
+    )
+    w_ref = "\n".join(ref_lines)
+    assert (
+        Stringifier(indent="#", linewidth=44, line_cont=line_cont).visit(module).strip()
+        == w_ref
+    )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transformer_source_invalidation_replace(frontend):
     """
     Test basic transformer functionality and verify source invalidation
@@ -568,16 +636,18 @@ end subroutine routine_simple
     # Replace the innermost statement in the body of the conditional
     def get_innermost_statement(ir):
         for stmt in FindNodes(Assignment).visit(ir):
-            if 'matrix' in str(stmt.lhs) and isinstance(stmt.rhs, Sum):
+            if "matrix" in str(stmt.lhs) and isinstance(stmt.rhs, Sum):
                 return stmt
         return None
 
     stmt = get_innermost_statement(routine.ir)
-    new_expr = Sum((*stmt.rhs.children[:-1], FloatLiteral(2.)))
+    new_expr = Sum((*stmt.rhs.children[:-1], FloatLiteral(2.0)))
     new_stmt = Assignment(stmt.lhs, new_expr)
     mapper = {stmt: new_stmt}
 
-    body_without_source = Transformer(mapper, invalidate_source=True).visit(routine.body)
+    body_without_source = Transformer(mapper, invalidate_source=True).visit(
+        routine.body
+    )
     body_with_source = Transformer(mapper, invalidate_source=False).visit(routine.body)
 
     # Find the original and new node in all bodies
@@ -592,9 +662,13 @@ end subroutine routine_simple
 
     # Check recursively the presence or absence of the source property
     while True:
-        node_without_src = FindNodes(node_without_src, mode='scope').visit(body_without_source)[0]
-        node_with_src = FindNodes(node_with_src, mode='scope').visit(body_with_source)[0]
-        orig_node = FindNodes(orig_node, mode='scope').visit(routine.body)[0]
+        node_without_src = FindNodes(node_without_src, mode="scope").visit(
+            body_without_source
+        )[0]
+        node_with_src = FindNodes(node_with_src, mode="scope").visit(body_with_source)[
+            0
+        ]
+        orig_node = FindNodes(orig_node, mode="scope").visit(routine.body)[0]
         if isinstance(orig_node, Section):
             assert isinstance(node_without_src, Section)
             assert isinstance(node_with_src, Section)
@@ -612,7 +686,7 @@ end subroutine routine_simple
     assert get_else_stmt(body_with_source).source == else_stmt.source
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transformer_source_invalidation_prepend(frontend):
     """
     Test basic transformer functionality and verify source invalidation
@@ -648,7 +722,9 @@ end subroutine routine_simple
     new_stmt = Assignment(lhs=routine.arguments[0], rhs=routine.arguments[1])
     mapper = {cond: (new_stmt, cond)}
 
-    body_without_source = Transformer(mapper, invalidate_source=True).visit(routine.body)
+    body_without_source = Transformer(mapper, invalidate_source=True).visit(
+        routine.body
+    )
     body_with_source = Transformer(mapper, invalidate_source=False).visit(routine.body)
 
     # Find the conditional in new bodies and check that source is untouched
@@ -673,9 +749,13 @@ end subroutine routine_simple
     # Check recursively the presence or absence of the source property
     orig_node = cond
     while True:
-        node_without_src = FindNodes(node_without_src, mode='scope').visit(body_without_source)[0]
-        node_with_src = FindNodes(node_with_src, mode='scope').visit(body_with_source)[0]
-        orig_node = FindNodes(orig_node, mode='scope').visit(routine.body)[0]
+        node_without_src = FindNodes(node_without_src, mode="scope").visit(
+            body_without_source
+        )[0]
+        node_with_src = FindNodes(node_with_src, mode="scope").visit(body_with_source)[
+            0
+        ]
+        orig_node = FindNodes(orig_node, mode="scope").visit(routine.body)[0]
         if isinstance(orig_node, Section):
             assert isinstance(node_without_src, Section)
             assert isinstance(node_with_src, Section)
@@ -684,7 +764,7 @@ end subroutine routine_simple
         assert node_with_src.source and node_with_src.source == orig_node.source
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transformer_rebuild(frontend):
     """
     Test basic transformer functionality with and without node rebuilding.
@@ -714,12 +794,12 @@ end subroutine routine_simple
     # Replace the innermost statement in the body of the conditional
     def get_innermost_statement(ir):
         for stmt in FindNodes(Assignment).visit(ir):
-            if 'matrix' in str(stmt.lhs) and isinstance(stmt.rhs, Sum):
+            if "matrix" in str(stmt.lhs) and isinstance(stmt.rhs, Sum):
                 return stmt
         return None
 
     stmt = get_innermost_statement(routine.ir)
-    new_expr = Sum((*stmt.rhs.children[:-1], FloatLiteral(2.)))
+    new_expr = Sum((*stmt.rhs.children[:-1], FloatLiteral(2.0)))
     new_stmt = Assignment(stmt.lhs, new_expr)
     mapper = {stmt: new_stmt}
 
@@ -748,7 +828,9 @@ end subroutine routine_simple
 
     # Check that no loops or conditionals around statements are rebuilt,
     # even if source_invalidation is deactivated
-    body_no_rebuild = Transformer(mapper, invalidate_source=False, inplace=True).visit(routine.body)
+    body_no_rebuild = Transformer(mapper, invalidate_source=False, inplace=True).visit(
+        routine.body
+    )
     stmts_no_rebuild = [str(s) for s in FindNodes(Assignment).visit(body_no_rebuild)]
     loops_no_rebuild = FindNodes(Loop).visit(body_no_rebuild)
     conds_no_rebuild = FindNodes(Conditional).visit(body_no_rebuild)
@@ -758,7 +840,7 @@ end subroutine routine_simple
     assert all(c in conds for c in conds_no_rebuild)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_transformer_multinode_keys(frontend):
     """
     Test basic transformer functionality with nulti-node keys
@@ -778,14 +860,17 @@ end subroutine routine_simple
 """
     routine = Subroutine.from_source(fcode, frontend=frontend)
     assigns = FindNodes(Assignment).visit(routine.body)
-    bounds = LoopRange((IntLiteral(1), routine.variable_map['x']))
+    bounds = LoopRange((IntLiteral(1), routine.variable_map["x"]))
 
     # Filter out only the two middle assignments to wrap in a loop.
     # Note that we need to be careful to clone loop body nodes to
     # avoid infinite recursion.
-    assigns = tuple(a for a in assigns if a.lhs in ['c(i)', 'd(i)'])
-    loop = Loop(variable=routine.variable_map['i'], bounds=bounds,
-                body=tuple(a.clone() for a in assigns))
+    assigns = tuple(a for a in assigns if a.lhs in ["c(i)", "d(i)"])
+    loop = Loop(
+        variable=routine.variable_map["i"],
+        bounds=bounds,
+        body=tuple(a.clone() for a in assigns),
+    )
     # Need to use NestedTransformer here, since replacement contains
     # the original nodes.
     transformed = NestedTransformer({assigns: loop}).visit(routine.body)
@@ -796,7 +881,7 @@ end subroutine routine_simple
     assert len(FindNodes(Assignment).visit(transformed)) == 4
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_masked_transformer(frontend):
     """
     A very basic sanity test for the MaskedTransformer class.
@@ -834,7 +919,9 @@ end subroutine masked_transformer
     assert len(FindNodes(Assignment).visit(body)) == 1
 
     # Retains all nodes but the last
-    body = MaskedTransformer(start=None, stop=assignments[-1], active=True).visit(routine.body)
+    body = MaskedTransformer(start=None, stop=assignments[-1], active=True).visit(
+        routine.body
+    )
     assert len(FindNodes(Assignment).visit(body)) == len(assignments) - 1
 
     # Retains the first two and last two nodes
@@ -872,7 +959,7 @@ end subroutine masked_transformer
     assert str(FindNodes(Assignment).visit(body)[0]) == str(assignments[0])
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_masked_transformer_minimum_set(frontend):
     """
     A very basic sanity test for the MaskedTransformer class with
@@ -899,22 +986,28 @@ end subroutine masked_transformer_minimum_set
     assignments = FindNodes(Assignment).visit(routine.body)
 
     # Requires all nodes and thus retains only the last
-    body = MaskedTransformer(start=assignments, require_all_start=True).visit(routine.body)
+    body = MaskedTransformer(start=assignments, require_all_start=True).visit(
+        routine.body
+    )
     assert len(FindNodes(Assignment).visit(body)) == 1
     assert fgen(body) == fgen(assignments[-1])
 
     # Retains only the second node
-    body = MaskedTransformer(start=assignments[:2], stop=assignments[2], require_all_start=True).visit(routine.body)
+    body = MaskedTransformer(
+        start=assignments[:2], stop=assignments[2], require_all_start=True
+    ).visit(routine.body)
     assert len(FindNodes(Assignment).visit(body)) == 1
     assert fgen(body) == fgen(assignments[1])
 
     # Retains only first node
-    body = MaskedTransformer(start=assignments, stop=assignments[1], greedy_stop=True).visit(routine.body)
+    body = MaskedTransformer(
+        start=assignments, stop=assignments[1], greedy_stop=True
+    ).visit(routine.body)
     assert len(FindNodes(Assignment).visit(body)) == 1
     assert fgen(body) == fgen(assignments[0])
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_masked_transformer_associates(frontend):
     """
     Test the masked transformer in conjunction with associate blocks
@@ -954,7 +1047,9 @@ end subroutine masked_transformer
     assert not FindNodes(Associate).visit(body)
 
     # Retains all nodes but the last
-    body = MaskedTransformer(start=None, stop=assignments[-1], active=True).visit(routine.body)
+    body = MaskedTransformer(start=None, stop=assignments[-1], active=True).visit(
+        routine.body
+    )
     assert len(FindNodes(Assignment).visit(body)) == len(assignments) - 1
     assert len(FindNodes(Associate).visit(body)) == 1
 
@@ -980,7 +1075,7 @@ end subroutine masked_transformer
     assert not FindNodes(Associate).visit(body)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_nested_masked_transformer(frontend):
     """
     Test the masked transformer in conjunction with nesting
@@ -1015,7 +1110,7 @@ end subroutine nested_masked_transformer
     assert len(conditionals) == 2 if frontend == OMNI else 1
 
     # Drops the outermost loop
-    start = [a for a in assignments if a.lhs == 'a']
+    start = [a for a in assignments if a.lhs == "a"]
     body = MaskedTransformer(start=start).visit(routine.body)
     assert len(FindNodes(Assignment).visit(body)) == 4
     assert len(FindNodes(Loop).visit(body)) == 1
@@ -1035,8 +1130,8 @@ end subroutine nested_masked_transformer
     assert len(FindNodes(Conditional).visit(body)) == len(conditionals)
 
     # Should leave no more than a single assignment
-    start = [a for a in assignments if a.lhs == 'c']
-    stop = [l for l in loops if l.variable == 'j']
+    start = [a for a in assignments if a.lhs == "c"]
+    stop = [l for l in loops if l.variable == "j"]
     body = MaskedTransformer(start=start, stop=stop).visit(routine.body)
     assert fgen(start).strip() == fgen(body).strip()
 
@@ -1048,7 +1143,7 @@ end subroutine nested_masked_transformer
     assert len(FindNodes(Conditional).visit(body)) == 1
 
     # Should leave no more than a single assignment
-    start = [a for a in assignments if a.lhs == 'd']
+    start = [a for a in assignments if a.lhs == "d"]
     body = MaskedTransformer(start=start, stop=start).visit(routine.body)
     assert fgen(start).strip() == fgen(body).strip()
 
@@ -1060,38 +1155,44 @@ end subroutine nested_masked_transformer
     assert len(FindNodes(Conditional).visit(body)) == 0
 
     # Should produce the original body
-    start = [a for a in assignments if a.lhs in ('a', 'd')]
+    start = [a for a in assignments if a.lhs in ("a", "d")]
     body = NestedMaskedTransformer(start=start).visit(routine.body)
     assert fgen(routine.body).strip() == fgen(body).strip()
 
     # Should leave a single assignment with the hierarchy of nested sections
     # in the else branch
-    body = NestedMaskedTransformer(start=start, require_all_start=True).visit(routine.body)
-    assert [a.lhs == 'd' for a in FindNodes(Assignment).visit(body)] == [True]
+    body = NestedMaskedTransformer(start=start, require_all_start=True).visit(
+        routine.body
+    )
+    assert [a.lhs == "d" for a in FindNodes(Assignment).visit(body)] == [True]
     assert len(FindNodes(Loop).visit(body)) == 2
     assert len(FindNodes(Conditional).visit(body)) == 0
 
     # Drops everything
-    stop = [a for a in assignments if a.lhs == 'a']
-    body = NestedMaskedTransformer(start=start, stop=stop, greedy_stop=True).visit(routine.body)
+    stop = [a for a in assignments if a.lhs == "a"]
+    body = NestedMaskedTransformer(start=start, stop=stop, greedy_stop=True).visit(
+        routine.body
+    )
     assert not body
 
     # Should drop the else-if branch
-    start = [a for a in assignments if a.lhs in ('b', 'd')]
-    stop = [a for a in assignments if a.lhs == 'c']
+    start = [a for a in assignments if a.lhs in ("b", "d")]
+    stop = [a for a in assignments if a.lhs == "c"]
     body = NestedMaskedTransformer(start=start, stop=stop).visit(routine.body)
     assert len(FindNodes(Assignment).visit(body)) == 2
     assert len(FindNodes(Loop).visit(body)) == 2
     assert len(FindNodes(Conditional).visit(body)) == 1
 
     # Should drop everything buth the if branch
-    body = NestedMaskedTransformer(start=start, stop=stop, greedy_stop=True).visit(routine.body)
-    assert [a.lhs == 'b' for a in FindNodes(Assignment).visit(body)] == [True]
+    body = NestedMaskedTransformer(start=start, stop=stop, greedy_stop=True).visit(
+        routine.body
+    )
+    assert [a.lhs == "b" for a in FindNodes(Assignment).visit(body)] == [True]
     assert len(FindNodes(Loop).visit(body)) == 1
     assert len(FindNodes(Conditional).visit(body)) == 1
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_is_parent_of(frontend):
     """
     Test the ``is_parent_of`` utility.
@@ -1123,7 +1224,7 @@ end subroutine test_is_parent_of
         assert all(not is_parent_of(a, node) for a in assignments)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_is_child_of(frontend):
     """
     Test the ``is_child_of`` utility.
@@ -1155,7 +1256,7 @@ end subroutine test_is_child_of
         assert all(not is_child_of(node, a) for a in assignments)
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_attach_scopes_associates(frontend):
     fcode = """
 module attach_scopes_associates_mod
@@ -1185,7 +1286,7 @@ end module attach_scopes_associates_mod
     """.strip()
 
     module = Module.from_source(fcode, frontend=frontend)
-    routine = module['attach_scopes_associates']
+    routine = module["attach_scopes_associates"]
     associates = FindNodes(Associate).visit(routine.body)
     assert len(associates) == 2
     assignment = FindNodes(Assignment).visit(routine.body)
@@ -1194,16 +1295,18 @@ end module attach_scopes_associates_mod
     var_map = {str(var): var for var in FindVariables().visit(assignment)}
     assert len(var_map) == 3
     assert associates[1].parent is associates[0]
-    assert var_map['a'].scope is routine
-    assert var_map['var%foo'].scope is associates[0]
-    assert var_map['var%foo'].parent.scope is associates[0]
-    assert var_map['var%foo'].parent is var_map['var']
+    assert var_map["a"].scope is routine
+    assert var_map["var%foo"].scope is associates[0]
+    assert var_map["var%foo"].parent.scope is associates[0]
+    assert var_map["var%foo"].parent is var_map["var"]
 
 
-@pytest.mark.parametrize('invalidate_source', [True, False])
-@pytest.mark.parametrize('replacement', ['body', 'self', 'self_tuple', 'duplicate'])
-@pytest.mark.parametrize('frontend', available_frontends())
-def test_transformer_duplicate_node_tuple_injection(frontend, invalidate_source, replacement):
+@pytest.mark.parametrize("invalidate_source", [True, False])
+@pytest.mark.parametrize("replacement", ["body", "self", "self_tuple", "duplicate"])
+@pytest.mark.parametrize("frontend", available_frontends())
+def test_transformer_duplicate_node_tuple_injection(
+    frontend, invalidate_source, replacement
+):
     """Test for #41, where identical nodes in a tuple have not been
     correctly handled in the tuple injection mechanism."""
     fcode_kernel = """
@@ -1223,19 +1326,21 @@ END SUBROUTINE compute_column
     kernel = Subroutine.from_source(fcode_kernel, frontend=frontend)
 
     # Empty substitution pass, which invalidates the source property
-    kernel.body = SubstituteExpressions({}, invalidate_source=invalidate_source).visit(kernel.body)
+    kernel.body = SubstituteExpressions({}, invalidate_source=invalidate_source).visit(
+        kernel.body
+    )
 
     loops = FindNodes(Loop).visit(kernel.body)
-    if replacement == 'body':
+    if replacement == "body":
         # Replace loop by its body
         mapper = {l: l.body for l in loops}
-    elif replacement == 'self':
+    elif replacement == "self":
         # Replace loop by itself
         mapper = {l: l for l in loops}
-    elif replacement == 'self_tuple':
+    elif replacement == "self_tuple":
         # Replace loop by itself, but wrapped in a tuple
         mapper = {l: (l,) for l in loops}
-    elif replacement == 'duplicate':
+    elif replacement == "duplicate":
         # Duplicate the loop (will this trigger infinite recursion in tuple injection)?
         mapper = {l: (l, l) for l in loops}
     else:
@@ -1248,8 +1353,12 @@ END SUBROUTINE compute_column
     # If the code gen works, then it's probably not too broken...
     assert kernel.to_fortran()
     # Make sure the number of loops is correct
-    assert len(FindNodes(Loop).visit(kernel.body)) == {
-        'body': 0, # All loops replaced by the body
-        'self': 2, 'self_tuple': 2,  # Loop replaced by itself
-        'duplicate': 4  # Loops duplicated
-    }[replacement]
+    assert (
+        len(FindNodes(Loop).visit(kernel.body))
+        == {
+            "body": 0,  # All loops replaced by the body
+            "self": 2,
+            "self_tuple": 2,  # Loop replaced by itself
+            "duplicate": 4,  # Loops duplicated
+        }[replacement]
+    )

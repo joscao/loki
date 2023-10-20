@@ -9,15 +9,29 @@ import pytest
 
 from conftest import available_frontends
 from loki import (
-    Subroutine, FindNodes, Assignment, Loop, Conditional, Pragma, fgen, Sourcefile,
-    CallStatement, MultiConditional, MaskedStatement, ProcedureSymbol, WhileLoop,
-    Associate
+    Subroutine,
+    FindNodes,
+    Assignment,
+    Loop,
+    Conditional,
+    Pragma,
+    fgen,
+    Sourcefile,
+    CallStatement,
+    MultiConditional,
+    MaskedStatement,
+    ProcedureSymbol,
+    WhileLoop,
+    Associate,
 )
 from loki.analyse import (
-    dataflow_analysis_attached, read_after_write_vars, loop_carried_dependencies
+    dataflow_analysis_attached,
+    read_after_write_vars,
+    loop_carried_dependencies,
 )
 
-@pytest.mark.parametrize('frontend', available_frontends())
+
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_live_symbols(frontend):
     fcode = """
 subroutine analyse_live_symbols(v1, v2, v3)
@@ -48,10 +62,10 @@ end subroutine analyse_live_symbols
             _ = assignment.live_symbols
 
     ref_live_symbols = {
-        'tmp': {'i', 'j', 'n', 'v1', 'v2'},
-        'a': {'i', 'tmp', 'n', 'v1', 'v2'},
-        'v3': {'tmp', 'a', 'n', 'v1', 'v2'},
-        'v2': {'tmp', 'a', 'n', 'v1', 'v2', 'v3'}
+        "tmp": {"i", "j", "n", "v1", "v2"},
+        "a": {"i", "tmp", "n", "v1", "v2"},
+        "v3": {"tmp", "a", "n", "v1", "v2"},
+        "v2": {"tmp", "a", "n", "v1", "v2", "v3"},
     }
 
     with dataflow_analysis_attached(routine):
@@ -69,7 +83,7 @@ end subroutine analyse_live_symbols
             _ = assignment.live_symbols
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_defines_uses_symbols(frontend):
     fcode = """
 subroutine analyse_defines_uses_symbols(a, j, m, n)
@@ -107,15 +121,15 @@ end subroutine analyse_defines_uses_symbols
         assert len(FindNodes(Conditional).visit(routine.body)) == 2
         assert len(FindNodes(Loop).visit(routine.body)) == 1
 
-        assert {str(s) for s in routine.body.uses_symbols} == {'m', 'n'}
-        assert {str(s) for s in loops[0].uses_symbols} == {'m', 'n', 'a', 'j'}
-        assert {str(s) for s in conditionals[0].uses_symbols} == {'i', 'a', 'n'}
-        assert {str(s) for s in conditionals[1].uses_symbols} == {'i', 'n'}
+        assert {str(s) for s in routine.body.uses_symbols} == {"m", "n"}
+        assert {str(s) for s in loops[0].uses_symbols} == {"m", "n", "a", "j"}
+        assert {str(s) for s in conditionals[0].uses_symbols} == {"i", "a", "n"}
+        assert {str(s) for s in conditionals[1].uses_symbols} == {"i", "n"}
         assert not conditionals[1].body[0].uses_symbols
 
-        assert {str(s) for s in routine.body.defines_symbols} == {'j', 'a'}
-        assert {str(s) for s in loops[0].defines_symbols} == {'j', 'a'}
-        assert {str(s) for s in conditionals[0].defines_symbols} == {'a'}
+        assert {str(s) for s in routine.body.defines_symbols} == {"j", "a"}
+        assert {str(s) for s in loops[0].defines_symbols} == {"j", "a"}
+        assert {str(s) for s in conditionals[0].defines_symbols} == {"a"}
         assert not conditionals[1].defines_symbols
         assert not conditionals[1].body[0].defines_symbols
 
@@ -128,7 +142,7 @@ end subroutine analyse_defines_uses_symbols
             _ = cond.uses_symbols
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_read_after_write_vars(frontend):
     fcode = """
 subroutine analyse_read_after_write_vars
@@ -153,11 +167,11 @@ end subroutine analyse_read_after_write_vars
     variable_map = routine.variable_map
 
     vars_at_inspection_node = {
-        'A': {variable_map['a']},
-        'B': {variable_map['a'], variable_map['b']},
-        'C': {variable_map['b'], variable_map['c']},
-        'D': {variable_map['c'], variable_map['d']},
-        'E': set(),
+        "A": {variable_map["a"]},
+        "B": {variable_map["a"], variable_map["b"]},
+        "C": {variable_map["b"], variable_map["c"]},
+        "D": {variable_map["c"], variable_map["d"]},
+        "E": set(),
     }
 
     pragmas = FindNodes(Pragma).visit(routine.body)
@@ -165,10 +179,13 @@ end subroutine analyse_read_after_write_vars
 
     with dataflow_analysis_attached(routine):
         for pragma in pragmas:
-            assert read_after_write_vars(routine.body, pragma) == vars_at_inspection_node[pragma.content]
+            assert (
+                read_after_write_vars(routine.body, pragma)
+                == vars_at_inspection_node[pragma.content]
+            )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_read_after_write_vars_conditionals(frontend):
     fcode = """
 subroutine analyse_read_after_write_vars_conditionals(a, b, c, d, e, f)
@@ -199,11 +216,11 @@ end subroutine analyse_read_after_write_vars_conditionals
     variable_map = routine.variable_map
 
     vars_at_inspection_node = {
-        'A': {variable_map['b'], variable_map['d']},
-        'B': {variable_map['d']},
-        'C': {variable_map['d']},
-        'D': {variable_map['c']},
-        'E': {variable_map['e']},
+        "A": {variable_map["b"], variable_map["d"]},
+        "B": {variable_map["d"]},
+        "C": {variable_map["d"]},
+        "D": {variable_map["c"]},
+        "E": {variable_map["e"]},
     }
 
     pragmas = FindNodes(Pragma).visit(routine.body)
@@ -211,10 +228,13 @@ end subroutine analyse_read_after_write_vars_conditionals
 
     with dataflow_analysis_attached(routine):
         for pragma in pragmas:
-            assert read_after_write_vars(routine.body, pragma) == vars_at_inspection_node[pragma.content]
+            assert (
+                read_after_write_vars(routine.body, pragma)
+                == vars_at_inspection_node[pragma.content]
+            )
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_loop_carried_dependencies(frontend):
     fcode = """
 subroutine analyse_loop_carried_dependencies(a, b, c)
@@ -229,7 +249,6 @@ subroutine analyse_loop_carried_dependencies(a, b, c)
 end subroutine analyse_loop_carried_dependencies
     """.strip()
 
-
     routine = Subroutine.from_source(fcode, frontend=frontend)
     variable_map = routine.variable_map
 
@@ -237,9 +256,13 @@ end subroutine analyse_loop_carried_dependencies
     assert len(loops) == 1
 
     with dataflow_analysis_attached(routine):
-        assert loop_carried_dependencies(loops[0]) == {variable_map['b'], variable_map['c']}
+        assert loop_carried_dependencies(loops[0]) == {
+            variable_map["b"],
+            variable_map["c"],
+        }
 
-@pytest.mark.parametrize('frontend', available_frontends())
+
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_interface(frontend):
     fcode = """
 subroutine random_call(v_out,v_in,v_inout)
@@ -270,7 +293,7 @@ end subroutine test
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
-    routine = source['test']
+    routine = source["test"]
 
     with dataflow_analysis_attached(routine):
         assert len(routine.body.defines_symbols) == 0
@@ -278,9 +301,10 @@ end subroutine test
         assert len(routine.spec.uses_symbols) == 0
         assert len(routine.spec.defines_symbols) == 1
         assert isinstance(list(routine.spec.defines_symbols)[0], ProcedureSymbol)
-        assert 'random_call' in routine.spec.defines_symbols
+        assert "random_call" in routine.spec.defines_symbols
 
-@pytest.mark.parametrize('frontend', available_frontends())
+
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_enriched_call(frontend):
     fcode = """
 subroutine random_call(v_out,v_in,v_inout)
@@ -306,16 +330,16 @@ end subroutine test
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
-    routine = source['test']
+    routine = source["test"]
     routine.enrich_calls(source.all_subroutines)
     call = FindNodes(CallStatement).visit(routine.body)[0]
 
     with dataflow_analysis_attached(routine):
-        assert all(i in call.defines_symbols for i in ('v_out', 'v_inout'))
-        assert all(i in call.uses_symbols for i in ('v_in', 'v_inout'))
+        assert all(i in call.defines_symbols for i in ("v_out", "v_inout"))
+        assert all(i in call.uses_symbols for i in ("v_in", "v_inout"))
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_unenriched_call(frontend):
     fcode = """
 subroutine test(v_out,v_in,v_inout)
@@ -331,15 +355,15 @@ end subroutine test
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
-    routine = source['test']
+    routine = source["test"]
     call = FindNodes(CallStatement).visit(routine.body)[0]
 
     with dataflow_analysis_attached(routine):
-        assert all(i in call.defines_symbols for i in ('v_out', 'v_inout', 'v_in'))
-        assert all(i in call.uses_symbols for i in ('v_in', 'v_inout', 'v_in'))
+        assert all(i in call.defines_symbols for i in ("v_out", "v_inout", "v_in"))
+        assert all(i in call.uses_symbols for i in ("v_in", "v_inout", "v_in"))
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_allocate_statement(frontend):
     fcode = """
 subroutine test(n,m)
@@ -359,12 +383,12 @@ end subroutine test
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
     with dataflow_analysis_attached(routine):
-        assert all(i not in routine.body.defines_symbols for i in ['m', 'n'])
-        assert all(i in routine.body.uses_symbols for i in ['m', 'n'])
-        assert 'a' in routine.body.defines_symbols
+        assert all(i not in routine.body.defines_symbols for i in ["m", "n"])
+        assert all(i in routine.body.uses_symbols for i in ["m", "n"])
+        assert "a" in routine.body.defines_symbols
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_import_kind(frontend):
     fcode = """
 subroutine test(n,m)
@@ -382,13 +406,13 @@ end subroutine test
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
     with dataflow_analysis_attached(routine):
-        assert 'real64' in routine.body.uses_symbols
-        assert 'real64' not in routine.body.defines_symbols
-        assert 'a' in routine.body.defines_symbols
-        assert 'a' not in routine.body.uses_symbols
+        assert "real64" in routine.body.uses_symbols
+        assert "real64" not in routine.body.defines_symbols
+        assert "a" in routine.body.defines_symbols
+        assert "a" not in routine.body.uses_symbols
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_query_memory_attributes(frontend):
     """
     Test that checks whether variables used only in function calls that
@@ -411,12 +435,12 @@ end subroutine test
 
     routine = Subroutine.from_source(fcode, frontend=frontend)
     with dataflow_analysis_attached(routine):
-        assert not 'a' in routine.body.uses_symbols
-        assert 'a' in routine.body.defines_symbols
-        assert not 'b' in routine.body.uses_symbols
+        assert not "a" in routine.body.uses_symbols
+        assert "a" in routine.body.defines_symbols
+        assert not "b" in routine.body.uses_symbols
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_call_args_array_slicing(frontend):
     fcode = """
 subroutine random_call(v)
@@ -440,17 +464,17 @@ end subroutine test
     """.strip()
 
     source = Sourcefile.from_source(fcode, frontend=frontend)
-    routine = source['test']
+    routine = source["test"]
 
     call = FindNodes(CallStatement).visit(routine.body)[0]
     routine.enrich_calls(source.all_subroutines)
 
     with dataflow_analysis_attached(routine):
-        assert 'n' in call.uses_symbols
-        assert not 'n' in call.defines_symbols
+        assert "n" in call.uses_symbols
+        assert not "n" in call.defines_symbols
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_multiconditional(frontend):
     fcode = """
 subroutine test(ia,ib,ic)
@@ -478,15 +502,15 @@ end subroutine test
 
         assert len(mcond.uses_symbols) == 3
         assert len(mcond.defines_symbols) == 2
-        assert all(i in mcond.uses_symbols for i in ['ic', 'ia', 'ib'])
-        assert all(i in mcond.defines_symbols for i in ['a', 'b'])
+        assert all(i in mcond.uses_symbols for i in ["ic", "ia", "ib"])
+        assert all(i in mcond.defines_symbols for i in ["a", "b"])
 
         assigns = FindNodes(Assignment).visit(routine.body)
         for assign in assigns:
-            assert assign.live_symbols == {'ia', 'ib', 'ic'}
+            assert assign.live_symbols == {"ia", "ib", "ic"}
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_maskedstatement(frontend):
     fcode = """
 subroutine masked_statements(n, mask, vec1, vec2)
@@ -510,11 +534,11 @@ end subroutine masked_statements
     with dataflow_analysis_attached(routine):
         assert len(mask.uses_symbols) == 1
         assert len(mask.defines_symbols) == 1
-        assert 'mask' in mask.uses_symbols
-        assert 'vec1' in mask.defines_symbols
+        assert "mask" in mask.uses_symbols
+        assert "vec1" in mask.defines_symbols
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_whileloop(frontend):
     fcode = """
 subroutine while_loop(flag)
@@ -540,20 +564,20 @@ end subroutine while_loop
     cond = FindNodes(Conditional).visit(routine.body)[0]
     with dataflow_analysis_attached(routine):
         assert len(cond.uses_symbols) == 1
-        assert 'flag' in cond.uses_symbols
+        assert "flag" in cond.uses_symbols
         assert len(loop.uses_symbols) == 1
         assert len(loop.defines_symbols) == 2
-        assert 'ij' in loop.uses_symbols
-        assert all(v in loop.defines_symbols for v in ('ij', 'a'))
+        assert "ij" in loop.uses_symbols
+        assert all(v in loop.defines_symbols for v in ("ij", "a"))
 
     with dataflow_analysis_attached(cond):
         assert len(loop.uses_symbols) == 1
         assert len(loop.defines_symbols) == 2
-        assert 'ij' in loop.uses_symbols
-        assert all(v in loop.defines_symbols for v in ('ij', 'a'))
+        assert "ij" in loop.uses_symbols
+        assert all(v in loop.defines_symbols for v in ("ij", "a"))
 
 
-@pytest.mark.parametrize('frontend', available_frontends())
+@pytest.mark.parametrize("frontend", available_frontends())
 def test_analyse_associate(frontend):
 
     fcode = """
@@ -579,17 +603,17 @@ end subroutine associate_test
     assigns = FindNodes(Assignment).visit(routine.body)
     with dataflow_analysis_attached(routine):
         # check that associates use variables names in outer scope
-        assert associates[0].uses_symbols == {'in_var'}
-        assert associates[0].defines_symbols == {'a', 'b', 'c'}
+        assert associates[0].uses_symbols == {"in_var"}
+        assert associates[0].defines_symbols == {"a", "b", "c"}
 
-        assert associates[1].uses_symbols == {'in_var'}
-        assert associates[1].defines_symbols == {'d'}
+        assert associates[1].uses_symbols == {"in_var"}
+        assert associates[1].defines_symbols == {"d"}
 
         # check that assignments use associated symbols
-        assert assigns[0].uses_symbols == {'in_var'}
-        assert assigns[1].uses_symbols == {'in_var'}
-        assert assigns[2].uses_symbols == {'in_var'}
+        assert assigns[0].uses_symbols == {"in_var"}
+        assert assigns[1].uses_symbols == {"in_var"}
+        assert assigns[2].uses_symbols == {"in_var"}
 
-        assert assigns[0].defines_symbols == {'e'}
-        assert assigns[1].defines_symbols == {'f'}
-        assert assigns[2].defines_symbols == {'d0'}
+        assert assigns[0].defines_symbols == {"e"}
+        assert assigns[1].defines_symbols == {"f"}
+        assert assigns[2].defines_symbols == {"d0"}

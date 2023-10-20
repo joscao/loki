@@ -12,15 +12,30 @@ Single Column Abstraction (SCA), as defined by CLAW (Clement et al., 2018)
 
 from collections import OrderedDict
 from loki import (
-    Transformation, FindVariables, FindNodes, Transformer, SubstituteExpressions,
-    Assignment, CallStatement, Loop, Variable,
-    Array, Pragma, VariableDeclaration, LoopRange, RangeIndex,
-    SymbolAttributes, BasicType, CaseInsensitiveDict, as_tuple, warning,
-    recursive_expression_map_update
+    Transformation,
+    FindVariables,
+    FindNodes,
+    Transformer,
+    SubstituteExpressions,
+    Assignment,
+    CallStatement,
+    Loop,
+    Variable,
+    Array,
+    Pragma,
+    VariableDeclaration,
+    LoopRange,
+    RangeIndex,
+    SymbolAttributes,
+    BasicType,
+    CaseInsensitiveDict,
+    as_tuple,
+    warning,
+    recursive_expression_map_update,
 )
 
 
-__all__ = ['ExtractSCATransformation', 'CLAWTransformation']
+__all__ = ["ExtractSCATransformation", "CLAWTransformation"]
 
 
 class ExtractSCATransformation(Transformation):
@@ -58,12 +73,12 @@ class ExtractSCATransformation(Transformation):
         role : string
             Role of the subroutine in the call tree; either ``"driver"`` or ``"kernel"``
         """
-        role = kwargs.get('role')
+        role = kwargs.get("role")
 
-        if role == 'driver':
+        if role == "driver":
             self.hoist_dimension_from_call(routine, wrap=True)
 
-        elif role == 'kernel':
+        elif role == "kernel":
             self.hoist_dimension_from_call(routine, wrap=False)
             self.remove_dimension(routine)
 
@@ -93,7 +108,9 @@ class ExtractSCATransformation(Transformation):
 
         # Drop declarations for dimension variables (eg. loop counter or sizes)
         # Note that this also removes arguments and their declarations!
-        routine.variables = [v for v in routine.variables if v not in self.horizontal.variables]
+        routine.variables = [
+            v for v in routine.variables if v not in self.horizontal.variables
+        ]
 
         # Establish the new dimensions and shapes first, before cloning the variables
         # The reason for this is that shapes of all variable instances are linked
@@ -105,7 +122,9 @@ class ExtractSCATransformation(Transformation):
         # declarations.
         for m in as_tuple(routine.members):
             variables += list(FindVariables(unique=False).visit(m.body))
-        variables = [v for v in variables if isinstance(v, Array) and v.shape is not None]
+        variables = [
+            v for v in variables if isinstance(v, Array) and v.shape is not None
+        ]
         shape_map = {v.name: v.shape for v in variables}
 
         # Now generate a mapping of old to new variable symbols
@@ -114,8 +133,11 @@ class ExtractSCATransformation(Transformation):
             old_shape = shape_map[v.name]
             new_shape = as_tuple(s for s in old_shape if s not in size_expressions)
             if v.dimensions:
-                new_dims = as_tuple(d for d, s in zip(v.dimensions, old_shape)
-                                    if s not in size_expressions)
+                new_dims = as_tuple(
+                    d
+                    for d, s in zip(v.dimensions, old_shape)
+                    if s not in size_expressions
+                )
             else:
                 new_dims = ()
             new_dims = None if len(new_dims) == 0 else new_dims
@@ -173,16 +195,21 @@ class ExtractSCATransformation(Transformation):
                     # Remove self.horizontal dimension sizes from caller-side argument indices
                     if val.shape is not None:
                         v_dims = val.dimensions if val.dimensions else new_dims
-                        new_dims = tuple(Variable(name=self.horizontal.index, scope=caller)
-                                         if tdim in size_expressions else ddim
-                                         for ddim, tdim in zip(v_dims, val.shape))
+                        new_dims = tuple(
+                            Variable(name=self.horizontal.index, scope=caller)
+                            if tdim in size_expressions
+                            else ddim
+                            for ddim, tdim in zip(v_dims, val.shape)
+                        )
 
                     if new_dims is not None:
                         argmap[val] = val.clone(dimensions=new_dims)
 
                 # Apply argmap to the list of call arguments
                 arguments = [argmap.get(a, a) for a in call.arguments]
-                kwarguments = as_tuple((k, argmap.get(a, a)) for k, a in call.kwarguments)
+                kwarguments = as_tuple(
+                    (k, argmap.get(a, a)) for k, a in call.kwarguments
+                )
 
                 # Collect caller-side expressions for dimension sizes and bounds
                 dim_lower = None
@@ -194,17 +221,25 @@ class ExtractSCATransformation(Transformation):
                         dim_upper = val
 
                 # Remove call-side arguments (in-place)
-                arguments = tuple(darg for darg, karg in zip(arguments, routine.arguments)
-                                  if karg not in self.horizontal.variables)
-                kwarguments = tuple((darg, karg) for darg, karg in kwarguments
-                                    if karg not in self.horizontal.variables)
+                arguments = tuple(
+                    darg
+                    for darg, karg in zip(arguments, routine.arguments)
+                    if karg not in self.horizontal.variables
+                )
+                kwarguments = tuple(
+                    (darg, karg)
+                    for darg, karg in kwarguments
+                    if karg not in self.horizontal.variables
+                )
                 new_call = call.clone(arguments=arguments, kwarguments=kwarguments)
 
                 # Create and insert new loop over self.horizontal dimension
                 if wrap:
-                    loop = Loop(variable=Variable(name=self.horizontal.index, scope=caller),
-                                bounds=LoopRange((dim_lower, dim_upper, None)),
-                                body=as_tuple([new_call]))
+                    loop = Loop(
+                        variable=Variable(name=self.horizontal.index, scope=caller),
+                        bounds=LoopRange((dim_lower, dim_upper, None)),
+                        body=as_tuple([new_call]),
+                    )
                     replacements[call] = loop
                 else:
                     replacements[call] = new_call
@@ -214,8 +249,10 @@ class ExtractSCATransformation(Transformation):
         # Finally, we add the declaration of the loop variable
         if wrap and self.horizontal.index not in [str(v) for v in caller.variables]:
             # TODO: Find a better way to define raw data type
-            dtype = SymbolAttributes(BasicType.INTEGER, kind=Variable(name='JPIM'))
-            caller.variables += (Variable(name=self.horizontal.index, type=dtype, scope=caller),)
+            dtype = SymbolAttributes(BasicType.INTEGER, kind=Variable(name="JPIM"))
+            caller.variables += (
+                Variable(name=self.horizontal.index, type=dtype, scope=caller),
+            )
 
 
 class CLAWTransformation(ExtractSCATransformation):
@@ -243,33 +280,40 @@ class CLAWTransformation(ExtractSCATransformation):
     """
 
     def __init__(self, **kwargs):
-        self.claw_data_offload = kwargs.pop('claw_data_offload', True)
+        self.claw_data_offload = kwargs.pop("claw_data_offload", True)
         super().__init__(**kwargs)
 
         # We need to keep track of the depth of items in the tree
         self.item_depth = CaseInsensitiveDict()
 
     def transform_subroutine(self, routine, **kwargs):
-        role = kwargs.get('role')
-        targets = as_tuple(kwargs.get('targets', None))
+        role = kwargs.get("role")
+        targets = as_tuple(kwargs.get("targets", None))
         if targets:
             targets = tuple(t.lower() for t in targets)
 
-        if role == 'driver':
+        if role == "driver":
             self.item_depth[routine.name.lower()] = 0
 
         for call in FindNodes(CallStatement).visit(routine.body):
             call_name = str(call.name).lower()
             if call_name in targets:
                 if call.routine is not BasicType.DEFERRED:
-                    self.item_depth[call_name] = self.item_depth[routine.name.lower()] + 1
+                    self.item_depth[call_name] = (
+                        self.item_depth[routine.name.lower()] + 1
+                    )
                 else:
-                    warning(f'[Loki] CLAWTransform: Routine {routine.name} not attached to call context ' +
-                            f'in {call_name}')
+                    warning(
+                        f"[Loki] CLAWTransform: Routine {routine.name} not attached to call context "
+                        + f"in {call_name}"
+                    )
 
         # Store the names of all variables that we are about to remove
-        claw_vars = [v.name for v in routine.variables
-                     if isinstance(v, Array) and v.shape[0] in self.horizontal.size_expressions]
+        claw_vars = [
+            v.name
+            for v in routine.variables
+            if isinstance(v, Array) and v.shape[0] in self.horizontal.size_expressions
+        ]
 
         # The CLAW assumes that variables defining dimension sizes or iteration spaces
         # exist in both driver and kernel as local variables. We often rely on implicit
@@ -282,59 +326,78 @@ class CLAWTransformation(ExtractSCATransformation):
                 # that mimic dimension variables in the kernel
                 assignments = []
                 for arg, val in call.arg_iter():
-                    if arg == self.horizontal.size and not arg.name in routine.variables:
-                        local_var = arg.clone(scope=routine, type=arg.type.clone(intent=None))
+                    if (
+                        arg == self.horizontal.size
+                        and not arg.name in routine.variables
+                    ):
+                        local_var = arg.clone(
+                            scope=routine, type=arg.type.clone(intent=None)
+                        )
                         assignments.append(Assignment(lhs=local_var, rhs=val))
                         routine.spec.append(VariableDeclaration(symbols=[local_var]))
 
-                    if arg == self.horizontal.bounds[0] and not arg.name in routine.variables:
-                        local_var = arg.clone(scope=routine, type=arg.type.clone(intent=None))
+                    if (
+                        arg == self.horizontal.bounds[0]
+                        and not arg.name in routine.variables
+                    ):
+                        local_var = arg.clone(
+                            scope=routine, type=arg.type.clone(intent=None)
+                        )
                         assignments.append(Assignment(lhs=local_var, rhs=val))
                         routine.spec.append(VariableDeclaration(symbols=[local_var]))
 
-                    if arg == self.horizontal.bounds[1] and not arg.name in routine.variables:
-                        local_var = arg.clone(scope=routine, type=arg.type.clone(intent=None))
+                    if (
+                        arg == self.horizontal.bounds[1]
+                        and not arg.name in routine.variables
+                    ):
+                        local_var = arg.clone(
+                            scope=routine, type=arg.type.clone(intent=None)
+                        )
                         assignments.append(Assignment(lhs=local_var, rhs=val))
                         routine.spec.append(VariableDeclaration(symbols=[local_var]))
 
-                routine.body = Transformer({call: assignments + [call]}).visit(routine.body)
+                routine.body = Transformer({call: assignments + [call]}).visit(
+                    routine.body
+                )
 
         # Invoke the actual SCA format extraction
         super().transform_subroutine(routine, **kwargs)
 
-        if role == 'kernel':
+        if role == "kernel":
             # Gather all declarations for variables that have been demoted during SCA
             declarations = FindNodes(VariableDeclaration).visit(routine.spec)
             decl_map = dict((v, decl) for decl in declarations for v in decl.symbols)
             claw_decls = [decl for v, decl in decl_map.items() if v.name in claw_vars]
 
             # Remove declarations from spec temporarily
-            routine.spec = Transformer({decl: None for decl in claw_decls}).visit(routine.spec)
+            routine.spec = Transformer({decl: None for decl in claw_decls}).visit(
+                routine.spec
+            )
 
             # Create CLAW declarations and mark with `!$claw model-data` pragmas
-            claw_decls = [Pragma(keyword='claw', content='model-data')] + claw_decls
-            claw_decls += [Pragma(keyword='claw', content='end model-data')]
+            claw_decls = [Pragma(keyword="claw", content="model-data")] + claw_decls
+            claw_decls += [Pragma(keyword="claw", content="end model-data")]
             routine.spec.append(claw_decls)
 
             # Add the `!$claw sca` and `!$claw sca routine` pragmas
             rname = routine.name.lower()
             if rname in self.item_depth and self.item_depth[rname] == 1:
-                routine.spec.append([Pragma(keyword='claw', content='sca')])
+                routine.spec.append([Pragma(keyword="claw", content="sca")])
             else:
-                routine.spec.append([Pragma(keyword='claw', content='sca routine')])
+                routine.spec.append([Pragma(keyword="claw", content="sca routine")])
 
             # Insert `!$claw sca forward` pragmas to propagate the SCA region
             for call in FindNodes(CallStatement).visit(routine.body):
                 if str(call.name).lower() in targets:
-                    call._update(pragma=Pragma(keyword='claw', content='sca forward'))
+                    call._update(pragma=Pragma(keyword="claw", content="sca forward"))
 
-        if role == 'driver':
+        if role == "driver":
             # Insert loop pragmas in driver (in-place)
             for loop in FindNodes(Loop).visit(routine.body):
-                claw_keywords = 'sca forward'
+                claw_keywords = "sca forward"
                 if self.claw_data_offload:
-                    claw_keywords += ' create update'
+                    claw_keywords += " create update"
 
                 if loop.variable == self.horizontal.index:
-                    pragma = Pragma(keyword='claw', content=claw_keywords)
+                    pragma = Pragma(keyword="claw", content=claw_keywords)
                     loop._update(pragma=as_tuple(pragma))

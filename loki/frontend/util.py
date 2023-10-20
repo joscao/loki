@@ -11,16 +11,29 @@ import codecs
 
 from loki.visitors import NestedTransformer, FindNodes, PatternFinder, SequenceFinder
 from loki.ir import (
-    Assignment, Comment, CommentBlock, VariableDeclaration, ProcedureDeclaration,
-    Loop, Intrinsic, Pragma
+    Assignment,
+    Comment,
+    CommentBlock,
+    VariableDeclaration,
+    ProcedureDeclaration,
+    Loop,
+    Intrinsic,
+    Pragma,
 )
 from loki.frontend.source import Source
 from loki.logging import warning
 
 __all__ = [
-    'Frontend', 'OFP', 'OMNI', 'FP', 'REGEX',
-    'inline_comments', 'cluster_comments', 'read_file',
-    'combine_multiline_pragmas', 'sanitize_ir'
+    "Frontend",
+    "OFP",
+    "OMNI",
+    "FP",
+    "REGEX",
+    "inline_comments",
+    "cluster_comments",
+    "read_file",
+    "combine_multiline_pragmas",
+    "sanitize_ir",
 ]
 
 
@@ -28,6 +41,7 @@ class Frontend(IntEnum):
     """
     Enumeration to identify available frontends.
     """
+
     #: The OMNI compiler frontend
     OMNI = 1
     #: The Open Fortran Parser
@@ -39,6 +53,7 @@ class Frontend(IntEnum):
 
     def __str__(self):
         return self.name.lower()  # pylint: disable=no-member
+
 
 OMNI = Frontend.OMNI
 OFP = Frontend.OFP
@@ -76,7 +91,7 @@ def cluster_comments(ir):
         # and map remaining comments to None for removal
         if all(c.source is not None for c in comments):
             if all(c.source.string is not None for c in comments):
-                string = '\n'.join(c.source.string for c in comments)
+                string = "\n".join(c.source.string for c in comments)
             else:
                 string = None
             lines = {l for c in comments for l in c.source.lines if l is not None}
@@ -102,14 +117,14 @@ def inline_labels(ir):
     pairs += PatternFinder(pattern=(Comment, Loop)).visit(ir)
     mapper = {}
     for pair in pairs:
-        if pair[0].source and pair[0].text == '__STATEMENT_LABEL__':
+        if pair[0].source and pair[0].text == "__STATEMENT_LABEL__":
             if pair[1].source and pair[1].source.lines[0] == pair[0].source.lines[1]:
                 mapper[pair[0]] = None  # Mark for deletion
-                mapper[pair[1]] = pair[1]._rebuild(label=pair[0].label.lstrip('0'))
+                mapper[pair[1]] = pair[1]._rebuild(label=pair[0].label.lstrip("0"))
 
     # Remove any stale labels
     for comment in FindNodes(Comment).visit(ir):
-        if comment.text == '__STATEMENT_LABEL__':
+        if comment.text == "__STATEMENT_LABEL__":
             mapper[comment] = None
     return NestedTransformer(mapper, invalidate_source=False).visit(ir)
 
@@ -124,12 +139,13 @@ def read_file(file_path):
     """
     filepath = Path(file_path)
     try:
-        with filepath.open('r') as f:
+        with filepath.open("r") as f:
             source = f.read()
     except UnicodeDecodeError as excinfo:
-        warning('Skipping bad character in input file "%s": %s',
-                str(filepath), str(excinfo))
-        kwargs = {'mode': 'r', 'encoding': 'utf-8', 'errors': 'ignore'}
+        warning(
+            'Skipping bad character in input file "%s": %s', str(filepath), str(excinfo)
+        )
+        kwargs = {"mode": "r", "encoding": "utf-8", "errors": "ignore"}
         with codecs.open(filepath, **kwargs) as f:
             source = f.read()
     return source
@@ -145,7 +161,7 @@ def combine_multiline_pragmas(ir):
         collected_pragmas = []
         for pragma in pragma_list:
             if not collected_pragmas:
-                if pragma.content.rstrip().endswith('&'):
+                if pragma.content.rstrip().endswith("&"):
                     # This is the beginning of a multiline pragma
                     collected_pragmas = [pragma]
             else:
@@ -153,25 +169,38 @@ def combine_multiline_pragmas(ir):
                 collected_pragmas += [pragma]
 
                 if pragma.keyword != collected_pragmas[0].keyword:
-                    raise RuntimeError('Pragma keyword mismatch after line continuation: ' +
-                                       f'{collected_pragmas[0].keyword} != {pragma.keyword}')
+                    raise RuntimeError(
+                        "Pragma keyword mismatch after line continuation: "
+                        + f"{collected_pragmas[0].keyword} != {pragma.keyword}"
+                    )
 
-                if not pragma.content.rstrip().endswith('&'):
+                if not pragma.content.rstrip().endswith("&"):
                     # This is the last line of a multiline pragma
-                    content = [p.content.strip()[:-1].rstrip() for p in collected_pragmas[:-1]]
-                    content = ' '.join(content) + ' ' + pragma.content.strip()
+                    content = [
+                        p.content.strip()[:-1].rstrip() for p in collected_pragmas[:-1]
+                    ]
+                    content = " ".join(content) + " " + pragma.content.strip()
 
                     if all(p.source is not None for p in collected_pragmas):
                         if all(p.source.string is not None for p in collected_pragmas):
-                            string = '\n'.join(p.source.string for p in collected_pragmas)
+                            string = "\n".join(
+                                p.source.string for p in collected_pragmas
+                            )
                         else:
                             string = None
-                        lines = (collected_pragmas[0].source.lines[0], collected_pragmas[-1].source.lines[1])
-                        source = Source(lines=lines, string=string, file=pragma.source.file)
+                        lines = (
+                            collected_pragmas[0].source.lines[0],
+                            collected_pragmas[-1].source.lines[1],
+                        )
+                        source = Source(
+                            lines=lines, string=string, file=pragma.source.file
+                        )
                     else:
                         source = None
 
-                    new_pragma = Pragma(keyword=pragma.keyword, content=content, source=source)
+                    new_pragma = Pragma(
+                        keyword=pragma.keyword, content=content, source=source
+                    )
                     pragma_mapper[collected_pragmas[0]] = new_pragma
                     pragma_mapper.update({p: None for p in collected_pragmas[1:]})
 

@@ -5,7 +5,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-from loki.lint.utils import * # noqa
-from loki.lint.rules import * # noqa
-from loki.lint.linter import * # noqa
-from loki.lint.reporter import * # noqa
+from loki.lint.utils import *  # noqa
+from loki.lint.rules import *  # noqa
+from loki.lint.linter import *  # noqa
+from loki.lint.reporter import *  # noqa

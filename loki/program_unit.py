@@ -8,14 +8,19 @@
 from abc import abstractmethod
 
 from loki import ir
-from loki.frontend import Frontend, parse_omni_source, parse_ofp_source, parse_fparser_source
+from loki.frontend import (
+    Frontend,
+    parse_omni_source,
+    parse_ofp_source,
+    parse_fparser_source,
+)
 from loki.scope import Scope
 from loki.tools import CaseInsensitiveDict, as_tuple, flatten
 from loki.types import ProcedureType
 from loki.visitors import FindNodes, Transformer
 
 
-__all__ = ['ProgramUnit']
+__all__ = ["ProgramUnit"]
 
 
 class ProgramUnit(Scope):
@@ -54,8 +59,17 @@ class ProgramUnit(Scope):
         frontend and a full parse using one of the other frontends is pending.
     """
 
-    def __initialize__(self, name, docstring=None, spec=None, contains=None,
-                       ast=None, source=None, rescope_symbols=False, incomplete=False):
+    def __initialize__(
+        self,
+        name,
+        docstring=None,
+        spec=None,
+        contains=None,
+        ast=None,
+        source=None,
+        rescope_symbols=False,
+        incomplete=False,
+    ):
         # Common properties
         assert name and isinstance(name, str)
         self.name = name
@@ -70,10 +84,10 @@ class ProgramUnit(Scope):
             if not isinstance(contains, ir.Section):
                 contains = ir.Section(body=as_tuple(contains))
             for node in contains.body:
-                if isinstance(node, ir.Intrinsic) and 'contains' in node.text.lower():
+                if isinstance(node, ir.Intrinsic) and "contains" in node.text.lower():
                     break
                 if isinstance(node, ProgramUnit):
-                    contains.prepend(ir.Intrinsic(text='CONTAINS'))
+                    contains.prepend(ir.Intrinsic(text="CONTAINS"))
                     break
 
         # Primary IR components
@@ -88,7 +102,15 @@ class ProgramUnit(Scope):
             self.rescope_symbols()
 
     @classmethod
-    def from_source(cls, source, definitions=None, xmods=None, parser_classes=None, frontend=Frontend.FP, parent=None):
+    def from_source(
+        cls,
+        source,
+        definitions=None,
+        xmods=None,
+        parser_classes=None,
+        frontend=Frontend.FP,
+        parent=None,
+    ):
         """
         Instantiate an object derived from :any:`ProgramUnit` from raw source string
 
@@ -109,22 +131,34 @@ class ProgramUnit(Scope):
             The parent scope this module or subroutine is nested into
         """
         if frontend == Frontend.REGEX:
-            return cls.from_regex(raw_source=source, parser_classes=parser_classes, parent=parent)
+            return cls.from_regex(
+                raw_source=source, parser_classes=parser_classes, parent=parent
+            )
 
         if frontend == Frontend.OMNI:
             ast = parse_omni_source(source, xmods=xmods)
-            type_map = {t.attrib['type']: t for t in ast.find('typeTable')}
-            return cls.from_omni(ast=ast, raw_source=source, definitions=definitions, type_map=type_map, parent=parent)
+            type_map = {t.attrib["type"]: t for t in ast.find("typeTable")}
+            return cls.from_omni(
+                ast=ast,
+                raw_source=source,
+                definitions=definitions,
+                type_map=type_map,
+                parent=parent,
+            )
 
         if frontend == Frontend.OFP:
             ast = parse_ofp_source(source)
-            return cls.from_ofp(ast=ast, raw_source=source, definitions=definitions, parent=parent)
+            return cls.from_ofp(
+                ast=ast, raw_source=source, definitions=definitions, parent=parent
+            )
 
         if frontend == Frontend.FP:
             ast = parse_fparser_source(source)
-            return cls.from_fparser(ast=ast, raw_source=source, definitions=definitions, parent=parent)
+            return cls.from_fparser(
+                ast=ast, raw_source=source, definitions=definitions, parent=parent
+            )
 
-        raise NotImplementedError(f'Unknown frontend: {frontend}')
+        raise NotImplementedError(f"Unknown frontend: {frontend}")
 
     @classmethod
     @abstractmethod
@@ -232,10 +266,10 @@ class ProgramUnit(Scope):
         """
         if not self._incomplete:
             return
-        frontend = frontend_args.pop('frontend', Frontend.FP)
-        definitions = frontend_args.get('definitions')
-        xmods = frontend_args.get('xmods')
-        parser_classes = frontend_args.get('parser_classes')
+        frontend = frontend_args.pop("frontend", Frontend.FP)
+        definitions = frontend_args.get("definitions")
+        xmods = frontend_args.get("xmods")
+        parser_classes = frontend_args.get("parser_classes")
 
         # If this object does not have a parent, we create a temporary parent scope
         # and make sure the node exists in the parent scope. This way, the existing
@@ -248,8 +282,12 @@ class ProgramUnit(Scope):
             self.register_in_parent_scope()
 
         ir_ = self.from_source(
-            self.source.string, frontend=frontend, definitions=definitions, xmods=xmods,
-            parser_classes=parser_classes, parent=self.parent
+            self.source.string,
+            frontend=frontend,
+            definitions=definitions,
+            xmods=xmods,
+            parser_classes=parser_classes,
+            parent=self.parent,
         )
         assert ir_ is self
 
@@ -272,34 +310,34 @@ class ProgramUnit(Scope):
             The cloned object.
         """
         # Collect all properties that have not been overriden
-        if self.name is not None and 'name' not in kwargs:
-            kwargs['name'] = self.name
-        if self.docstring and 'docstring' not in kwargs:
-            kwargs['docstring'] = self.docstring
-        if self.spec and 'spec' not in kwargs:
-            kwargs['spec'] = self.spec
-        if self.contains and 'contains' not in kwargs:
+        if self.name is not None and "name" not in kwargs:
+            kwargs["name"] = self.name
+        if self.docstring and "docstring" not in kwargs:
+            kwargs["docstring"] = self.docstring
+        if self.spec and "spec" not in kwargs:
+            kwargs["spec"] = self.spec
+        if self.contains and "contains" not in kwargs:
             contains_needs_clone = True
-            kwargs['contains'] = self.contains
+            kwargs["contains"] = self.contains
         else:
             contains_needs_clone = False
-        if self._ast is not None and 'ast' not in kwargs:
-            kwargs['ast'] = self._ast
-        if self._source is not None and 'source' not in kwargs:
-            kwargs['source'] = self._source
-        kwargs.setdefault('incomplete', self._incomplete)
+        if self._ast is not None and "ast" not in kwargs:
+            kwargs["ast"] = self._ast
+        if self._source is not None and "source" not in kwargs:
+            kwargs["source"] = self._source
+        kwargs.setdefault("incomplete", self._incomplete)
 
         # Rebuild IRs
         rebuild = Transformer({}, rebuild_scopes=True)
-        if 'docstring' in kwargs:
-            kwargs['docstring'] = rebuild.visit(kwargs['docstring'])
-        if 'spec' in kwargs:
-            kwargs['spec'] = rebuild.visit(kwargs['spec'])
-        if 'contains' in kwargs:
-            kwargs['contains'] = rebuild.visit(kwargs['contains'])
+        if "docstring" in kwargs:
+            kwargs["docstring"] = rebuild.visit(kwargs["docstring"])
+        if "spec" in kwargs:
+            kwargs["spec"] = rebuild.visit(kwargs["spec"])
+        if "contains" in kwargs:
+            kwargs["contains"] = rebuild.visit(kwargs["contains"])
 
         # Rescope symbols if not explicitly disabled
-        kwargs.setdefault('rescope_symbols', True)
+        kwargs.setdefault("rescope_symbols", True)
 
         # Escalate to Scope's clone function
         obj = super().clone(**kwargs)
@@ -310,8 +348,9 @@ class ProgramUnit(Scope):
         if obj.contains:
             if contains_needs_clone:
                 contains = [
-                    node.clone(parent=obj, rescope_symbols=kwargs['rescope_symbols'])
-                    if isinstance(node, ProgramUnit) else node
+                    node.clone(parent=obj, rescope_symbols=kwargs["rescope_symbols"])
+                    if isinstance(node, ProgramUnit)
+                    else node
                     for node in obj.contains.body
                 ]
                 obj.contains = obj.contains.clone(body=as_tuple(contains))
@@ -347,7 +386,11 @@ class ProgramUnit(Scope):
         """
         Return the declarations from the :attr:`spec` of this unit
         """
-        return as_tuple(FindNodes((ir.VariableDeclaration, ir.ProcedureDeclaration)).visit(self.spec))
+        return as_tuple(
+            FindNodes((ir.VariableDeclaration, ir.ProcedureDeclaration)).visit(
+                self.spec
+            )
+        )
 
     @property
     def variables(self):
@@ -368,9 +411,9 @@ class ProgramUnit(Scope):
             if v not in decl_map:
                 # By default, append new variables to the end of the spec
                 if isinstance(v.type.dtype, ProcedureType):
-                    new_decl = ir.ProcedureDeclaration(symbols=(v, ))
+                    new_decl = ir.ProcedureDeclaration(symbols=(v,))
                 else:
-                    new_decl = ir.VariableDeclaration(symbols=(v, ))
+                    new_decl = ir.VariableDeclaration(symbols=(v,))
                 self.spec.append(new_decl)
 
         # Run through existing declarations and check that all variables still exist
@@ -404,7 +447,9 @@ class ProgramUnit(Scope):
         """
         Map of imported symbol names to :any:`Import` objects
         """
-        return CaseInsensitiveDict((s.name, imprt) for imprt in self.imports for s in imprt.symbols)
+        return CaseInsensitiveDict(
+            (s.name, imprt) for imprt in self.imports for s in imprt.symbols
+        )
 
     @property
     def imported_symbols(self):
@@ -412,10 +457,12 @@ class ProgramUnit(Scope):
         Return the symbols imported in this unit
         """
         imports = self.imports
-        return as_tuple(flatten(
-            imprt.symbols or [s[1] for s in imprt.rename_list or []]
-            for imprt in imports
-        ))
+        return as_tuple(
+            flatten(
+                imprt.symbols or [s[1] for s in imprt.rename_list or []]
+                for imprt in imports
+            )
+        )
 
     @property
     def imported_symbol_map(self):
@@ -452,16 +499,19 @@ class ProgramUnit(Scope):
         """
         Map of declared interface names to symbols
         """
-        return CaseInsensitiveDict(
-            (s.name, s) for s in self.interface_symbols
-        )
+        return CaseInsensitiveDict((s.name, s) for s in self.interface_symbols)
 
     @property
     def enum_symbols(self):
         """
         List of symbols defined via an enum
         """
-        return as_tuple(flatten(enum.symbols for enum in FindNodes(ir.Enumeration).visit(self.spec or ())))
+        return as_tuple(
+            flatten(
+                enum.symbols
+                for enum in FindNodes(ir.Enumeration).visit(self.spec or ())
+            )
+        )
 
     @property
     def symbols(self):
@@ -469,35 +519,48 @@ class ProgramUnit(Scope):
         Return list of all symbols declared or imported in this module scope
         """
 
-        #Find all nodes that may contain symbols
-        nodelist = FindNodes((ir.VariableDeclaration, ir.ProcedureDeclaration,
-                    ir.Import, ir.Interface, ir.Enumeration)).visit(self.spec or ())
+        # Find all nodes that may contain symbols
+        nodelist = FindNodes(
+            (
+                ir.VariableDeclaration,
+                ir.ProcedureDeclaration,
+                ir.Import,
+                ir.Interface,
+                ir.Enumeration,
+            )
+        ).visit(self.spec or ())
 
-        #Return all symbols found in nodelist as well as any procedure_symbols
-        #in contained subroutines
-        return as_tuple(flatten(n.symbols for n in nodelist)) + \
-               tuple(routine.procedure_symbol for routine in self.subroutines)
+        # Return all symbols found in nodelist as well as any procedure_symbols
+        # in contained subroutines
+        return as_tuple(flatten(n.symbols for n in nodelist)) + tuple(
+            routine.procedure_symbol for routine in self.subroutines
+        )
 
     @property
     def symbol_map(self):
         """
         Map of symbol names to symbols
         """
-        return CaseInsensitiveDict(
-            (s.name, s) for s in self.symbols
-        )
+        return CaseInsensitiveDict((s.name, s) for s in self.symbols)
 
     @property
     def subroutines(self):
         """
         List of :class:`Subroutine` objects that are declared in this unit
         """
-        from loki.subroutine import Subroutine  # pylint: disable=import-outside-toplevel,cyclic-import
+        from loki.subroutine import (
+            Subroutine,
+        )  # pylint: disable=import-outside-toplevel,cyclic-import
+
         if self.contains is None:
             return ()
-        return as_tuple([
-            routine for routine in self.contains.body if isinstance(routine, Subroutine)
-        ])
+        return as_tuple(
+            [
+                routine
+                for routine in self.contains.body
+                if isinstance(routine, Subroutine)
+            ]
+        )
 
     routines = subroutines
 
@@ -506,9 +569,7 @@ class ProgramUnit(Scope):
         """
         Map of subroutine names to :any:`Subroutine` objects in :attr:`subroutines`
         """
-        return CaseInsensitiveDict(
-            (s.name, s) for s in self.subroutines
-        )
+        return CaseInsensitiveDict((s.name, s) for s in self.subroutines)
 
     @property
     def spec_parts(self):
@@ -534,10 +595,14 @@ class ProgramUnit(Scope):
             The parts of the spec, with empty parts represented by empty tuples.
         """
         if not self.spec:
-            return ((),(),())
+            return ((), (), ())
 
         intrinsic_nodes = FindNodes(ir.Intrinsic).visit(self.spec)
-        implicit_nodes = [node for node in intrinsic_nodes if node.text.lstrip().lower().startswith('implicit')]
+        implicit_nodes = [
+            node
+            for node in intrinsic_nodes
+            if node.text.lstrip().lower().startswith("implicit")
+        ]
 
         if implicit_nodes:
             # Use 'IMPLICIT' statements as divider
@@ -549,8 +614,8 @@ class ProgramUnit(Scope):
 
             return (
                 self.spec.body[:implicit_start_index],
-                self.spec.body[implicit_start_index:implicit_end_index+1],
-                self.spec.body[implicit_end_index+1:]
+                self.spec.body[implicit_start_index : implicit_end_index + 1],
+                self.spec.body[implicit_end_index + 1 :],
             )
 
         # No 'IMPLICIT' statements: find the end of imports
@@ -561,9 +626,9 @@ class ProgramUnit(Scope):
 
         import_nodes_end_index = self.spec.body.index(import_nodes[-1])
         return (
-            self.spec.body[:import_nodes_end_index+1],
+            self.spec.body[: import_nodes_end_index + 1],
             (),
-            self.spec.body[import_nodes_end_index+1:]
+            self.spec.body[import_nodes_end_index + 1 :],
         )
 
     @property
@@ -585,16 +650,20 @@ class ProgramUnit(Scope):
         Convert this unit to Fortran source representation
         """
         if cuf:
-            from loki.backend.cufgen import cufgen # pylint: disable=import-outside-toplevel
+            from loki.backend.cufgen import (
+                cufgen,
+            )  # pylint: disable=import-outside-toplevel
+
             return cufgen(self, conservative=conservative)
         from loki.backend.fgen import fgen  # pylint: disable=import-outside-toplevel
+
         return fgen(self, conservative=conservative)
 
     def __repr__(self):
         """
         Short string representation
         """
-        return f'{self.__class__.__name__}:: {self.name}'
+        return f"{self.__class__.__name__}:: {self.name}"
 
     def __contains__(self, name):
         """
@@ -609,7 +678,7 @@ class ProgramUnit(Scope):
         variable corresponding to the given name
         """
         if not isinstance(name, str):
-            raise TypeError('Name lookup requires a string!')
+            raise TypeError("Name lookup requires a string!")
 
         item = self.subroutine_map.get(name)
         if item is None:
@@ -622,7 +691,9 @@ class ProgramUnit(Scope):
         """
         Make :any:`ProgramUnit`s non-iterable
         """
-        raise TypeError('ProgramUnit nodes can not be traversed. Try `ir` or `subroutines` instead.')
+        raise TypeError(
+            "ProgramUnit nodes can not be traversed. Try `ir` or `subroutines` instead."
+        )
 
     def __bool__(self):
         """

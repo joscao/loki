@@ -11,8 +11,11 @@ Collection of utility routines to perform code-level force-inlining.
 
 """
 from loki.expression import (
-    FindVariables, FindInlineCalls, FindLiterals,
-    SubstituteExpressions, LokiIdentityMapper
+    FindVariables,
+    FindInlineCalls,
+    FindLiterals,
+    SubstituteExpressions,
+    LokiIdentityMapper,
 )
 from loki.ir import Import, Comment, Assignment, VariableDeclaration, CallStatement
 from loki.expression import symbols as sym
@@ -23,8 +26,9 @@ from loki.logging import warning, error
 
 
 __all__ = [
-    'inline_constant_parameters', 'inline_elemental_functions',
-    'inline_member_procedures'
+    "inline_constant_parameters",
+    "inline_elemental_functions",
+    "inline_member_procedures",
 ]
 
 
@@ -37,9 +41,11 @@ class InlineSubstitutionMapper(LokiIdentityMapper):
         raise NotImplementedError
 
     def map_scalar(self, expr, *args, **kwargs):
-        parent = self.rec(expr.parent, *args, **kwargs) if expr.parent is not None else None
+        parent = (
+            self.rec(expr.parent, *args, **kwargs) if expr.parent is not None else None
+        )
 
-        scope = kwargs.get('scope') or expr.scope
+        scope = kwargs.get("scope") or expr.scope
         # We're re-scoping an imported symbol
         if expr.scope != scope:
             return expr.clone(scope=scope, type=expr.type.clone(), parent=parent)
@@ -52,18 +58,27 @@ class InlineSubstitutionMapper(LokiIdentityMapper):
             dimensions = self.rec(expr.dimensions, *args, **kwargs)
         else:
             dimensions = None
-        parent = self.rec(expr.parent, *args, **kwargs) if expr.parent is not None else None
+        parent = (
+            self.rec(expr.parent, *args, **kwargs) if expr.parent is not None else None
+        )
 
-        scope = kwargs.get('scope') or expr.scope
+        scope = kwargs.get("scope") or expr.scope
         # We're re-scoping an imported symbol
         if expr.scope != scope:
-            return expr.clone(scope=scope, type=expr.type.clone(), parent=parent, dimensions=dimensions)
+            return expr.clone(
+                scope=scope,
+                type=expr.type.clone(),
+                parent=parent,
+                dimensions=dimensions,
+            )
         return expr.clone(parent=parent, dimensions=dimensions)
 
     def map_procedure_symbol(self, expr, *args, **kwargs):
-        parent = self.rec(expr.parent, *args, **kwargs) if expr.parent is not None else None
+        parent = (
+            self.rec(expr.parent, *args, **kwargs) if expr.parent is not None else None
+        )
 
-        scope = kwargs.get('scope') or expr.scope
+        scope = kwargs.get("scope") or expr.scope
         # We're re-scoping an imported symbol
         if expr.scope != scope:
             return expr.clone(scope=scope, type=expr.type.clone(), parent=parent)
@@ -111,7 +126,7 @@ def inline_constant_parameters(routine, external_only=True):
         variables = [v for v in variables if v not in routine.variables]
 
     def is_inline_parameter(v):
-        return hasattr(v, 'type') and v.type.parameter and v.type.initial
+        return hasattr(v, "type") and v.type.parameter and v.type.initial
 
     # Create mapping for variables and imports
     vmap = {v: v.type.initial for v in variables if is_inline_parameter(v)}
@@ -119,24 +134,34 @@ def inline_constant_parameters(routine, external_only=True):
     # Replace kind parameters in variable types
     for variable in routine.variables:
         if is_inline_parameter(variable.type.kind):
-            routine.symbol_attrs[variable.name] = variable.type.clone(kind=variable.type.kind.type.initial)
+            routine.symbol_attrs[variable.name] = variable.type.clone(
+                kind=variable.type.kind.type.initial
+            )
         if variable.type.initial is not None:
             # Substitute kind specifier in literals in initializers (I know...)
-            init_map = {literal.kind: literal.kind.type.initial
-                        for literal in FindLiterals().visit(variable.type.initial)
-                        if is_inline_parameter(literal.kind)}
+            init_map = {
+                literal.kind: literal.kind.type.initial
+                for literal in FindLiterals().visit(variable.type.initial)
+                if is_inline_parameter(literal.kind)
+            }
             if init_map:
                 initial = SubstituteExpressions(init_map).visit(variable.type.initial)
-                routine.symbol_attrs[variable.name] = variable.type.clone(initial=initial)
+                routine.symbol_attrs[variable.name] = variable.type.clone(
+                    initial=initial
+                )
 
     # Update imports
     imprtmap = {}
     substituted_names = {v.name.lower() for v in vmap}
     for imprt in FindNodes(Import).visit(routine.spec):
         if imprt.symbols:
-            symbols = tuple(s for s in imprt.symbols if s.name.lower() not in substituted_names)
+            symbols = tuple(
+                s for s in imprt.symbols if s.name.lower() not in substituted_names
+            )
             if not symbols:
-                imprtmap[imprt] = Comment(f'! Loki: parameters from {imprt.module} inlined')
+                imprtmap[imprt] = Comment(
+                    f"! Loki: parameters from {imprt.module} inlined"
+                )
             elif len(symbols) < len(imprt.symbols):
                 imprtmap[imprt] = imprt.clone(symbols=symbols)
 
@@ -147,7 +172,8 @@ def inline_constant_parameters(routine, external_only=True):
 
     # Clean up declarations that are about to become defunct
     decl_map = {
-        decl: None for decl in routine.declarations
+        decl: None
+        for decl in routine.declarations
         if all(isinstance(s, sym.IntLiteral) for s in decl.symbols)
     }
     routine.spec = Transformer(decl_map).visit(routine.spec)
@@ -185,7 +211,9 @@ def inline_elemental_functions(routine):
     # Remove all module imports that have become obsolete now
     import_map = {}
     for im in FindNodes(Import).visit(routine.spec):
-        if all(hasattr(s, 'type') and s.type.dtype in removed_functions for s in im.symbols):
+        if all(
+            hasattr(s, "type") and s.type.dtype in removed_functions for s in im.symbols
+        ):
             import_map[im] = None
     routine.spec = Transformer(import_map).visit(routine.spec)
 
@@ -222,7 +250,11 @@ def inline_member_routine(routine, member):
         """
         new_dimensions = list(val.dimensions)
 
-        indices = [index for index, dim in enumerate(val.dimensions) if isinstance(dim, sym.Range)]
+        indices = [
+            index
+            for index, dim in enumerate(val.dimensions)
+            if isinstance(dim, sym.Range)
+        ]
 
         for index, dim in enumerate(var.dimensions):
             new_dimensions[indices[index]] = dim
@@ -232,19 +264,26 @@ def inline_member_routine(routine, member):
     # Prevent shadowing of member variables by renaming them a priori
     parent_variables = routine.variable_map
     duplicate_locals = tuple(
-        v for v in member.variables
+        v
+        for v in member.variables
         if v.name in parent_variables and v.name.lower() not in member._dummies
     )
     shadow_mapper = SubstituteExpressions(
-        {v: v.clone(name=f'{member.name}_{v.name}') for v in duplicate_locals}
+        {v: v.clone(name=f"{member.name}_{v.name}") for v in duplicate_locals}
     )
     member.spec = shadow_mapper.visit(member.spec)
     member.body = shadow_mapper.visit(member.body)
 
     # Get local variable declarations and hoist them
     decls = FindNodes(VariableDeclaration).visit(member.spec)
-    decls = tuple(d for d in decls if all(s.name.lower() not in member._dummies for s in d.symbols))
-    decls = tuple(d for d in decls if all(s not in routine.variables for s in d.symbols))
+    decls = tuple(
+        d
+        for d in decls
+        if all(s.name.lower() not in member._dummies for s in d.symbols)
+    )
+    decls = tuple(
+        d for d in decls if all(s not in routine.variables for s in d.symbols)
+    )
     routine.spec.append(decls)
 
     call_map = {}
@@ -269,14 +308,20 @@ def inline_member_routine(routine, member):
 
                     # If sequence association (scalar-to-array argument passing) is used,
                     # we cannot determine the right re-mapped iteration space, so we bail here!
-                    if not any(isinstance(d, sym.Range) for d in qualified_value.dimensions):
+                    if not any(
+                        isinstance(d, sym.Range) for d in qualified_value.dimensions
+                    ):
                         error(
-                            '[Loki::TransformInline] Cannot find free dimension resolving '
+                            "[Loki::TransformInline] Cannot find free dimension resolving "
                             f' array argument for value "{qualified_value}"'
                         )
-                        raise RuntimeError('[Loki::TransformInline] Unable to resolve member subroutine call')
+                        raise RuntimeError(
+                            "[Loki::TransformInline] Unable to resolve member subroutine call"
+                        )
                     arg_vars = tuple(v for v in member_vars if v.name == arg.name)
-                    argmap.update((v, _map_unbound_dims(v, qualified_value)) for v in arg_vars)
+                    argmap.update(
+                        (v, _map_unbound_dims(v, qualified_value)) for v in arg_vars
+                    )
                 else:
                     argmap[arg] = val
 
@@ -289,9 +334,9 @@ def inline_member_routine(routine, member):
             )
 
             # Inline substituted body within a pair of marker comments
-            comment = Comment(f'! [Loki] inlined member subroutine: {member.name}')
-            c_line = Comment('! =========================================')
-            call_map[call] = (comment, c_line) + as_tuple(member_body) + (c_line, )
+            comment = Comment(f"! [Loki] inlined member subroutine: {member.name}")
+            c_line = Comment("! =========================================")
+            call_map[call] = (comment, c_line) + as_tuple(member_body) + (c_line,)
 
     # Replace calls to member with the member's body
     routine.body = Transformer(call_map).visit(routine.body)
@@ -316,6 +361,8 @@ def inline_member_procedures(routine):
     for member in routine.members:
         if member.is_function:
             # TODO: Implement for functions!!!
-            warning('[Loki::inline] Inlining member functions is not yet supported, only subroutines!')
+            warning(
+                "[Loki::inline] Inlining member functions is not yet supported, only subroutines!"
+            )
         else:
             inline_member_routine(routine, member)
