@@ -206,5 +206,3 @@ def test_yield_one_d_systems(matrix, rhs, list_of_lhs_column, list_of_rhs_column
     for index, (A, b) in enumerate(yield_one_d_systems(matrix, rhs)):
         assert np.allclose(A, list_of_lhs_column[index])
         assert np.allclose(b, list_of_rhs_column[index])
-
-    
